@@ -22,13 +22,16 @@ type playbackScreen struct {
 	artwork   *components.TerminalImage
 }
 
-func newPlaybackScreen(services Services) *playbackScreen {
+func newPlaybackScreen(services Services, options AlbumArtOptions) *playbackScreen {
 	screen := &playbackScreen{
 		services: services,
 		pane:     PaneArtwork,
 		snapshot: PlaybackSnapshot{Volume: 60},
 		status:   "Playback mode ready. Connect a playback backend to drive live state.",
-		artwork:  components.NewTerminalImage(),
+		artwork: components.NewTerminalImageWithSettings(components.TerminalImageSettings{
+			Protocol:  options.Protocol,
+			ScaleMode: options.FillMode,
+		}),
 	}
 	screen.refreshSnapshot()
 	return screen

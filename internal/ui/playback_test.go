@@ -24,7 +24,7 @@ func TestPlaybackScreenArtworkPaneUsesImageComponent(t *testing.T) {
 		Artwork: stubArtworkProvider{
 			source: &components.ImageSource{Data: []byte("abc"), Description: "cover"},
 		},
-	})
+	}, AlbumArtOptions{})
 	screen.snapshot.Track = &TrackInfo{ID: "track-1", Title: "Song"}
 	screen.artwork = components.NewTerminalImageWithRenderer(components.ImageRendererFunc(func(source components.ImageSource, width, height int) (string, error) {
 		return "rendered artwork", nil
@@ -44,7 +44,7 @@ func TestPlaybackScreenArtworkPaneShowsRenderFailure(t *testing.T) {
 		Artwork: stubArtworkProvider{
 			source: &components.ImageSource{Data: []byte("abc"), Description: "cover"},
 		},
-	})
+	}, AlbumArtOptions{})
 	screen.snapshot.Track = &TrackInfo{ID: "track-1", Title: "Song"}
 	screen.artwork = components.NewTerminalImageWithRenderer(components.ImageRendererFunc(func(source components.ImageSource, width, height int) (string, error) {
 		return "", errors.New("no protocol")
@@ -57,7 +57,7 @@ func TestPlaybackScreenArtworkPaneShowsRenderFailure(t *testing.T) {
 }
 
 func TestPlaybackScreenViewUsesOverlaysInsteadOfStackedPanels(t *testing.T) {
-	screen := newPlaybackScreen(Services{})
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
 	screen.SetSize(48, 24)
 
 	got := screen.View()

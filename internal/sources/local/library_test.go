@@ -30,7 +30,7 @@ func TestLibrarySearchFindsLocalAudioFiles(t *testing.T) {
 	audioPath := filepath.Join(dir, "My Song.wav")
 	writeSilentWAV(t, audioPath)
 
-	library := NewLibrary(dir)
+	library := NewLibrary(Options{Roots: []string{dir}})
 	results, err := library.Search(teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "song",
@@ -55,7 +55,7 @@ func TestLibraryResolveDecodesWAVFiles(t *testing.T) {
 	audioPath := filepath.Join(dir, "Track.wav")
 	writeSilentWAV(t, audioPath)
 
-	library := NewLibrary(dir)
+	library := NewLibrary(Options{Roots: []string{dir}})
 	resolved, err := library.Resolve(teaui.QueueEntry{
 		ID:     audioPath,
 		Title:  "Track",
@@ -85,7 +85,7 @@ func TestLibraryRefreshesSearchResultsWhenFilesChange(t *testing.T) {
 	firstPath := filepath.Join(dir, "First.wav")
 	writeSilentWAV(t, firstPath)
 
-	library := NewLibrary(dir)
+	library := NewLibrary(Options{Roots: []string{dir}})
 	library.RefreshInterval = 0
 
 	results, err := library.Search(teaui.SearchRequest{
@@ -125,7 +125,7 @@ func TestLibrarySearchFindsNestedFilesByPathFragment(t *testing.T) {
 	audioPath := filepath.Join(nestedDir, "Track.wav")
 	writeSilentWAV(t, audioPath)
 
-	library := NewLibrary(dir)
+	library := NewLibrary(Options{Roots: []string{dir}})
 	results, err := library.Search(teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "artist/album/track.wav",
@@ -148,7 +148,7 @@ func TestLibrarySearchArtworkMetadataResolvesSiblingCover(t *testing.T) {
 		t.Fatalf("write cover failed: %v", err)
 	}
 
-	library := NewLibrary(dir)
+	library := NewLibrary(Options{Roots: []string{dir}})
 	results, err := library.Search(teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "track",
@@ -168,6 +168,26 @@ func TestLibrarySearchArtworkMetadataResolvesSiblingCover(t *testing.T) {
 	}
 	if image.Image.Description != "Cover.JPG" {
 		t.Fatalf("expected sibling cover to resolve from search metadata, got %#v", image.Image)
+	}
+}
+
+func TestLibrarySearchSpansMultipleConfiguredRoots(t *testing.T) {
+	first := t.TempDir()
+	second := t.TempDir()
+	audioPath := filepath.Join(second, "Elsewhere.wav")
+	writeSilentWAV(t, audioPath)
+
+	library := NewLibrary(Options{Roots: []string{first, second}})
+	results, err := library.Search(teaui.SearchRequest{
+		SourceID: sourceID,
+		Query:    "elsewhere",
+		Filters:  teaui.DefaultSearchFilters(),
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(results) != 1 || results[0].ID != audioPath {
+		t.Fatalf("expected multi-root match, got %#v", results)
 	}
 }
 

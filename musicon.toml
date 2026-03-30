@@ -1,0 +1,14 @@
+[audio]
+backend = "auto"
+
+[ui]
+theme = "default"
+start_mode = "queue"
+cell_width_ratio = 0.5
+
+[ui.album_art]
+fill_mode = "fill"
+protocol = "halfblocks"
+
+[sources.local]
+dirs = ["~/Music"]

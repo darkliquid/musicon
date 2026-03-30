@@ -6,7 +6,7 @@ The node currently exposes generic rendering primitives and widgets including:
 - `SizeRequirements` and `SizeCheck` for explicit terminal-size validation
 - `Input` with `Update`, `View`, `SetSize`, and `SetFocused`
 - `List` with `SetItems`, `Update`, `View`, `SetSize`, `SetFocused`, and `SetSelectedIndex`, plus optional leading markers on items
-- `ImageSource` plus `TerminalImage` with `SetSource`, `SetSize`, `View`, `Ready`, and `Error`
+- `ImageSource` plus `TerminalImage` with `SetSource`, `SetSize`, `View`, `Ready`, and `Error`, plus construction with explicit render settings when callers want config-driven behavior
 - `RenderPanel`, `RenderProgress`, and `RenderEmptyState` helpers
 
 # Contracts
@@ -20,6 +20,7 @@ The node currently exposes generic rendering primitives and widgets including:
 - Image rendering components should accept encoded image data and own terminal-protocol concerns internally rather than forcing screen code to call renderer libraries directly.
 - The terminal-image component should default to a guaranteed-visible Unicode halfblock renderer and allow richer protocol selection through `MUSICON_IMAGE_PROTOCOL` (`auto`, `kitty`, `sixel`, `iterm2`, `halfblocks`).
 - The terminal-image component should default to a fill-oriented scale mode so artwork occupies more of the available pane, while allowing `MUSICON_IMAGE_SCALE` (`fill`, `stretch`, `fit`, `auto`, `none`) to tune how aggressively it expands.
+- The terminal-image component should also allow callers to provide explicit protocol and scale settings so application config can drive image rendering without relying on process env reads.
 
 # Failure modes
 

@@ -18,7 +18,7 @@ func TestRequestWindowSizeCmdReturnsWindowSizeRequest(t *testing.T) {
 func TestRootModelInitRequestsWindowSize(t *testing.T) {
 	model := &rootModel{
 		queue:    newQueueScreen(Services{}),
-		playback: newPlaybackScreen(Services{}),
+		playback: newPlaybackScreen(Services{}, AlbumArtOptions{}),
 	}
 
 	msg := model.Init()()
@@ -82,6 +82,19 @@ func TestTerminalCellWidthRatioFromEnv(t *testing.T) {
 	}
 }
 
+func TestNormalizedOptionsUsesConfiguredStartModeAndCellRatio(t *testing.T) {
+	options := normalizedOptions(Options{
+		StartMode:      ModePlayback,
+		CellWidthRatio: 0.75,
+	})
+	if options.StartMode != ModePlayback {
+		t.Fatalf("expected playback start mode, got %v", options.StartMode)
+	}
+	if options.CellWidthRatio != 0.75 {
+		t.Fatalf("expected configured cell width ratio, got %v", options.CellWidthRatio)
+	}
+}
+
 func TestLayoutCheckAccountsForNonSquareTerminalCells(t *testing.T) {
 	model := &rootModel{width: 120, height: 40, cellWidthRatio: 0.5}
 
@@ -115,7 +128,7 @@ func TestMakeViewSeparatesContentAndWindowTitle(t *testing.T) {
 func TestTerminalTitleIdle(t *testing.T) {
 	model := &rootModel{
 		mode:     ModeQueue,
-		playback: newPlaybackScreen(Services{}),
+		playback: newPlaybackScreen(Services{}, AlbumArtOptions{}),
 	}
 
 	got := model.terminalTitle()
@@ -128,7 +141,7 @@ func TestTerminalTitleIdle(t *testing.T) {
 func TestTerminalTitlePlaybackTrack(t *testing.T) {
 	model := &rootModel{
 		mode:     ModePlayback,
-		playback: newPlaybackScreen(Services{}),
+		playback: newPlaybackScreen(Services{}, AlbumArtOptions{}),
 	}
 	model.playback.snapshot = PlaybackSnapshot{
 		Paused: false,
@@ -160,7 +173,7 @@ func TestRootViewOmitsOuterChrome(t *testing.T) {
 		cellWidthRatio: 1,
 		mode:           ModeQueue,
 		queue:          newQueueScreen(Services{}),
-		playback:       newPlaybackScreen(Services{}),
+		playback:       newPlaybackScreen(Services{}, AlbumArtOptions{}),
 	}
 
 	view := model.View().Content
@@ -177,7 +190,7 @@ func TestRootViewOverlaysHelpInsideSquare(t *testing.T) {
 		mode:           ModeQueue,
 		showHelp:       true,
 		queue:          newQueueScreen(Services{}),
-		playback:       newPlaybackScreen(Services{}),
+		playback:       newPlaybackScreen(Services{}, AlbumArtOptions{}),
 	}
 
 	view := model.View().Content

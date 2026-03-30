@@ -1,0 +1,19 @@
+name: AppConfig
+type: service
+description: "Typed TOML-backed application configuration for audio, UI, and source startup wiring"
+relations:
+  - target: internal/audio
+    type: uses
+    consumes: [Options]
+    failure: "Normalize and validate audio settings before passing them into the runtime so invalid config fails explicitly at startup"
+  - target: internal/ui
+    type: uses
+    consumes: [NewApp]
+    failure: "Translate config into UI-facing options without making the UI package parse config files itself"
+  - target: internal/sources/local
+    type: uses
+    consumes: [NewLibrary]
+    failure: "Resolve configured local directories before constructing the local source so missing paths surface through startup or search explicitly"
+mapping:
+  paths:
+    - internal/config/

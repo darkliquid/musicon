@@ -23,6 +23,8 @@ The reusable `TerminalImage` widget now defaults `go-termimg` to the Unicode hal
 
 The same widget now uses a fill-oriented scaling mode by default so album art expands to occupy more of the available viewport instead of sitting centered with large margins. Users who prefer preserved framing or exact stretching can override this with `MUSICON_IMAGE_SCALE`.
 
+The widget now also supports explicit construction-time render settings for protocol and scale mode. This keeps terminal-image behavior reusable while letting the application move those knobs into TOML-backed startup config instead of requiring every caller to rely on env variables.
+
 ## Decisions
 
 - Chose `pkg/components` for reusable widgets because the user explicitly requested that generic UI components live outside `internal/ui`.
@@ -30,6 +32,7 @@ The same widget now uses a fill-oriented scaling mode by default so album art ex
 - Chose a generic cached terminal-image component in `pkg/components` over embedding `go-termimg` calls directly in playback mode because the user wanted protocol-aware image rendering to stay reusable while `internal/ui` only supplies artwork-specific data and fallback messaging.
 - Chose a guaranteed-visible halfblock default with an env override over always trusting `go-termimg` auto-detection because local artwork can already resolve correctly while terminal protocol auto-selection still fails to display images for some users.
 - Chose a fill-oriented default scale mode with an env override over a conservative fit-only default because the user explicitly preferred artwork that uses the available square more aggressively.
+- Chose explicit image render settings on the reusable component over teaching `internal/ui` to translate config directly into termimg calls because reusable renderer policy still belongs in `pkg/components`.
 - Chose to reserve cursor width inside the reusable input field instead of letting the focused cursor overflow because a one-column spill from a shared widget can visibly break square-constrained parent layouts.
 - Chose an explicit cell width ratio input for square viewport math instead of assuming terminal cells are square because the user observed the visual frame distortion caused by tall terminal glyphs.
 - Chose a generic leading marker field on list items instead of hard-coding queue icons into the widget because callers may need lightweight row state cues without turning the shared list into a Musicon-specific queue component.

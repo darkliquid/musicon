@@ -39,15 +39,29 @@ type TerminalImage struct {
 	height   int
 	source   *ImageSource
 	renderer ImageRenderer
+	settings TerminalImageSettings
 
 	renderKey string
 	rendered  string
 	err       error
 }
 
+type TerminalImageSettings struct {
+	Protocol  string
+	ScaleMode string
+}
+
 // NewTerminalImage constructs a terminal image component backed by go-termimg.
 func NewTerminalImage() *TerminalImage {
 	return NewTerminalImageWithRenderer(ImageRendererFunc(renderWithTermimg))
+}
+
+// NewTerminalImageWithSettings constructs a terminal image component with
+// explicit rendering settings.
+func NewTerminalImageWithSettings(settings TerminalImageSettings) *TerminalImage {
+	image := NewTerminalImageWithRenderer(ImageRendererFunc(renderWithTermimg))
+	image.settings = settings
+	return image
 }
 
 // NewTerminalImageWithRenderer constructs a terminal image component with a
@@ -115,7 +129,7 @@ func (i *TerminalImage) ensureRendered() {
 		return
 	}
 
-	rendered, err := i.renderer.Render(*i.source, i.width, i.height)
+	rendered, err := i.render(*i.source, i.width, i.height)
 	if err != nil {
 		i.err = err
 		return
@@ -153,14 +167,25 @@ func equalImageSource(left, right *ImageSource) bool {
 	return bytes.Equal(left.Data, right.Data)
 }
 
+func (i *TerminalImage) render(source ImageSource, width, height int) (string, error) {
+	if i.settings.Protocol != "" || i.settings.ScaleMode != "" {
+		return renderWithTermimgSettings(source, width, height, i.settings)
+	}
+	return i.renderer.Render(source, width, height)
+}
+
 func renderWithTermimg(source ImageSource, width, height int) (string, error) {
+	return renderWithTermimgSettings(source, width, height, TerminalImageSettings{})
+}
+
+func renderWithTermimgSettings(source ImageSource, width, height int, settings TerminalImageSettings) (string, error) {
 	decoded, _, err := image.Decode(bytes.NewReader(source.Data))
 	if err != nil {
 		return "", err
 	}
 
-	protocol := configuredImageProtocol()
-	scaleMode := configuredImageScaleMode()
+	protocol := configuredImageProtocolWithOverride(settings.Protocol)
+	scaleMode := configuredImageScaleModeWithOverride(settings.ScaleMode)
 	rendered, err := termimg.New(decoded).
 		Protocol(protocol).
 		Scale(scaleMode).
@@ -184,7 +209,11 @@ func renderWithTermimg(source ImageSource, width, height int) (string, error) {
 }
 
 func configuredImageProtocol() termimg.Protocol {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("MUSICON_IMAGE_PROTOCOL"))) {
+	return configuredImageProtocolWithOverride(os.Getenv("MUSICON_IMAGE_PROTOCOL"))
+}
+
+func configuredImageProtocolWithOverride(raw string) termimg.Protocol {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", "halfblocks", "halfblock", "unicode":
 		return termimg.Halfblocks
 	case "auto":
@@ -201,7 +230,11 @@ func configuredImageProtocol() termimg.Protocol {
 }
 
 func configuredImageScaleMode() termimg.ScaleMode {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("MUSICON_IMAGE_SCALE"))) {
+	return configuredImageScaleModeWithOverride(os.Getenv("MUSICON_IMAGE_SCALE"))
+}
+
+func configuredImageScaleModeWithOverride(raw string) termimg.ScaleMode {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", "fill":
 		return termimg.ScaleFill
 	case "stretch":

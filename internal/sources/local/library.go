@@ -33,7 +33,7 @@ var supportedExtensions = map[string]struct{}{
 
 // Library provides a concrete local-file source and resolver.
 type Library struct {
-	root string
+	roots []string
 
 	RefreshInterval time.Duration
 
@@ -52,14 +52,14 @@ type indexedTrack struct {
 	haystack string
 }
 
-// NewLibrary constructs a local-file source rooted at root.
-func NewLibrary(root string) *Library {
-	root = strings.TrimSpace(root)
-	if root == "" {
-		root = "."
-	}
+type Options struct {
+	Roots []string
+}
+
+// NewLibrary constructs a local-file source rooted at one or more directories.
+func NewLibrary(options Options) *Library {
 	return &Library{
-		root:            root,
+		roots:           normalizeRoots(options.Roots),
 		RefreshInterval: defaultRefreshInterval,
 	}
 }
@@ -68,7 +68,7 @@ func (l *Library) Sources() []teaui.SourceDescriptor {
 	return []teaui.SourceDescriptor{{
 		ID:          sourceID,
 		Name:        "Local files",
-		Description: "Search and play local audio files from " + l.root,
+		Description: "Search and play local audio files from " + summarizeRoots(l.roots),
 	}}
 }
 
@@ -149,33 +149,42 @@ func (l *Library) scan() ([]indexedTrack, error) {
 		return append([]indexedTrack(nil), l.index...), l.scanErr
 	}
 
-	root, err := filepath.Abs(l.root)
-	if err != nil {
-		l.scanned = true
-		l.scanErr = err
-		return nil, err
-	}
-
 	index := make([]indexedTrack, 0, 128)
 	byID := make(map[string]indexedTrack)
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+	var err error
+	for _, configuredRoot := range l.roots {
+		root, absErr := filepath.Abs(configuredRoot)
+		if absErr != nil {
+			err = absErr
+			break
+		}
+
+		walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if _, ok := supportedExtensions[strings.ToLower(filepath.Ext(path))]; !ok {
+				return nil
+			}
+			track, trackErr := indexTrack(root, path)
+			if trackErr != nil {
+				return nil
+			}
+			if _, exists := byID[track.result.ID]; exists {
+				return nil
+			}
+			index = append(index, track)
+			byID[track.result.ID] = track
+			return nil
+		})
 		if walkErr != nil {
-			return walkErr
+			err = walkErr
+			break
 		}
-		if d.IsDir() {
-			return nil
-		}
-		if _, ok := supportedExtensions[strings.ToLower(filepath.Ext(path))]; !ok {
-			return nil
-		}
-		track, err := indexTrack(root, path)
-		if err != nil {
-			return nil
-		}
-		index = append(index, track)
-		byID[track.result.ID] = track
-		return nil
-	})
+	}
 
 	l.scanned = true
 	l.scanErr = err
@@ -257,6 +266,40 @@ func indexTrack(root, path string) (indexedTrack, error) {
 		track:    track,
 		haystack: haystack,
 	}, nil
+}
+
+func normalizeRoots(roots []string) []string {
+	if len(roots) == 0 {
+		return []string{"."}
+	}
+	normalized := make([]string, 0, len(roots))
+	seen := make(map[string]struct{}, len(roots))
+	for _, root := range roots {
+		root = strings.TrimSpace(root)
+		if root == "" {
+			continue
+		}
+		if _, exists := seen[root]; exists {
+			continue
+		}
+		seen[root] = struct{}{}
+		normalized = append(normalized, root)
+	}
+	if len(normalized) == 0 {
+		return []string{"."}
+	}
+	return normalized
+}
+
+func summarizeRoots(roots []string) string {
+	switch len(roots) {
+	case 0:
+		return "."
+	case 1:
+		return roots[0]
+	default:
+		return fmt.Sprintf("%s and %d more", roots[0], len(roots)-1)
+	}
 }
 
 func readTagMetadata(path string) (coverart.Metadata, error) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/darkliquid/musicon/internal/audio"
+	"github.com/darkliquid/musicon/internal/config"
 	"github.com/darkliquid/musicon/internal/mpris"
 	"github.com/darkliquid/musicon/internal/sources/local"
 	"github.com/darkliquid/musicon/internal/ui"
@@ -14,8 +14,17 @@ import (
 )
 
 func main() {
-	library := local.NewLibrary(defaultLocalRoot())
-	engine := audio.NewEngine(audio.Options{Resolver: library})
+	loaded, err := config.LoadDefault()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "musicon: load config: %v\n", err)
+		os.Exit(1)
+	}
+
+	library := local.NewLibrary(local.Options{Roots: loaded.Config.ResolvedLocalDirs()})
+	engine := audio.NewEngine(audio.Options{
+		Resolver: library,
+		Backend:  loaded.Config.Audio.Backend,
+	})
 	defer engine.Close()
 
 	playback := engine.PlaybackService()
@@ -31,6 +40,14 @@ func main() {
 		Queue:    engine.QueueService(),
 		Playback: playback,
 		Artwork:  buildArtworkProvider(),
+	}, ui.Options{
+		StartMode:      modeFromConfig(loaded.Config.UI.StartMode),
+		Theme:          loaded.Config.UI.Theme,
+		CellWidthRatio: loaded.Config.UI.CellWidthRatio,
+		AlbumArt: ui.AlbumArtOptions{
+			FillMode: loaded.Config.UI.AlbumArt.FillMode,
+			Protocol: loaded.Config.UI.AlbumArt.Protocol,
+		},
 	})
 	if err := ui.Run(app); err != nil {
 		fmt.Fprintf(os.Stderr, "musicon: %v\n", err)
@@ -87,15 +104,9 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func defaultLocalRoot() string {
-	if root := strings.TrimSpace(os.Getenv("MUSICON_LOCAL_ROOT")); root != "" {
-		return root
+func modeFromConfig(raw string) ui.Mode {
+	if raw == "playback" {
+		return ui.ModePlayback
 	}
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		candidate := filepath.Join(home, "Music")
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
-		}
-	}
-	return "."
+	return ui.ModeQueue
 }

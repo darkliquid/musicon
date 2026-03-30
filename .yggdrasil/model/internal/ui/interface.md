@@ -2,7 +2,7 @@
 
 The node currently exposes a small application-facing surface from `internal/ui`:
 
-- `NewApp(Services) *App`
+- `NewApp(Services, Options) *App`
 - `Run(*App) error`
 
 The `Services` struct carries the backend-facing contracts the UI compiles against:
@@ -11,6 +11,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - `QueueService` for queue snapshots and mutation
 - `PlaybackService` for transport, seek, volume, and playback snapshots
 - `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with artwork providers receiving reusable cover-art metadata and supplying image data to reusable rendering components
+- `Options` for startup mode, theme selection, cell-width ratio, and playback artwork rendering preferences
 
 # Contracts
 
@@ -19,7 +20,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Search results and queue entries should be able to carry reusable artwork metadata forward so playback snapshots can reuse source-derived local paths, embedded-art hints, and external IDs.
 - The root model owns mode switching, help toggling, and visually square viewport resizing.
 - `NewApp` seeds the Bubble Tea program with a best-effort initial terminal size so the first frame can render even when the terminal does not deliver an immediate startup resize event.
-- `NewApp` also chooses a terminal cell width ratio (default `0.5`, override via `MUSICON_CELL_WIDTH_RATIO`) so the square viewport remains visually square under non-square terminal glyphs.
+- `NewApp` should accept typed startup options from the application layer, including the initial mode and terminal cell width ratio, while still keeping env-based fallbacks for legacy/default operation.
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
 - The root model also publishes terminal window titles derived from mode, help state, and current playback snapshot through Bubble Tea's `View.WindowTitle` field.
 - The root model also enforces the minimum supported terminal size and suppresses normal mode interaction until the viewport is large enough.
@@ -30,6 +31,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Queue mode should clearly mark the currently playing queued item so users can tell which pinned row is active even while browsing or reordering the rest of the queue.
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
 - Playback mode owns pane switching, transport key routing, scrubber controls, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
+- Playback mode should accept album-art rendering preferences from UI startup options so fill mode and protocol selection no longer depend on each screen reading env directly.
 - Playback mode should treat the active artwork/lyrics/eq/visualizer pane as the base layer and place pane labels, transport controls, and optional track metadata as overlays within that same square instead of stacking separate panels below it.
 - When rendered artwork does not occupy the full playback pane, the remaining pane area should use a muted filler pattern so the image bounds remain legible without overwhelming the artwork itself.
 - Playback artwork rendering should route provider-supplied image data through reusable `pkg/components` image rendering instead of embedding terminal-image protocol logic inside the screen model.

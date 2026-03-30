@@ -5,9 +5,10 @@ This node owns concrete audio playback runtime behavior for Musicon.
 It is responsible for:
 
 - initializing and closing the output pipeline
-- using `github.com/darkliquid/mago/speaker` as the physical playback surface
+- using mago-backed playback output as the physical playback surface
 - using `github.com/gopxl/beep` streamers and controls for decode/playback composition
 - exposing queue-aware playback state and transport controls through interfaces consumed by `internal/ui`
+- honoring configured audio backend selection when initializing the playback device
 
 # Boundaries
 

@@ -9,6 +9,10 @@ mapping:
   paths:
     - main.go
 relations:
+  - target: internal/config
+    type: calls
+    consumes: [LoadDefault, ResolvedLocalDirs]
+    failure: "Surface invalid or unreadable config files explicitly before constructing runtime services"
   - target: internal/ui
     type: calls
     consumes: [NewApp, Run]
@@ -24,7 +28,7 @@ relations:
   - target: internal/sources/local
     type: calls
     consumes: [NewLibrary]
-    failure: "Degrade cleanly when the local source root is unavailable while preserving the terminal UI"
+    failure: "Degrade cleanly when configured local source directories are unavailable while preserving the terminal UI"
   - target: pkg/coverart/core
     type: calls
     consumes: [NewDiskCache, NewCachedProvider, NewChain]

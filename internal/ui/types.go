@@ -209,3 +209,15 @@ type Services struct {
 	Artwork       ArtworkProvider
 	Visualization VisualizationProvider
 }
+
+type Options struct {
+	StartMode      Mode
+	Theme          string
+	CellWidthRatio float64
+	AlbumArt       AlbumArtOptions
+}
+
+type AlbumArtOptions struct {
+	FillMode string
+	Protocol string
+}

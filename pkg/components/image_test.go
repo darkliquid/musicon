@@ -139,3 +139,15 @@ func TestConfiguredImageScaleModeFromEnv(t *testing.T) {
 		})
 	}
 }
+
+func TestConfiguredImageProtocolWithOverride(t *testing.T) {
+	if got := configuredImageProtocolWithOverride("kitty"); got != termimg.Kitty {
+		t.Fatalf("expected kitty override, got %v", got)
+	}
+}
+
+func TestConfiguredImageScaleModeWithOverride(t *testing.T) {
+	if got := configuredImageScaleModeWithOverride("stretch"); got != termimg.ScaleStretch {
+		t.Fatalf("expected stretch override, got %v", got)
+	}
+}

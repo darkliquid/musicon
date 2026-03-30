@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	magospeaker "github.com/darkliquid/mago/speaker"
 	teaui "github.com/darkliquid/musicon/internal/ui"
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/effects"
@@ -36,6 +35,7 @@ type Options struct {
 	Resolver       Resolver
 	OutputRate     beep.SampleRate
 	BufferDuration time.Duration
+	Backend        string
 }
 
 // Engine owns queue state, active playback state, and the mago/beep runtime.
@@ -56,6 +56,8 @@ type Engine struct {
 	bufferSamples int
 	speakerReady  bool
 	closed        bool
+	speaker       *runtimeSpeaker
+	speakerErr    error
 }
 
 type activeTrack struct {
@@ -79,6 +81,7 @@ func NewEngine(options Options) *Engine {
 	if bufferDuration <= 0 {
 		bufferDuration = defaultBufferDuration
 	}
+	backends, backendErr := selectSpeakerBackends(options.Backend)
 
 	return &Engine{
 		resolver:      options.Resolver,
@@ -86,6 +89,8 @@ func NewEngine(options Options) *Engine {
 		volume:        70,
 		speakerRate:   rate,
 		bufferSamples: rate.N(bufferDuration),
+		speaker:       newRuntimeSpeaker(backends),
+		speakerErr:    backendErr,
 	}
 }
 
@@ -450,7 +455,7 @@ func (e *Engine) startCurrentLocked(paused bool) error {
 	volumeFx := &effects.Volume{Streamer: controller, Base: 2, Volume: volumeLevel, Silent: silent}
 	index := e.currentIndex
 	sequence := beep.Seq(volumeFx, beep.Callback(func() { go e.onTrackFinished(index) }))
-	magospeaker.Play(sequence)
+	e.speaker.Play(sequence)
 
 	info := resolved.Info
 	info = prepareTrackInfo(entry, resolved)
@@ -488,7 +493,10 @@ func (e *Engine) ensureSpeakerLocked() error {
 	if e.speakerReady {
 		return nil
 	}
-	if err := magospeaker.Init(e.speakerRate, e.bufferSamples); err != nil {
+	if e.speakerErr != nil {
+		return e.speakerErr
+	}
+	if err := e.speaker.Init(e.speakerRate, e.bufferSamples); err != nil {
 		return err
 	}
 	e.speakerReady = true
@@ -497,14 +505,14 @@ func (e *Engine) ensureSpeakerLocked() error {
 
 func (e *Engine) stopCurrentLocked(closeSpeaker bool) {
 	if e.speakerReady {
-		magospeaker.Clear()
+		e.speaker.Clear()
 	}
 	if e.current != nil && e.current.stream != nil {
 		_ = e.current.stream.Close()
 	}
 	e.current = nil
 	if closeSpeaker && e.speakerReady {
-		magospeaker.Close()
+		e.speaker.Close()
 		e.speakerReady = false
 	}
 }
@@ -528,8 +536,8 @@ func (e *Engine) withSpeakerLock(fn func()) {
 		fn()
 		return
 	}
-	magospeaker.Lock()
-	defer magospeaker.Unlock()
+	e.speaker.Lock()
+	defer e.speaker.Unlock()
 	fn()
 }
 

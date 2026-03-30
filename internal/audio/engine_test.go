@@ -64,6 +64,28 @@ func TestEngineMoveQueueEntryReordersSnapshot(t *testing.T) {
 	}
 }
 
+func TestSelectSpeakerBackends(t *testing.T) {
+	backends, err := selectSpeakerBackends("alsa")
+	if err != nil {
+		t.Fatalf("select backends failed: %v", err)
+	}
+	if len(backends) != 1 {
+		t.Fatalf("expected single backend, got %#v", backends)
+	}
+
+	backends, err = selectSpeakerBackends("auto")
+	if err != nil {
+		t.Fatalf("select auto backends failed: %v", err)
+	}
+	if backends != nil {
+		t.Fatalf("expected nil backends for auto, got %#v", backends)
+	}
+
+	if _, err := selectSpeakerBackends("mystery"); err == nil {
+		t.Fatal("expected unsupported backend error")
+	}
+}
+
 func TestEngineToggleFlags(t *testing.T) {
 	engine := NewEngine(Options{})
 	defer engine.Close()

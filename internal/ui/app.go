@@ -29,6 +29,7 @@ type tickMsg time.Time
 
 type rootModel struct {
 	services       Services
+	options        Options
 	width          int
 	height         int
 	cellWidthRatio float64
@@ -41,15 +42,17 @@ type rootModel struct {
 }
 
 // NewApp constructs the Bubble Tea application shell with injected UI-facing services.
-func NewApp(services Services) *App {
+func NewApp(services Services, options Options) *App {
+	options = normalizedOptions(options)
 	model := &rootModel{
 		services:       services,
-		cellWidthRatio: terminalCellWidthRatio(),
-		mode:           ModeQueue,
+		options:        options,
+		cellWidthRatio: options.CellWidthRatio,
+		mode:           options.StartMode,
 		status:         "Ready. tab switches modes, ? toggles help, ctrl+c exits.",
 	}
 	model.queue = newQueueScreen(services)
-	model.playback = newPlaybackScreen(services)
+	model.playback = newPlaybackScreen(services, options.AlbumArt)
 	width, height := initialTerminalSize()
 
 	return &App{
@@ -348,6 +351,27 @@ func sanitizeTitle(title string) string {
 		"\t", " ",
 	)
 	return strings.TrimSpace(replacer.Replace(title))
+}
+
+func normalizedOptions(options Options) Options {
+	if options.CellWidthRatio <= 0 {
+		options.CellWidthRatio = terminalCellWidthRatio()
+	}
+	if options.Theme == "" {
+		options.Theme = "default"
+	}
+	switch options.StartMode {
+	case ModePlayback:
+	default:
+		options.StartMode = ModeQueue
+	}
+	if options.AlbumArt.FillMode == "" {
+		options.AlbumArt.FillMode = "fill"
+	}
+	if options.AlbumArt.Protocol == "" {
+		options.AlbumArt.Protocol = "halfblocks"
+	}
+	return options
 }
 
 func terminalCellWidthRatio() float64 {
