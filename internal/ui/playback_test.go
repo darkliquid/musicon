@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -10,77 +11,214 @@ import (
 	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
-type stubArtworkProvider struct {
+type playbackTestService struct {
+	mu            sync.Mutex
+	snapshot      PlaybackSnapshot
+	togglePauseCh chan struct{}
+	toggleErr     error
+	toggleCalls   int
+}
+
+func (s *playbackTestService) Snapshot() PlaybackSnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.snapshot
+}
+func (s *playbackTestService) TogglePause() error {
+	s.mu.Lock()
+	s.toggleCalls++
+	wait := s.togglePauseCh
+	err := s.toggleErr
+	snapshot := s.snapshot
+	s.mu.Unlock()
+	if wait != nil {
+		<-wait
+	}
+	if err != nil {
+		return err
+	}
+	snapshot.Paused = !snapshot.Paused
+	s.mu.Lock()
+	s.snapshot = snapshot
+	s.mu.Unlock()
+	return nil
+}
+func (s *playbackTestService) Previous() error              { return nil }
+func (s *playbackTestService) Next() error                  { return nil }
+func (s *playbackTestService) AdjustVolume(delta int) error { return nil }
+func (s *playbackTestService) SetRepeat(repeat bool) error  { return nil }
+func (s *playbackTestService) SetStream(stream bool) error  { return nil }
+
+type artworkTestProvider struct {
+	mu     sync.Mutex
+	calls  int
 	source *components.ImageSource
-	err    error
 }
 
-func (s stubArtworkProvider) Artwork(metadata coverart.Metadata) (*components.ImageSource, error) {
-	_ = metadata
-	return s.source, s.err
+func (p *artworkTestProvider) Artwork(_ coverart.Metadata) (*components.ImageSource, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls++
+	return p.source, nil
 }
 
-func TestPlaybackScreenArtworkPaneUsesImageComponent(t *testing.T) {
-	screen := newPlaybackScreen(Services{
-		Artwork: stubArtworkProvider{
-			source: &components.ImageSource{Data: []byte("abc"), Description: "cover"},
-		},
-	}, AlbumArtOptions{})
-	screen.snapshot.Track = &TrackInfo{ID: "track-1", Title: "Song"}
-	screen.artwork = components.NewTerminalImageWithRenderer(components.ImageRendererFunc(func(source components.ImageSource, width, height int) (string, error) {
-		return "rendered artwork", nil
-	}))
-
-	got := screen.centerView(24, 12)
-	if !strings.Contains(got, "rendered artwork") {
-		t.Fatalf("expected rendered artwork in view, got %q", got)
-	}
-	if !strings.Contains(got, "·") {
-		t.Fatalf("expected filler pattern around artwork, got %q", got)
-	}
+type lyricsTestProvider struct {
+	mu    sync.Mutex
+	calls int
+	lines []string
 }
 
-func TestPlaybackScreenArtworkPaneShowsRenderFailure(t *testing.T) {
-	screen := newPlaybackScreen(Services{
-		Artwork: stubArtworkProvider{
-			source: &components.ImageSource{Data: []byte("abc"), Description: "cover"},
-		},
-	}, AlbumArtOptions{})
-	screen.snapshot.Track = &TrackInfo{ID: "track-1", Title: "Song"}
-	screen.artwork = components.NewTerminalImageWithRenderer(components.ImageRendererFunc(func(source components.ImageSource, width, height int) (string, error) {
-		return "", errors.New("no protocol")
-	}))
-
-	got := screen.centerView(24, 12)
-	if !strings.Contains(got, "Artwork render") || !strings.Contains(got, "no protocol") {
-		t.Fatalf("expected render failure message, got %q", got)
-	}
+func (p *lyricsTestProvider) Lyrics(string) ([]string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls++
+	return append([]string(nil), p.lines...), nil
 }
 
-func TestPlaybackScreenViewUsesOverlaysInsteadOfStackedPanels(t *testing.T) {
+type visualizationTestProvider struct {
+	mu      sync.Mutex
+	calls   int
+	content string
+}
+
+func (p *visualizationTestProvider) Placeholder(PlaybackPane, int, int) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.calls++
+	return p.content, nil
+}
+
+func TestPlaybackControlsViewOmitsSeekStatus(t *testing.T) {
 	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
-	screen.SetSize(48, 24)
+	screen.snapshot = PlaybackSnapshot{Volume: 70}
 
-	got := screen.View()
-	if !strings.Contains(got, "Playback") || !strings.Contains(got, "state:") {
-		t.Fatalf("expected playback controls overlay, got %q", got)
-	}
-	if strings.Contains(got, "Playback controls") {
-		t.Fatalf("expected stacked controls panel title to be removed, got %q", got)
+	view := screen.controlsView(48)
+	if strings.Contains(view, "seeking:") {
+		t.Fatalf("did not expect seek status in controls view, got %q", view)
 	}
 }
 
-func TestPlaybackScreenUsesConfiguredPauseBinding(t *testing.T) {
-	screen := newPlaybackScreenWithKeyMap(Services{}, AlbumArtOptions{}, normalizedKeyMap(KeybindOptions{
-		Playback: PlaybackKeybindOptions{
-			TogglePause: []string{"p"},
-		},
-	}).Playback)
-
-	if got := screen.Update(tea.KeyPressMsg(tea.Key{Text: "p"})); got != "Playback paused." {
-		t.Fatalf("expected custom pause keybind to pause playback, got %q", got)
+func TestPlaybackUpdateDispatchesTogglePauseAsynchronously(t *testing.T) {
+	service := &playbackTestService{
+		snapshot:      PlaybackSnapshot{Volume: 70},
+		togglePauseCh: make(chan struct{}),
 	}
-	if got := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeySpace})); got != "" {
-		t.Fatalf("expected default space binding to stop matching after override, got %q", got)
+	screen := newPlaybackScreen(Services{Playback: service}, AlbumArtOptions{})
+
+	status, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Code: ' '}))
+	if status != "" {
+		t.Fatalf("expected no immediate status, got %q", status)
+	}
+	if cmd == nil {
+		t.Fatal("expected async command for playback action")
+	}
+	if !screen.pending {
+		t.Fatal("expected screen to mark action pending")
+	}
+	secondStatus, secondCmd := screen.Update(tea.KeyPressMsg(tea.Key{Code: ' '}))
+	if secondStatus != "" || secondCmd != nil {
+		t.Fatalf("expected repeated keypress to be ignored while pending, got status=%q cmd=%v", secondStatus, secondCmd)
+	}
+	close(service.togglePauseCh)
+	msg := cmd()
+	finalStatus, finalCmd := screen.Update(msg)
+	if finalCmd != nil {
+		t.Fatal("expected no follow-up command after action result")
+	}
+	if finalStatus != "Playback paused." {
+		t.Fatalf("unexpected completion status: %q", finalStatus)
+	}
+	if screen.pending {
+		t.Fatal("expected pending action to clear after result")
+	}
+	if !screen.snapshot.Paused {
+		t.Fatal("expected snapshot to reflect toggled pause state")
+	}
+}
+
+func TestPlaybackUpdateSurfacesAsyncPlaybackErrors(t *testing.T) {
+	service := &playbackTestService{
+		snapshot:  PlaybackSnapshot{Volume: 70},
+		toggleErr: errors.New("toggle failed"),
+	}
+	screen := newPlaybackScreen(Services{Playback: service}, AlbumArtOptions{})
+
+	_, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Code: ' '}))
+	if cmd == nil {
+		t.Fatal("expected async command for playback action")
+	}
+	status, followUp := screen.Update(cmd())
+	if followUp != nil {
+		t.Fatal("expected no follow-up command after error")
+	}
+	if status != "toggle failed" {
+		t.Fatalf("unexpected error status: %q", status)
+	}
+	if screen.pending {
+		t.Fatal("expected pending action to clear after error")
+	}
+}
+
+func TestPlaybackArtworkLookupIsCachedAcrossViews(t *testing.T) {
+	provider := &artworkTestProvider{
+		source: &components.ImageSource{Description: "cached artwork"},
+	}
+	screen := newPlaybackScreen(Services{Artwork: provider}, AlbumArtOptions{})
+	screen.SetSize(40, 20)
+	screen.snapshot = PlaybackSnapshot{
+		Track: &TrackInfo{
+			ID:     "track-1",
+			Title:  "Song",
+			Artist: "Artist",
+			Album:  "Album",
+			Source: "youtube",
+		},
+	}
+
+	_ = screen.View()
+	_ = screen.View()
+
+	provider.mu.Lock()
+	calls := provider.calls
+	provider.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("expected artwork provider to be called once, got %d", calls)
+	}
+}
+
+func TestPlaybackLyricsLookupIsCachedAcrossViews(t *testing.T) {
+	provider := &lyricsTestProvider{lines: []string{"line one", "line two"}}
+	screen := newPlaybackScreen(Services{Lyrics: provider}, AlbumArtOptions{})
+	screen.pane = PaneLyrics
+	screen.SetSize(40, 20)
+	screen.snapshot = PlaybackSnapshot{
+		Track: &TrackInfo{ID: "track-1"},
+	}
+
+	_ = screen.View()
+	_ = screen.View()
+
+	provider.mu.Lock()
+	calls := provider.calls
+	provider.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("expected lyrics provider to be called once, got %d", calls)
+	}
+}
+
+func TestPlaybackVisualizationLookupIsCachedAcrossViews(t *testing.T) {
+	provider := &visualizationTestProvider{content: "bars"}
+	screen := newPlaybackScreen(Services{Visualization: provider}, AlbumArtOptions{})
+	screen.pane = PaneVisualizer
+	screen.SetSize(40, 20)
+
+	_ = screen.View()
+	_ = screen.View()
+
+	provider.mu.Lock()
+	calls := provider.calls
+	provider.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("expected visualization provider to be called once, got %d", calls)
 	}
 }

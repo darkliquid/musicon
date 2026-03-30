@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"time"
 
 	"github.com/darkliquid/musicon/pkg/components"
@@ -167,7 +168,7 @@ type PlaybackSnapshot struct {
 
 type SearchService interface {
 	Sources() []SourceDescriptor
-	Search(SearchRequest) ([]SearchResult, error)
+	Search(context.Context, SearchRequest) ([]SearchResult, error)
 }
 
 type QueueService interface {
@@ -183,7 +184,6 @@ type PlaybackService interface {
 	TogglePause() error
 	Previous() error
 	Next() error
-	Seek(delta time.Duration) error
 	AdjustVolume(delta int) error
 	SetRepeat(repeat bool) error
 	SetStream(stream bool) error

@@ -3,7 +3,6 @@ package ui
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
 	bubblekey "github.com/charmbracelet/bubbles/key"
@@ -18,10 +17,29 @@ type playbackScreen struct {
 	keymap    PlaybackKeyMap
 	pane      PlaybackPane
 	showInfo  bool
+	pending   bool
 	snapshot  PlaybackSnapshot
 	status    string
 	artStatus string
 	artwork   *components.TerminalImage
+
+	artworkTrackKey string
+	artworkSource   *components.ImageSource
+	artworkErr      error
+
+	lyricsTrackID string
+	lyricsLines   []string
+	lyricsErr     error
+
+	visualKey     string
+	visualContent string
+	visualErr     error
+}
+
+type playbackActionResult struct {
+	snapshot PlaybackSnapshot
+	status   string
+	err      error
 }
 
 func newPlaybackScreen(services Services, options AlbumArtOptions) *playbackScreen {
@@ -49,85 +67,112 @@ func (p *playbackScreen) SetSize(width, height int) {
 	p.height = max(1, height)
 }
 
-func (p *playbackScreen) Update(msg tea.Msg) string {
+func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
+	switch typed := msg.(type) {
+	case playbackActionResult:
+		p.pending = false
+		if typed.err != nil {
+			return typed.err.Error(), nil
+		}
+		typed.snapshot.Volume = clamp(typed.snapshot.Volume, 0, 100)
+		p.snapshot = typed.snapshot
+		return typed.status, nil
+	}
+
 	keypress, ok := msg.(tea.KeyPressMsg)
 	if !ok {
-		return ""
+		return "", nil
 	}
 
 	switch {
 	case bubblekey.Matches(keypress, p.keymap.CyclePane):
 		p.pane = (p.pane + 1) % 4
-		return fmt.Sprintf("Playback pane: %s", p.pane.String())
+		return fmt.Sprintf("Playback pane: %s", p.pane.String()), nil
 	case bubblekey.Matches(keypress, p.keymap.ToggleInfo):
 		p.showInfo = !p.showInfo
 		if p.showInfo {
-			return "Track information shown."
+			return "Track information shown.", nil
 		}
-		return "Track information hidden."
+		return "Track information hidden.", nil
 	case bubblekey.Matches(keypress, p.keymap.ToggleRepeat):
 		if p.services.Playback != nil {
 			next := !p.snapshot.Repeat
-			if err := p.services.Playback.SetRepeat(next); err != nil {
-				return err.Error()
-			}
-			p.refreshSnapshot()
+			return "", p.runPlaybackAction(func(service PlaybackService) error {
+				return service.SetRepeat(next)
+			}, func(snapshot PlaybackSnapshot) string {
+				return fmt.Sprintf("Repeat %s.", onOff(snapshot.Repeat))
+			})
 		} else {
 			p.snapshot.Repeat = !p.snapshot.Repeat
 		}
-		return fmt.Sprintf("Repeat %s.", onOff(p.snapshot.Repeat))
+		return fmt.Sprintf("Repeat %s.", onOff(p.snapshot.Repeat)), nil
 	case bubblekey.Matches(keypress, p.keymap.ToggleStream):
 		if p.services.Playback != nil {
 			next := !p.snapshot.Stream
-			if err := p.services.Playback.SetStream(next); err != nil {
-				return err.Error()
-			}
-			p.refreshSnapshot()
+			return "", p.runPlaybackAction(func(service PlaybackService) error {
+				return service.SetStream(next)
+			}, func(snapshot PlaybackSnapshot) string {
+				return fmt.Sprintf("Stream continuation %s.", onOff(snapshot.Stream))
+			})
 		} else {
 			p.snapshot.Stream = !p.snapshot.Stream
 		}
-		return fmt.Sprintf("Stream continuation %s.", onOff(p.snapshot.Stream))
+		return fmt.Sprintf("Stream continuation %s.", onOff(p.snapshot.Stream)), nil
 	case bubblekey.Matches(keypress, p.keymap.TogglePause):
 		if p.services.Playback != nil {
-			if err := p.services.Playback.TogglePause(); err != nil {
-				return err.Error()
-			}
-			p.refreshSnapshot()
+			return "", p.runPlaybackAction(func(service PlaybackService) error {
+				return service.TogglePause()
+			}, func(snapshot PlaybackSnapshot) string {
+				if snapshot.Paused {
+					return "Playback paused."
+				}
+				return "Playback resumed."
+			})
 		} else {
 			p.snapshot.Paused = !p.snapshot.Paused
 		}
 		if p.snapshot.Paused {
-			return "Playback paused."
+			return "Playback paused.", nil
 		}
-		return "Playback resumed."
+		return "Playback resumed.", nil
 	case bubblekey.Matches(keypress, p.keymap.PreviousTrack):
 		if p.services.Playback != nil {
-			if err := p.services.Playback.Previous(); err != nil {
-				return err.Error()
-			}
-			p.refreshSnapshot()
-			return "Moved to the previous track."
+			return "", p.runPlaybackAction(func(service PlaybackService) error {
+				return service.Previous()
+			}, func(PlaybackSnapshot) string {
+				return "Moved to the previous track."
+			})
 		}
-		return "Previous track requires a playback backend."
+		return "Previous track requires a playback backend.", nil
 	case bubblekey.Matches(keypress, p.keymap.NextTrack):
 		if p.services.Playback != nil {
-			if err := p.services.Playback.Next(); err != nil {
-				return err.Error()
-			}
-			p.refreshSnapshot()
-			return "Moved to the next track."
+			return "", p.runPlaybackAction(func(service PlaybackService) error {
+				return service.Next()
+			}, func(PlaybackSnapshot) string {
+				return "Moved to the next track."
+			})
 		}
-		return "Next track requires a playback backend."
+		return "Next track requires a playback backend.", nil
 	case bubblekey.Matches(keypress, p.keymap.VolumeDown):
-		return p.adjustVolume(-5)
+		if p.services.Playback != nil {
+			return "", p.runPlaybackAction(func(service PlaybackService) error {
+				return service.AdjustVolume(-5)
+			}, func(snapshot PlaybackSnapshot) string {
+				return fmt.Sprintf("Volume set to %d%%.", snapshot.Volume)
+			})
+		}
+		return p.adjustVolume(-5), nil
 	case bubblekey.Matches(keypress, p.keymap.VolumeUp):
-		return p.adjustVolume(5)
-	case bubblekey.Matches(keypress, p.keymap.SeekBackward):
-		return p.seek(-5 * time.Second)
-	case bubblekey.Matches(keypress, p.keymap.SeekForward):
-		return p.seek(5 * time.Second)
+		if p.services.Playback != nil {
+			return "", p.runPlaybackAction(func(service PlaybackService) error {
+				return service.AdjustVolume(5)
+			}, func(snapshot PlaybackSnapshot) string {
+				return fmt.Sprintf("Volume set to %d%%.", snapshot.Volume)
+			})
+		}
+		return p.adjustVolume(5), nil
 	default:
-		return ""
+		return "", nil
 	}
 }
 
@@ -136,7 +181,6 @@ func (p *playbackScreen) View() string {
 		return ""
 	}
 
-	p.refreshSnapshot()
 	body := lipgloss.NewStyle().Width(p.width).Height(p.height).Render(p.centerView(p.width, p.height))
 	top := p.paneOverlay()
 	body = bottomOverlay(body, p.controlsOverlay(), p.width, p.height)
@@ -159,7 +203,6 @@ func (p *playbackScreen) HelpView() string {
 	}, strings.Join([]string{
 		helpLine(p.keymap.TogglePause, "toggle play / pause state"),
 		helpLinePair(p.keymap.PreviousTrack, p.keymap.NextTrack, "previous / next track request"),
-		helpLinePair(p.keymap.SeekBackward, p.keymap.SeekForward, "scrub backward / forward by five seconds"),
 		helpLinePair(p.keymap.VolumeDown, p.keymap.VolumeUp, "lower / raise volume"),
 		helpLine(p.keymap.CyclePane, "cycle artwork, lyrics, eq, and visualizer panes"),
 		helpLine(p.keymap.ToggleInfo, "show or hide track information"),
@@ -197,12 +240,10 @@ func (p *playbackScreen) controlsOverlay() string {
 	width := min(p.width, max(36, p.width-4))
 	return components.RenderPanel(components.PanelOptions{
 		Title: "Playback",
-		Subtitle: fmt.Sprintf("%s pause · %s / %s next/prev · %s / %s seek",
+		Subtitle: fmt.Sprintf("%s pause · %s / %s next/prev",
 			bindingLabel(p.keymap.TogglePause),
 			bindingLabel(p.keymap.PreviousTrack),
 			bindingLabel(p.keymap.NextTrack),
-			bindingLabel(p.keymap.SeekBackward),
-			bindingLabel(p.keymap.SeekForward),
 		),
 		Width:   width,
 		Height:  6,
@@ -261,50 +302,38 @@ func (p *playbackScreen) centerView(width, height int) string {
 
 	switch p.pane {
 	case PaneLyrics:
-		if p.services.Lyrics != nil && trackID != "" {
-			lines, err := p.services.Lyrics.Lyrics(trackID)
-			if err == nil && len(lines) > 0 {
-				content := strings.Join(lines, "\n")
-				return lipgloss.NewStyle().Width(width).Height(height).Render(content)
-			}
+		p.refreshLyrics(trackID)
+		if len(p.lyricsLines) > 0 {
+			content := strings.Join(p.lyricsLines, "\n")
+			return lipgloss.NewStyle().Width(width).Height(height).Render(content)
 		}
 		return components.RenderEmptyState(width, height, "Lyrics unavailable", "Hook up a lyrics provider to replace this placeholder with scrollable lyric content.")
 	case PaneEQ, PaneVisualizer:
-		if p.services.Visualization != nil {
-			if content, err := p.services.Visualization.Placeholder(p.pane, width, height); err == nil && strings.TrimSpace(content) != "" {
-				return lipgloss.NewStyle().Width(width).Height(height).Render(content)
-			}
+		p.refreshVisualization(width, height)
+		if strings.TrimSpace(p.visualContent) != "" {
+			return lipgloss.NewStyle().Width(width).Height(height).Render(p.visualContent)
 		}
 		return components.RenderEmptyState(width, height, p.pane.String()+" placeholder", "Attach a visualization provider to render live analysis inside this pane.")
 	default:
-		p.artStatus = ""
 		p.artwork.SetSize(width, height)
-		if p.services.Artwork != nil && trackInfo != nil {
-			source, err := p.services.Artwork.Artwork(trackInfo.CoverArtMetadata())
-			if err != nil {
-				p.artStatus = err.Error()
-				p.artwork.SetSource(nil)
-			} else {
-				p.artwork.SetSource(source)
-				if artwork := strings.TrimSpace(p.artwork.View()); artwork != "" {
-					return lipgloss.Place(
-						width,
-						height,
-						lipgloss.Center,
-						lipgloss.Center,
-						artwork,
-						lipgloss.WithWhitespaceChars("·"),
-						lipgloss.WithWhitespaceForeground(lipgloss.Color("238")),
-					)
-				}
-				if renderErr := p.artwork.Error(); renderErr != nil {
-					p.artStatus = fmt.Sprintf("Artwork render failed: %v", renderErr)
-				} else if source != nil && strings.TrimSpace(source.Description) != "" {
-					p.artStatus = source.Description
-				}
-			}
-		} else {
-			p.artwork.SetSource(nil)
+		p.refreshArtwork(trackInfo)
+		if artwork := strings.TrimSpace(p.artwork.View()); artwork != "" {
+			return lipgloss.Place(
+				width,
+				height,
+				lipgloss.Center,
+				lipgloss.Center,
+				artwork,
+				lipgloss.WithWhitespaceChars("·"),
+				lipgloss.WithWhitespaceForeground(lipgloss.Color("238")),
+			)
+		}
+		if renderErr := p.artwork.Error(); renderErr != nil {
+			p.artStatus = fmt.Sprintf("Artwork render failed: %v", renderErr)
+		} else if p.artworkErr != nil {
+			p.artStatus = p.artworkErr.Error()
+		} else if p.artworkSource != nil && strings.TrimSpace(p.artworkSource.Description) != "" {
+			p.artStatus = p.artworkSource.Description
 		}
 		body := "Artwork will appear here when an artwork provider is connected. Until then this pane defines the layout and focus of playback mode."
 		if strings.TrimSpace(p.artStatus) != "" {
@@ -312,6 +341,76 @@ func (p *playbackScreen) centerView(width, height int) string {
 		}
 		return components.RenderEmptyState(width, height, "Album art", body)
 	}
+}
+
+func (p *playbackScreen) refreshArtwork(trackInfo *TrackInfo) {
+	p.artStatus = ""
+	if p.services.Artwork == nil || trackInfo == nil {
+		p.clearArtworkCache()
+		return
+	}
+	key := artworkCacheKey(trackInfo)
+	if key != p.artworkTrackKey {
+		source, err := p.services.Artwork.Artwork(trackInfo.CoverArtMetadata())
+		p.artworkTrackKey = key
+		p.artworkSource = source
+		p.artworkErr = err
+		p.artwork.SetSource(source)
+		return
+	}
+}
+
+func (p *playbackScreen) clearArtworkCache() {
+	p.artworkTrackKey = ""
+	p.artworkSource = nil
+	p.artworkErr = nil
+	p.artwork.SetSource(nil)
+}
+
+func artworkCacheKey(track *TrackInfo) string {
+	if track == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%s",
+		track.ID,
+		track.Source,
+		track.Title,
+		track.Artist,
+		track.Album,
+	)
+}
+
+func (p *playbackScreen) refreshLyrics(trackID string) {
+	if p.services.Lyrics == nil || trackID == "" {
+		p.lyricsTrackID = ""
+		p.lyricsLines = nil
+		p.lyricsErr = nil
+		return
+	}
+	if trackID == p.lyricsTrackID {
+		return
+	}
+	lines, err := p.services.Lyrics.Lyrics(trackID)
+	p.lyricsTrackID = trackID
+	p.lyricsLines = append([]string(nil), lines...)
+	p.lyricsErr = err
+}
+
+func (p *playbackScreen) refreshVisualization(width, height int) {
+	if p.services.Visualization == nil {
+		p.visualKey = ""
+		p.visualContent = ""
+		p.visualErr = nil
+		return
+	}
+	key := fmt.Sprintf("%s:%dx%d", p.pane.String(), width, height)
+	if key == p.visualKey {
+		return
+	}
+	content, err := p.services.Visualization.Placeholder(p.pane, width, height)
+	p.visualKey = key
+	p.visualContent = content
+	p.visualErr = err
 }
 
 func (p *playbackScreen) refreshSnapshot() {
@@ -326,32 +425,29 @@ func (p *playbackScreen) refreshSnapshot() {
 
 func (p *playbackScreen) adjustVolume(delta int) string {
 	if p.services.Playback != nil {
-		if err := p.services.Playback.AdjustVolume(delta); err != nil {
-			return err.Error()
-		}
-		p.refreshSnapshot()
+		return ""
 	} else {
 		p.snapshot.Volume = clamp(p.snapshot.Volume+delta, 0, 100)
 	}
 	return fmt.Sprintf("Volume set to %d%%.", p.snapshot.Volume)
 }
 
-func (p *playbackScreen) seek(delta time.Duration) string {
-	if p.services.Playback != nil {
-		if err := p.services.Playback.Seek(delta); err != nil {
-			return err.Error()
+func (p *playbackScreen) runPlaybackAction(run func(PlaybackService) error, status func(PlaybackSnapshot) string) tea.Cmd {
+	if p.services.Playback == nil || p.pending {
+		return nil
+	}
+	p.pending = true
+	playback := p.services.Playback
+	return func() tea.Msg {
+		if err := run(playback); err != nil {
+			return playbackActionResult{err: err}
 		}
-		p.refreshSnapshot()
-	} else {
-		p.snapshot.Position += delta
-		if p.snapshot.Position < 0 {
-			p.snapshot.Position = 0
-		}
-		if p.snapshot.Duration > 0 && p.snapshot.Position > p.snapshot.Duration {
-			p.snapshot.Position = p.snapshot.Duration
+		snapshot := playback.Snapshot()
+		return playbackActionResult{
+			snapshot: snapshot,
+			status:   status(snapshot),
 		}
 	}
-	return fmt.Sprintf("Scrubber moved to %s.", formatDuration(p.snapshot.Position))
 }
 
 func paneHint(pane PlaybackPane) string {

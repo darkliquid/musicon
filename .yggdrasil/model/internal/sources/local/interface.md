@@ -16,6 +16,7 @@ The resulting type implements:
 - Local discovery should refresh over time so newly added or removed files can appear without restarting Musicon.
 - Search results must preserve local file paths and best-effort embedded-art metadata for downstream cover-art resolution, so sibling artwork can still be found when playback begins.
 - Local discovery searches should match path-style queries against absolute and library-relative file paths as well as title/artist/album metadata, so users can paste or type filesystem fragments directly.
+- Local discovery search should honor caller cancellation so the queue UI can abandon superseded work during live typing.
 - Resolver output must decode supported local files into playable `beep` streams and provide track info rich enough for the playback UI.
 
 # Failure modes

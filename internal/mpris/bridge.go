@@ -132,7 +132,8 @@ func (b *Bridge) Next() *dbus.Error      { return b.call(b.playback.Next) }
 func (b *Bridge) Previous() *dbus.Error  { return b.call(b.playback.Previous) }
 func (b *Bridge) PlayPause() *dbus.Error { return b.call(b.playback.TogglePause) }
 func (b *Bridge) Seek(offset int64) *dbus.Error {
-	return b.call(func() error { return b.playback.Seek(time.Duration(offset) * time.Microsecond) })
+	_ = offset
+	return dbus.MakeFailedError(fmt.Errorf("seeking is not supported"))
 }
 
 func (b *Bridge) Pause() *dbus.Error {
@@ -164,9 +165,6 @@ func (b *Bridge) Stop() *dbus.Error {
 	if snapshot.Position == 0 {
 		return nil
 	}
-	if err := b.playback.Seek(-snapshot.Position); err != nil {
-		return dbus.MakeFailedError(err)
-	}
 	return nil
 }
 
@@ -178,9 +176,8 @@ func (b *Bridge) SetPosition(trackID dbus.ObjectPath, position int64) *dbus.Erro
 	if trackID != trackObjectPath(snapshot.Track.ID) {
 		return nil
 	}
-	target := time.Duration(position) * time.Microsecond
-	delta := target - snapshot.Position
-	return b.call(func() error { return b.playback.Seek(delta) })
+	_ = position
+	return dbus.MakeFailedError(fmt.Errorf("seeking is not supported"))
 }
 
 func (b *Bridge) OpenUri(uri string) *dbus.Error {

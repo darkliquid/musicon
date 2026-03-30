@@ -31,7 +31,7 @@ func TestLibrarySearchFindsLocalAudioFiles(t *testing.T) {
 	writeSilentWAV(t, audioPath)
 
 	library := NewLibrary(Options{Roots: []string{dir}})
-	results, err := library.Search(teaui.SearchRequest{
+	results, err := library.Search(context.Background(), teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "song",
 		Filters:  teaui.DefaultSearchFilters(),
@@ -88,7 +88,7 @@ func TestLibraryRefreshesSearchResultsWhenFilesChange(t *testing.T) {
 	library := NewLibrary(Options{Roots: []string{dir}})
 	library.RefreshInterval = 0
 
-	results, err := library.Search(teaui.SearchRequest{
+	results, err := library.Search(context.Background(), teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "first",
 		Filters:  teaui.DefaultSearchFilters(),
@@ -103,7 +103,7 @@ func TestLibraryRefreshesSearchResultsWhenFilesChange(t *testing.T) {
 	secondPath := filepath.Join(dir, "Second.wav")
 	writeSilentWAV(t, secondPath)
 
-	results, err = library.Search(teaui.SearchRequest{
+	results, err = library.Search(context.Background(), teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "second",
 		Filters:  teaui.DefaultSearchFilters(),
@@ -126,7 +126,7 @@ func TestLibrarySearchFindsNestedFilesByPathFragment(t *testing.T) {
 	writeSilentWAV(t, audioPath)
 
 	library := NewLibrary(Options{Roots: []string{dir}})
-	results, err := library.Search(teaui.SearchRequest{
+	results, err := library.Search(context.Background(), teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "artist/album/track.wav",
 		Filters:  teaui.DefaultSearchFilters(),
@@ -149,7 +149,7 @@ func TestLibrarySearchArtworkMetadataResolvesSiblingCover(t *testing.T) {
 	}
 
 	library := NewLibrary(Options{Roots: []string{dir}})
-	results, err := library.Search(teaui.SearchRequest{
+	results, err := library.Search(context.Background(), teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "track",
 		Filters:  teaui.DefaultSearchFilters(),
@@ -178,7 +178,7 @@ func TestLibrarySearchSpansMultipleConfiguredRoots(t *testing.T) {
 	writeSilentWAV(t, audioPath)
 
 	library := NewLibrary(Options{Roots: []string{first, second}})
-	results, err := library.Search(teaui.SearchRequest{
+	results, err := library.Search(context.Background(), teaui.SearchRequest{
 		SourceID: sourceID,
 		Query:    "elsewhere",
 		Filters:  teaui.DefaultSearchFilters(),

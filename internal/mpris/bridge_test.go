@@ -9,14 +9,13 @@ import (
 
 type stubPlayback struct{ snapshot ui.PlaybackSnapshot }
 
-func (s stubPlayback) Snapshot() ui.PlaybackSnapshot  { return s.snapshot }
-func (s stubPlayback) TogglePause() error             { return nil }
-func (s stubPlayback) Previous() error                { return nil }
-func (s stubPlayback) Next() error                    { return nil }
-func (s stubPlayback) Seek(delta time.Duration) error { _ = delta; return nil }
-func (s stubPlayback) AdjustVolume(delta int) error   { _ = delta; return nil }
-func (s stubPlayback) SetRepeat(repeat bool) error    { _ = repeat; return nil }
-func (s stubPlayback) SetStream(stream bool) error    { _ = stream; return nil }
+func (s stubPlayback) Snapshot() ui.PlaybackSnapshot { return s.snapshot }
+func (s stubPlayback) TogglePause() error            { return nil }
+func (s stubPlayback) Previous() error               { return nil }
+func (s stubPlayback) Next() error                   { return nil }
+func (s stubPlayback) AdjustVolume(delta int) error  { _ = delta; return nil }
+func (s stubPlayback) SetRepeat(repeat bool) error   { _ = repeat; return nil }
+func (s stubPlayback) SetStream(stream bool) error   { _ = stream; return nil }
 
 func TestPlaybackStatus(t *testing.T) {
 	if got := playbackStatus(ui.PlaybackSnapshot{}); got != "Stopped" {

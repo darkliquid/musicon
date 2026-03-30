@@ -13,6 +13,7 @@ The node should expose a small lifecycle-oriented surface:
 - MPRIS property updates should tolerate missing track metadata and idle playback.
 - Desktop transport requests must map to Musicon playback controls without blocking the terminal UI loop.
 - Writable MPRIS properties such as loop status and volume must flow back into the same playback runtime used by the TUI.
+- MPRIS seek-style requests should fail explicitly because Musicon no longer exposes seek control through its playback service.
 
 # Failure modes
 

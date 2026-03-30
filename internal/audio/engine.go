@@ -58,6 +58,7 @@ type Engine struct {
 	closed        bool
 	speaker       *runtimeSpeaker
 	speakerErr    error
+	lastSnapshot  teaui.PlaybackSnapshot
 }
 
 type activeTrack struct {
@@ -91,6 +92,10 @@ func NewEngine(options Options) *Engine {
 		bufferSamples: rate.N(bufferDuration),
 		speaker:       newRuntimeSpeaker(backends),
 		speakerErr:    backendErr,
+		lastSnapshot: teaui.PlaybackSnapshot{
+			Volume:     70,
+			QueueIndex: -1,
+		},
 	}
 }
 
@@ -243,9 +248,17 @@ func (e *Engine) ClearQueue() error {
 }
 
 func (e *Engine) PlaybackSnapshot() teaui.PlaybackSnapshot {
-	e.mu.Lock()
+	if !e.mu.TryLock() {
+		return e.lastSnapshot
+	}
 	defer e.mu.Unlock()
 
+	snapshot := e.playbackSnapshotLocked()
+	e.lastSnapshot = snapshot
+	return snapshot
+}
+
+func (e *Engine) playbackSnapshotLocked() teaui.PlaybackSnapshot {
 	snapshot := teaui.PlaybackSnapshot{
 		Repeat:      e.repeat,
 		Stream:      e.stream,
@@ -330,32 +343,6 @@ func (e *Engine) Next() error {
 		e.currentIndex++
 	}
 	return e.startCurrentLocked(false)
-}
-
-func (e *Engine) Seek(delta time.Duration) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.closed {
-		return errors.New("audio runtime is closed")
-	}
-	if e.current == nil || e.current.stream == nil {
-		return errors.New("no active track")
-	}
-
-	target := e.currentPositionLocked() + delta
-	if target < 0 {
-		target = 0
-	}
-	duration := e.currentDurationLocked()
-	if duration > 0 && target > duration {
-		target = duration
-	}
-	samplePosition := e.current.format.SampleRate.N(target)
-	var seekErr error
-	e.withSpeakerLock(func() {
-		seekErr = e.current.stream.Seek(samplePosition)
-	})
-	return seekErr
 }
 
 func (e *Engine) AdjustVolume(delta int) error {
@@ -587,7 +574,6 @@ func (s playbackService) Snapshot() teaui.PlaybackSnapshot { return s.engine.Pla
 func (s playbackService) TogglePause() error               { return s.engine.TogglePause() }
 func (s playbackService) Previous() error                  { return s.engine.Previous() }
 func (s playbackService) Next() error                      { return s.engine.Next() }
-func (s playbackService) Seek(delta time.Duration) error   { return s.engine.Seek(delta) }
 func (s playbackService) AdjustVolume(delta int) error     { return s.engine.AdjustVolume(delta) }
 func (s playbackService) SetRepeat(repeat bool) error      { return s.engine.SetRepeat(repeat) }
 func (s playbackService) SetStream(stream bool) error      { return s.engine.SetStream(stream) }

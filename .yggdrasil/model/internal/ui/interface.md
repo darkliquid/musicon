@@ -7,9 +7,9 @@ The node currently exposes a small application-facing surface from `internal/ui`
 
 The `Services` struct carries the backend-facing contracts the UI compiles against:
 
-- `SearchService` for source discovery and result retrieval
+- `SearchService` for source discovery and result retrieval, with caller-supplied context so UI search can cancel superseded provider work
 - `QueueService` for queue snapshots and mutation
-- `PlaybackService` for transport, seek, volume, and playback snapshots
+- `PlaybackService` for transport, volume, and playback snapshots
 - `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with artwork providers receiving reusable cover-art metadata and supplying image data to reusable rendering components
 - `Options` for startup mode, theme selection, cell-width ratio, and playback artwork rendering preferences
 
@@ -30,10 +30,11 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Queue mode must keep query editing and browser navigation live at the same time: when search is focused, typing and deletion refresh the active search while non-printing navigation keys continue to change the selected row; when search is unfocused, queue-management shortcuts such as source switching, filter toggles, removal, and reorder actions become active again.
 - Queue mode must expose a dedicated search-focus toggle so users can type literal characters that may also be bound as queue shortcuts.
 - Queue mode must not block the Bubble Tea event loop on source-backed searches; slow or networked searches should resolve asynchronously so quit, mode switching, and navigation remain responsive.
+- Queue mode should debounce live search input and cancel superseded in-flight searches so remote providers do not spin up one request per keystroke.
 - The UI must accept typed, config-driven keybindings for global shell actions and per-screen controls instead of hardcoding Bubble Tea key strings inside each update loop.
 - Queue mode should clearly mark the currently playing queued item so users can tell which pinned row is active even while browsing or reordering the rest of the queue.
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
-- Playback mode owns pane switching, transport key routing, scrubber controls, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
+- Playback mode owns pane switching, transport key routing, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
 - Playback mode should accept album-art rendering preferences from UI startup options so fill mode and protocol selection no longer depend on each screen reading env directly.
 - Playback mode should treat the active artwork/lyrics/eq/visualizer pane as the base layer and place pane labels, transport controls, and optional track metadata as overlays within that same square instead of stacking separate panels below it.
 - When rendered artwork does not occupy the full playback pane, the remaining pane area should use a muted filler pattern so the image bounds remain legible without overwhelming the artwork itself.

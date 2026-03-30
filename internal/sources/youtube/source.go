@@ -1,27 +1,30 @@
+// Package youtube implements Musicon's YouTube Music provider.
+//
+// The package intentionally separates "what the source does" from "how bytes are
+// fetched and decoded":
+//   - source.go keeps the top-level Source surface small
+//   - search.go owns search and URL inspection
+//   - media.go owns yt-dlp extraction and ranged HTTP reads
+//   - stream.go owns WebM/Opus buffering and decode
+//
+// That split matters because the package has to satisfy two different app
+// contracts at once: `ui.SearchService` for discovery and `audio.Resolver` for
+// playable audio streams.
 package youtube
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
+	"io"
+	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/darkliquid/musicon/internal/audio"
 	teaui "github.com/darkliquid/musicon/internal/ui"
-	"github.com/darkliquid/musicon/pkg/coverart"
 	"github.com/gopxl/beep"
-	"github.com/gopxl/beep/mp3"
-	"github.com/lrstanley/go-ytdlp"
+	youtubev2 "github.com/kkdai/youtube/v2"
 )
 
 const (
@@ -29,16 +32,20 @@ const (
 	sourceName            = "YouTube Music"
 	entryIDPrefix         = "youtube:"
 	defaultMaxResults     = 20
-	defaultSearchTimeout  = 90 * time.Second
+	defaultSearchTimeout  = 20 * time.Second
 	defaultResolveTimeout = 10 * time.Minute
+	musicSearchEndpoint   = "https://music.youtube.com/youtubei/v1/search?prettyPrint=false"
+	musicClientName       = "WEB_REMIX"
+	musicClientVersion    = "1.20240417.01.01"
+	opusFrameSize         = 5760
+	initialBufferDuration = 250 * time.Millisecond
+	initialPCMBufferBytes = 1 << 20
+	mediaRequestBlockSize = 256 << 10
+	farSeekDebounce       = 80 * time.Millisecond
+	seekSettleDuration    = 120 * time.Millisecond
 )
 
-type commandOutput struct {
-	Stdout string
-	Stderr string
-}
-
-// Options configures the yt-dlp-backed YouTube source.
+// Options configures the YouTube Music source.
 type Options struct {
 	Enabled            bool
 	MaxResults         int
@@ -48,77 +55,73 @@ type Options struct {
 	CacheDir           string
 }
 
-// Source provides YouTube-backed search and cached playback resolution.
+type youtubeClient interface {
+	GetVideoContext(context.Context, string) (*youtubev2.Video, error)
+	GetPlaylistContext(context.Context, string) (*youtubev2.Playlist, error)
+}
+
+// Source is the high-level provider object wired into the rest of the app.
+//
+// It deliberately stores a few function fields (`openMedia`, `streamDecode`,
+// `openYTDLP`) so tests can replace the expensive external/media pieces without
+// stubbing the entire provider.
 type Source struct {
-	enabled            bool
-	maxResults         int
-	cookiesFile        string
-	cookiesFromBrowser string
-	extraArgs          []string
-	cacheDir           string
-
-	installOnce sync.Once
-	installErr  error
-
-	postProcessOnce sync.Once
-	postProcessErr  error
-
-	run               func(context.Context, *ytdlp.Command, ...string) (commandOutput, error)
-	ensureYTDLP       func(context.Context) error
-	ensurePostProcess func(context.Context) error
-	decode            func(string) (beep.StreamSeekCloser, beep.Format, error)
+	enabled        bool
+	maxResults     int
+	httpClient     *http.Client
+	searchEndpoint string
+	cookiesFile    string
+	cookiesBrowser string
+	extraArgs      []string
+	cacheDir       string
+	yt             youtubeClient
+	openMedia      func(context.Context, string, time.Duration) (beep.StreamSeekCloser, beep.Format, error)
+	streamDecode   func(context.Context, io.ReadCloser, func() error, int) (beep.StreamSeekCloser, beep.Format, error)
+	openYTDLP      func(context.Context, string) (io.ReadCloser, func() error, error)
 }
 
-type ytEntry struct {
-	Type        string    `json:"_type"`
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Artist      string    `json:"artist"`
-	Album       string    `json:"album"`
-	Uploader    string    `json:"uploader"`
-	Channel     string    `json:"channel"`
-	WebpageURL  string    `json:"webpage_url"`
-	OriginalURL string    `json:"original_url"`
-	URL         string    `json:"url"`
-	Duration    float64   `json:"duration"`
-	LiveStatus  string    `json:"live_status"`
-	IsLive      bool      `json:"is_live"`
-	Entries     []ytEntry `json:"entries"`
-}
-
-// NewSource constructs a YouTube-backed source using yt-dlp under the hood.
+// NewSource constructs a provider that:
+//   - searches YouTube Music through its HTTP endpoint
+//   - inspects pasted URLs through youtube/v2
+//   - resolves playback by asking yt-dlp for a final media URL
+//   - decodes WebM/Opus in-process instead of shelling out to ffmpeg
 func NewSource(options Options) *Source {
-	s := &Source{
-		enabled:            options.Enabled,
-		maxResults:         normalizeMaxResults(options.MaxResults),
-		cookiesFile:        strings.TrimSpace(options.CookiesFile),
-		cookiesFromBrowser: strings.TrimSpace(options.CookiesFromBrowser),
-		extraArgs:          normalizeExtraArgs(options.ExtraArgs),
-		cacheDir:           strings.TrimSpace(options.CacheDir),
+	httpClient := http.DefaultClient
+	source := &Source{
+		enabled:        options.Enabled,
+		maxResults:     normalizeMaxResults(options.MaxResults),
+		httpClient:     httpClient,
+		searchEndpoint: musicSearchEndpoint,
+		cookiesFile:    strings.TrimSpace(options.CookiesFile),
+		cookiesBrowser: strings.TrimSpace(options.CookiesFromBrowser),
+		extraArgs:      append([]string(nil), options.ExtraArgs...),
+		cacheDir:       strings.TrimSpace(options.CacheDir),
+		yt:             &youtubev2.Client{HTTPClient: httpClient},
+		openMedia:      nil,
+		streamDecode:   streamWebMOpus,
 	}
-	s.run = s.runCommand
-	s.ensureYTDLP = s.ensureYTDLPInstalled
-	s.ensurePostProcess = s.ensurePostProcessorsInstalled
-	s.decode = decodeMP3File
-	return s
+	source.openYTDLP = source.openYTDLPStream
+	source.openMedia = source.openYTDLPMedia
+	return source
 }
 
 func (s *Source) Sources() []teaui.SourceDescriptor {
 	if s == nil || !s.enabled {
 		return nil
 	}
-	description := "Search and play YouTube Music via yt-dlp."
-	if s.cookiesFile != "" || s.cookiesFromBrowser != "" {
-		description += " Auth is configured for private playlists and uploads."
-	}
 	return []teaui.SourceDescriptor{{
 		ID:          sourceID,
 		Name:        sourceName,
-		Description: description,
+		Description: "Search YouTube Music directly and play streams through yt-dlp plus pure-Go Opus decode.",
 	}}
 }
 
-func (s *Source) Search(request teaui.SearchRequest) ([]teaui.SearchResult, error) {
+// Search routes plain-text queries to the YouTube Music search endpoint and URL
+// inputs to metadata inspection.
+//
+// This keeps queue UX predictable: users can paste a concrete URL for exact
+// resolution, while ordinary text stays on the fast search path.
+func (s *Source) Search(ctx context.Context, request teaui.SearchRequest) ([]teaui.SearchResult, error) {
 	if s == nil || !s.enabled {
 		return nil, nil
 	}
@@ -130,12 +133,8 @@ func (s *Source) Search(request teaui.SearchRequest) ([]teaui.SearchResult, erro
 		return nil, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), defaultSearchTimeout)
+	ctx, cancel := context.WithTimeout(ctx, defaultSearchTimeout)
 	defer cancel()
-
-	if err := s.ensureYTDLP(ctx); err != nil {
-		return nil, err
-	}
 
 	if looksLikeURL(query) {
 		if !isYouTubeURL(query) {
@@ -146,6 +145,14 @@ func (s *Source) Search(request teaui.SearchRequest) ([]teaui.SearchResult, erro
 	return s.searchQuery(ctx, query, request.Filters)
 }
 
+// Resolve turns a queued YouTube entry into a playable track.
+//
+// Resolution intentionally combines two different data sources:
+//   - youtube/v2 for richer metadata when available
+//   - yt-dlp for the actual media URL + request headers needed for playback
+//
+// If metadata lookup fails but yt-dlp playback still succeeds, Resolve returns
+// a playable track and falls back to queue-provided metadata.
 func (s *Source) Resolve(entry teaui.QueueEntry) (audio.ResolvedTrack, error) {
 	if s == nil || !s.enabled {
 		return audio.ResolvedTrack{}, errors.New("youtube source is disabled")
@@ -157,356 +164,31 @@ func (s *Source) Resolve(entry teaui.QueueEntry) (audio.ResolvedTrack, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultResolveTimeout)
 	defer cancel()
 
-	if err := s.ensureYTDLP(ctx); err != nil {
-		return audio.ResolvedTrack{}, err
+	duration := entry.Duration
+	video, metadataErr := s.yt.GetVideoContext(ctx, entryURLFromID(entry.ID))
+	duration = firstDuration(duration, videoDuration(video))
+	if s.openMedia == nil {
+		return audio.ResolvedTrack{}, errors.New("youtube source has no media opener")
 	}
-	if err := s.ensurePostProcess(ctx); err != nil {
-		return audio.ResolvedTrack{}, err
-	}
-
-	cacheFile, err := s.cacheFilePath(entryURLFromID(entry.ID))
+	decoded, formatInfo, err := s.openMedia(ctx, entryURLFromID(entry.ID), duration)
 	if err != nil {
-		return audio.ResolvedTrack{}, err
-	}
-	if err := os.MkdirAll(filepath.Dir(cacheFile), 0o755); err != nil {
-		return audio.ResolvedTrack{}, fmt.Errorf("create youtube cache dir: %w", err)
-	}
-	if _, statErr := os.Stat(cacheFile); statErr != nil {
-		if !errors.Is(statErr, os.ErrNotExist) {
-			return audio.ResolvedTrack{}, fmt.Errorf("stat youtube cache: %w", statErr)
+		if metadataErr != nil {
+			return audio.ResolvedTrack{}, fmt.Errorf("load youtube video metadata: %v; yt-dlp playback failed: %w", metadataErr, err)
 		}
-		if err := s.downloadAudio(ctx, entryURLFromID(entry.ID), cacheFile); err != nil {
-			return audio.ResolvedTrack{}, err
-		}
-	}
-
-	stream, format, err := s.decode(cacheFile)
-	if err != nil {
-		return audio.ResolvedTrack{}, err
+		return audio.ResolvedTrack{}, fmt.Errorf("yt-dlp playback failed: %w", err)
 	}
 
 	info := teaui.TrackInfo{
 		ID:       entry.ID,
-		Title:    firstNonEmpty(entry.Artwork.Title, entry.Title),
-		Artist:   firstNonEmpty(entry.Artwork.Artist, entry.Subtitle),
+		Title:    firstNonEmpty(entry.Artwork.Title, videoTitle(video), entry.Title),
+		Artist:   firstNonEmpty(entry.Artwork.Artist, videoAuthor(video), entry.Subtitle),
 		Album:    entry.Artwork.Album,
 		Source:   firstNonEmpty(entry.Source, sourceName),
-		Duration: entry.Duration,
+		Duration: firstDuration(entry.Duration, videoDuration(video)),
 		Artwork:  entry.Artwork.Normalize(),
 	}
 
-	return audio.ResolvedTrack{
-		Info:   info,
-		Format: format,
-		Stream: stream,
-	}, nil
-}
-
-// OwnsEntryID reports whether the queue ID belongs to the YouTube source.
-func OwnsEntryID(id string) bool {
-	return strings.HasPrefix(id, entryIDPrefix)
-}
-
-func (s *Source) searchQuery(ctx context.Context, query string, filters teaui.SearchFilters) ([]teaui.SearchResult, error) {
-	cmd := ytdlp.New().
-		DefaultSearch(fmt.Sprintf("ytsearch%d", s.maxResults)).
-		DumpJSON().
-		SkipDownload().
-		SetSeparateProcessGroup(true)
-	s.applyAuth(cmd)
-
-	output, err := s.run(ctx, cmd, query)
-	if err != nil {
-		return nil, err
-	}
-
-	scanner := bufio.NewScanner(strings.NewReader(output.Stdout))
-	const maxJSONLine = 10 * 1024 * 1024
-	scanner.Buffer(make([]byte, 0, 64*1024), maxJSONLine)
-
-	results := make([]teaui.SearchResult, 0, s.maxResults)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		var entry ytEntry
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			return nil, fmt.Errorf("parse yt-dlp search output: %w", err)
-		}
-		results = append(results, s.entryResults(entry, filters)...)
-		if len(results) >= s.maxResults {
-			return results[:s.maxResults], nil
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan yt-dlp search output: %w", err)
-	}
-	return results, nil
-}
-
-func (s *Source) inspectURL(ctx context.Context, rawURL string, filters teaui.SearchFilters) ([]teaui.SearchResult, error) {
-	cmd := ytdlp.New().
-		DumpSingleJSON().
-		SkipDownload().
-		SetSeparateProcessGroup(true)
-	s.applyAuth(cmd)
-
-	output, err := s.run(ctx, cmd, rawURL)
-	if err != nil {
-		return nil, err
-	}
-
-	var entry ytEntry
-	if err := json.Unmarshal([]byte(strings.TrimSpace(output.Stdout)), &entry); err != nil {
-		return nil, fmt.Errorf("parse yt-dlp URL output: %w", err)
-	}
-	return s.entryResults(entry, filters), nil
-}
-
-func (s *Source) entryResults(entry ytEntry, filters teaui.SearchFilters) []teaui.SearchResult {
-	if len(entry.Entries) > 0 {
-		results := make([]teaui.SearchResult, 0, len(entry.Entries))
-		for _, child := range entry.Entries {
-			results = append(results, s.entryResults(child, filters)...)
-			if len(results) >= s.maxResults {
-				return results[:s.maxResults]
-			}
-		}
-		return results
-	}
-
-	kind := mediaKindForEntry(entry)
-	if kind == teaui.MediaPlaylist || !filters.Matches(kind) {
-		return nil
-	}
-
-	resolvedURL := entryURL(entry)
-	if resolvedURL == "" {
-		return nil
-	}
-
-	title := firstNonEmpty(entry.Title, entry.ID, resolvedURL)
-	artist := firstNonEmpty(entry.Artist, entry.Uploader, entry.Channel)
-	metadata := coverart.Metadata{
-		Title:  title,
-		Album:  entry.Album,
-		Artist: artist,
-	}.Normalize()
-
-	return []teaui.SearchResult{{
-		ID:       entryIDPrefix + resolvedURL,
-		Title:    title,
-		Subtitle: firstNonEmpty(artist, entry.Album, sourceName),
-		Source:   sourceName,
-		Kind:     kind,
-		Duration: durationFromSeconds(entry.Duration),
-		Artwork:  metadata,
-	}}
-}
-
-func mediaKindForEntry(entry ytEntry) teaui.MediaKind {
-	switch {
-	case len(entry.Entries) > 0 || entry.Type == "playlist" || entry.Type == "multi_video":
-		return teaui.MediaPlaylist
-	case entry.IsLive || strings.EqualFold(entry.LiveStatus, "is_live"):
-		return teaui.MediaStream
-	default:
-		return teaui.MediaTrack
-	}
-}
-
-func entryURL(entry ytEntry) string {
-	for _, candidate := range []string{entry.WebpageURL, entry.OriginalURL, entry.URL} {
-		candidate = strings.TrimSpace(candidate)
-		if candidate == "" {
-			continue
-		}
-		if strings.HasPrefix(candidate, "http://") || strings.HasPrefix(candidate, "https://") {
-			return candidate
-		}
-	}
-	if entry.ID == "" {
-		return ""
-	}
-	return "https://music.youtube.com/watch?v=" + url.QueryEscape(entry.ID)
-}
-
-func entryURLFromID(id string) string {
-	return strings.TrimSpace(strings.TrimPrefix(id, entryIDPrefix))
-}
-
-func (s *Source) downloadAudio(ctx context.Context, rawURL, destination string) error {
-	cmd := ytdlp.New().
-		NoPlaylist().
-		Format("bestaudio/best").
-		ExtractAudio().
-		AudioFormat("mp3").
-		AudioQuality("0").
-		Output(destination).
-		SetSeparateProcessGroup(true)
-	s.applyAuth(cmd)
-
-	if _, err := s.run(ctx, cmd, rawURL); err != nil {
-		_ = os.Remove(destination)
-		return err
-	}
-	return nil
-}
-
-func (s *Source) runCommand(ctx context.Context, command *ytdlp.Command, args ...string) (commandOutput, error) {
-	cmd := command.BuildCommand(ctx, args...)
-	cmd.Args = mergeExtraArgs(cmd.Args, len(args), s.extraArgs)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	output := commandOutput{
-		Stdout: stdout.String(),
-		Stderr: stderr.String(),
-	}
-	if err != nil {
-		message := strings.TrimSpace(output.Stderr)
-		if message == "" {
-			message = err.Error()
-		}
-		return output, fmt.Errorf("yt-dlp failed: %s", message)
-	}
-	return output, nil
-}
-
-func mergeExtraArgs(commandArgs []string, positionalArgs int, extraArgs []string) []string {
-	if len(extraArgs) == 0 {
-		return commandArgs
-	}
-	if positionalArgs <= 0 || positionalArgs >= len(commandArgs) {
-		return append(commandArgs, extraArgs...)
-	}
-
-	flagsEnd := len(commandArgs) - positionalArgs
-	merged := make([]string, 0, len(commandArgs)+len(extraArgs))
-	merged = append(merged, commandArgs[:flagsEnd]...)
-	merged = append(merged, extraArgs...)
-	merged = append(merged, commandArgs[flagsEnd:]...)
-	return merged
-}
-
-func (s *Source) applyAuth(cmd *ytdlp.Command) {
-	if s.cookiesFile != "" {
-		cmd.Cookies(s.cookiesFile)
-		return
-	}
-	if s.cookiesFromBrowser != "" {
-		cmd.CookiesFromBrowser(s.cookiesFromBrowser)
-	}
-}
-
-func (s *Source) ensureYTDLPInstalled(ctx context.Context) error {
-	s.installOnce.Do(func() {
-		_, s.installErr = ytdlp.Install(ctx, nil)
-	})
-	return s.installErr
-}
-
-func (s *Source) ensurePostProcessorsInstalled(ctx context.Context) error {
-	s.postProcessOnce.Do(func() {
-		if _, err := ytdlp.InstallFFmpeg(ctx, nil); err != nil {
-			s.postProcessErr = err
-			return
-		}
-		_, s.postProcessErr = ytdlp.InstallFFprobe(ctx, nil)
-	})
-	return s.postProcessErr
-}
-
-func (s *Source) cacheFilePath(rawURL string) (string, error) {
-	if strings.TrimSpace(rawURL) == "" {
-		return "", errors.New("youtube entry URL is empty")
-	}
-	cacheDir := strings.TrimSpace(s.cacheDir)
-	if cacheDir == "" {
-		root, err := os.UserCacheDir()
-		if err != nil || strings.TrimSpace(root) == "" {
-			root = os.TempDir()
-		}
-		cacheDir = filepath.Join(root, "musicon", "youtube")
-	}
-	sum := sha1.Sum([]byte(rawURL))
-	return filepath.Join(cacheDir, hex.EncodeToString(sum[:])+".mp3"), nil
-}
-
-func decodeMP3File(path string) (beep.StreamSeekCloser, beep.Format, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, beep.Format{}, err
-	}
-	stream, format, err := mp3.Decode(file)
-	if err != nil {
-		_ = file.Close()
-		return nil, beep.Format{}, err
-	}
-	return stream, format, nil
-}
-
-func normalizeMaxResults(value int) int {
-	switch {
-	case value <= 0:
-		return defaultMaxResults
-	case value > 50:
-		return 50
-	default:
-		return value
-	}
-}
-
-func normalizeExtraArgs(values []string) []string {
-	normalized := make([]string, 0, len(values))
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			normalized = append(normalized, value)
-		}
-	}
-	return normalized
-}
-
-func looksLikeURL(raw string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(raw))
-	return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
-}
-
-func isYouTubeURL(raw string) bool {
-	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
-		return false
-	}
-	host := strings.ToLower(strings.TrimPrefix(parsed.Hostname(), "www."))
-	switch host {
-	case "youtube.com", "music.youtube.com", "m.youtube.com", "youtu.be", "youtube-nocookie.com":
-		return true
-	default:
-		return strings.HasSuffix(host, ".youtube.com")
-	}
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			return value
-		}
-	}
-	return ""
-}
-
-func durationFromSeconds(seconds float64) time.Duration {
-	if seconds <= 0 {
-		return 0
-	}
-	return time.Duration(seconds * float64(time.Second))
+	return audio.ResolvedTrack{Info: info, Format: formatInfo, Stream: decoded}, nil
 }
 
 var _ teaui.SearchService = (*Source)(nil)

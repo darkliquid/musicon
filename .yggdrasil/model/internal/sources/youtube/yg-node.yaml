@@ -1,15 +1,15 @@
 name: YouTubeMusicSource
 type: service
-description: "Concrete yt-dlp-backed source for YouTube and YouTube Music search, URL inspection, and cached playback"
+description: "Concrete youtube/v2-backed source for YouTube Music search, URL inspection, and yt-dlp-extracted range-backed pure-Go WebM/Opus playback"
 relations:
   - target: internal/ui
     type: implements
     consumes: [SearchService]
-    failure: "Surface yt-dlp search, auth, or metadata failures through the UI search contract without embedding provider logic in the UI"
+    failure: "Surface YouTube search, playlist inspection, or metadata failures through the UI search contract without embedding provider logic in the UI"
   - target: internal/audio
     type: implements
     consumes: [Resolver]
-    failure: "Surface download, authentication, or decode failures through the audio resolver contract"
+    failure: "Surface stream, playlist, or pure-Go decode failures through the audio resolver contract"
   - target: internal/config
     type: uses
     consumes: [Config]

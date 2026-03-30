@@ -49,8 +49,6 @@ type PlaybackKeybindOptions struct {
 	NextTrack     []string
 	VolumeDown    []string
 	VolumeUp      []string
-	SeekBackward  []string
-	SeekForward   []string
 }
 
 type KeyMap struct {
@@ -90,8 +88,6 @@ type PlaybackKeyMap struct {
 	NextTrack     bubblekey.Binding
 	VolumeDown    bubblekey.Binding
 	VolumeUp      bubblekey.Binding
-	SeekBackward  bubblekey.Binding
-	SeekForward   bubblekey.Binding
 }
 
 func defaultKeybindOptions() KeybindOptions {
@@ -130,8 +126,6 @@ func defaultKeybindOptions() KeybindOptions {
 			NextTrack:     []string{"]"},
 			VolumeDown:    []string{"-"},
 			VolumeUp:      []string{"=", "+"},
-			SeekBackward:  []string{"left"},
-			SeekForward:   []string{"right"},
 		},
 	}
 }
@@ -177,8 +171,6 @@ func normalizedKeyMap(options KeybindOptions) KeyMap {
 		NextTrack:     newBinding(options.Playback.NextTrack, defaults.Playback.NextTrack, "next track"),
 		VolumeDown:    newBinding(options.Playback.VolumeDown, defaults.Playback.VolumeDown, "lower volume"),
 		VolumeUp:      newBinding(options.Playback.VolumeUp, defaults.Playback.VolumeUp, "raise volume"),
-		SeekBackward:  newBinding(options.Playback.SeekBackward, defaults.Playback.SeekBackward, "seek backward"),
-		SeekForward:   newBinding(options.Playback.SeekForward, defaults.Playback.SeekForward, "seek forward"),
 	}
 
 	return KeyMap{

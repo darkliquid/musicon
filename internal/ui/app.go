@@ -119,24 +119,30 @@ func parsePositiveEnvInt(key string) (int, bool) {
 }
 
 func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmdBatch []tea.Cmd
+
+HandleMsg:
 	switch typed := msg.(type) {
 	case tickMsg:
-		return m, tickCmd()
+		if m.playback != nil {
+			m.playback.refreshSnapshot()
+		}
+		cmdBatch = append(cmdBatch, tickCmd())
 	case tea.WindowSizeMsg:
 		m.width = typed.Width
 		m.height = typed.Height
 		m.viewport = components.ClampSquareWithCellWidthRatio(m.width, m.height, m.cellWidthRatio)
 		m.updateSizeStatus()
 		m.resizeScreens()
-		return m, nil
 	case tea.KeyPressMsg:
 		switch {
 		case bubblekey.Matches(typed, m.keymap.Global.Quit):
-			return m, tea.Quit
+			cmdBatch = append(cmdBatch, tea.Quit)
+			break HandleMsg
 		}
 
 		if !m.layoutCheck().Fits() {
-			return m, nil
+			break HandleMsg
 		}
 
 		switch {
@@ -150,23 +156,25 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.status = fmt.Sprintf("%s help hidden.", m.mode.String())
 			}
-			return m, nil
 		}
 	}
 
-	if m.mode == ModeQueue {
+	switch m.mode {
+	case ModeQueue:
 		status, cmd := m.queue.Update(msg)
 		if status != "" {
 			m.status = status
 		}
-		return m, cmd
-	} else {
-		if status := m.playback.Update(msg); status != "" {
+		cmdBatch = append(cmdBatch, cmd)
+	case ModePlayback:
+		status, cmd := m.playback.Update(msg)
+		if status != "" {
 			m.status = status
 		}
+		cmdBatch = append(cmdBatch, cmd)
 	}
 
-	return m, nil
+	return m, tea.Batch(cmdBatch...)
 }
 
 func (m *rootModel) View() tea.View {
@@ -343,7 +351,6 @@ func (m *rootModel) playbackSnapshot() PlaybackSnapshot {
 	if m.playback == nil {
 		return PlaybackSnapshot{}
 	}
-	m.playback.refreshSnapshot()
 	return m.playback.snapshot
 }
 
@@ -480,12 +487,6 @@ func mergeKeybindOptions(defaults, provided KeybindOptions) KeybindOptions {
 	}
 	if len(provided.Playback.VolumeUp) > 0 {
 		merged.Playback.VolumeUp = append([]string(nil), provided.Playback.VolumeUp...)
-	}
-	if len(provided.Playback.SeekBackward) > 0 {
-		merged.Playback.SeekBackward = append([]string(nil), provided.Playback.SeekBackward...)
-	}
-	if len(provided.Playback.SeekForward) > 0 {
-		merged.Playback.SeekForward = append([]string(nil), provided.Playback.SeekForward...)
 	}
 
 	return merged

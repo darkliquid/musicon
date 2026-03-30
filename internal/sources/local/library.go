@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -72,14 +73,17 @@ func (l *Library) Sources() []teaui.SourceDescriptor {
 	}}
 }
 
-func (l *Library) Search(request teaui.SearchRequest) ([]teaui.SearchResult, error) {
+func (l *Library) Search(ctx context.Context, request teaui.SearchRequest) ([]teaui.SearchResult, error) {
 	if request.SourceID != "" && request.SourceID != "all" && request.SourceID != sourceID {
 		return nil, nil
 	}
 	if !request.Filters.Matches(teaui.MediaTrack) {
 		return nil, nil
 	}
-	tracks, err := l.scan()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	tracks, err := l.scan(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +94,9 @@ func (l *Library) Search(request teaui.SearchRequest) ([]teaui.SearchResult, err
 
 	results := make([]teaui.SearchResult, 0, min(len(tracks), 200))
 	for _, track := range tracks {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if !matchesQuery(track.haystack, query) {
 			continue
 		}
@@ -102,7 +109,7 @@ func (l *Library) Search(request teaui.SearchRequest) ([]teaui.SearchResult, err
 }
 
 func (l *Library) Resolve(entry teaui.QueueEntry) (audio.ResolvedTrack, error) {
-	tracks, err := l.scan()
+	tracks, err := l.scan(context.Background())
 	if err != nil {
 		return audio.ResolvedTrack{}, err
 	}
@@ -135,7 +142,7 @@ func (l *Library) Resolve(entry teaui.QueueEntry) (audio.ResolvedTrack, error) {
 	}, nil
 }
 
-func (l *Library) scan() ([]indexedTrack, error) {
+func (l *Library) scan(ctx context.Context) ([]indexedTrack, error) {
 	l.mu.RLock()
 	if !l.needsRefreshLocked() {
 		defer l.mu.RUnlock()
@@ -153,6 +160,12 @@ func (l *Library) scan() ([]indexedTrack, error) {
 	byID := make(map[string]indexedTrack)
 	var err error
 	for _, configuredRoot := range l.roots {
+		if ctx != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				err = ctxErr
+				break
+			}
+		}
 		root, absErr := filepath.Abs(configuredRoot)
 		if absErr != nil {
 			err = absErr
@@ -162,6 +175,11 @@ func (l *Library) scan() ([]indexedTrack, error) {
 		walkErr := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 			if walkErr != nil {
 				return walkErr
+			}
+			if ctx != nil {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr
+				}
 			}
 			if d.IsDir() {
 				return nil

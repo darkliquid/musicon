@@ -1,15 +1,20 @@
 package ui
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	bubblekey "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/darkliquid/musicon/pkg/components"
 )
+
+const defaultQueueSearchDebounce = 300 * time.Millisecond
 
 type queueBrowserRowKind int
 
@@ -43,6 +48,15 @@ type queueScreen struct {
 	lastSourceID  string
 	searchSeq     uint64
 	searching     bool
+	searchDelay   time.Duration
+	cancelSearch  context.CancelFunc
+}
+
+type queueStartSearchMsg struct {
+	seq      uint64
+	query    string
+	sourceID string
+	filters  SearchFilters
 }
 
 type queueSearchResultsMsg struct {
@@ -76,6 +90,7 @@ func newQueueScreenWithKeyMap(services Services, keymap QueueKeyMap) *queueScree
 		searchFocused: true,
 		sources:       configuredSources(services),
 		status:        "Queue mode ready. Focus search to type, unfocus it to use queue shortcuts.",
+		searchDelay:   defaultQueueSearchDebounce,
 	}
 
 	screen.syncFocus()
@@ -108,10 +123,37 @@ func (q *queueScreen) resizeBrowser() {
 
 func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	switch typed := msg.(type) {
+	case queueStartSearchMsg:
+		if typed.seq != q.searchSeq || typed.query != q.lastQuery || typed.sourceID != q.lastSourceID || typed.filters != q.filters {
+			return "", nil
+		}
+		search := q.services.Search
+		ctx, cancel := context.WithCancel(context.Background())
+		q.cancelSearch = cancel
+		return "", func() tea.Msg {
+			defer cancel()
+			results, err := search.Search(ctx, SearchRequest{
+				SourceID: typed.sourceID,
+				Query:    typed.query,
+				Filters:  typed.filters,
+			})
+			if err != nil && errors.Is(err, context.Canceled) {
+				return nil
+			}
+			return queueSearchResultsMsg{
+				seq:      typed.seq,
+				query:    typed.query,
+				sourceID: typed.sourceID,
+				filters:  typed.filters,
+				results:  results,
+				err:      err,
+			}
+		}
 	case queueSearchResultsMsg:
 		if typed.seq != q.searchSeq || typed.query != q.lastQuery || typed.sourceID != q.lastSourceID || typed.filters != q.filters {
 			return "", nil
 		}
+		q.cancelSearch = nil
 		q.searching = false
 		if typed.err != nil {
 			q.resultData = nil
@@ -258,8 +300,10 @@ func (q *queueScreen) activeSource() SourceDescriptor {
 func (q *queueScreen) refreshResultsCmd() tea.Cmd {
 	query := strings.TrimSpace(q.searchInput.Value())
 	sourceID := q.activeSource().ID
+	seq := atomic.AddUint64(&q.searchSeq, 1)
 	q.lastQuery = query
 	q.lastSourceID = sourceID
+	q.cancelRunningSearch()
 
 	if query == "" {
 		q.resultData = nil
@@ -276,19 +320,31 @@ func (q *queueScreen) refreshResultsCmd() tea.Cmd {
 
 	q.searching = true
 	q.rebuildBrowser()
-	seq := atomic.AddUint64(&q.searchSeq, 1)
 	filters := q.filters
-	search := q.services.Search
-	return func() tea.Msg {
-		results, err := search.Search(SearchRequest{SourceID: sourceID, Query: query, Filters: filters})
-		return queueSearchResultsMsg{
+	if q.searchDelay <= 0 {
+		return func() tea.Msg {
+			return queueStartSearchMsg{
+				seq:      seq,
+				query:    query,
+				sourceID: sourceID,
+				filters:  filters,
+			}
+		}
+	}
+	return tea.Tick(q.searchDelay, func(time.Time) tea.Msg {
+		return queueStartSearchMsg{
 			seq:      seq,
 			query:    query,
 			sourceID: sourceID,
 			filters:  filters,
-			results:  results,
-			err:      err,
 		}
+	})
+}
+
+func (q *queueScreen) cancelRunningSearch() {
+	if q.cancelSearch != nil {
+		q.cancelSearch()
+		q.cancelSearch = nil
 	}
 }
 

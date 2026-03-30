@@ -71,8 +71,6 @@ type PlaybackKeybindsConfig struct {
 	NextTrack     []string `toml:"next_track"`
 	VolumeDown    []string `toml:"volume_down"`
 	VolumeUp      []string `toml:"volume_up"`
-	SeekBackward  []string `toml:"seek_backward"`
-	SeekForward   []string `toml:"seek_forward"`
 }
 
 type AudioConfig struct {
@@ -292,8 +290,6 @@ func defaultKeybinds() KeybindsConfig {
 			NextTrack:     []string{"]"},
 			VolumeDown:    []string{"-"},
 			VolumeUp:      []string{"=", "+"},
-			SeekBackward:  []string{"left"},
-			SeekForward:   []string{"right"},
 		},
 	}
 }
@@ -331,8 +327,6 @@ func (k *KeybindsConfig) normalize() {
 	k.Playback.NextTrack = normalizeKeyList(k.Playback.NextTrack, defaults.Playback.NextTrack)
 	k.Playback.VolumeDown = normalizeKeyList(k.Playback.VolumeDown, defaults.Playback.VolumeDown)
 	k.Playback.VolumeUp = normalizeKeyList(k.Playback.VolumeUp, defaults.Playback.VolumeUp)
-	k.Playback.SeekBackward = normalizeKeyList(k.Playback.SeekBackward, defaults.Playback.SeekBackward)
-	k.Playback.SeekForward = normalizeKeyList(k.Playback.SeekForward, defaults.Playback.SeekForward)
 }
 
 func normalizeKeyList(values, fallback []string) []string {

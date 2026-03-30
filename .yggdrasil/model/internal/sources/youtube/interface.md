@@ -11,14 +11,12 @@ The resulting type implements:
 
 # Contracts
 
-- Unqualified text queries should search YouTube-backed music candidates without requiring the user to paste a URL first.
-- Pasted YouTube or YouTube Music URLs should resolve into queueable items, including playlist entries when the URL targets a playlist.
-- Authentication should prefer cookie-based mechanisms compatible with yt-dlp, especially cookie files and browser-cookie import strings.
-- Playback should materialize remote media into a deterministic cache location before decode so Musicon keeps stable seeking, duration, and replay behavior.
-- Resolver output must decode into a `beep`-compatible stream and preserve title, artist, album, duration, and downstream cover-art metadata when available.
+- Unqualified text queries should search YouTube Music candidates through the lightweight music.youtube.com HTTP API without requiring the user to paste a URL first.
+- Pasted YouTube or YouTube Music URLs should resolve into queueable items, including flattened public playlist entries when the URL targets a playlist.
+- Search should honor caller cancellation so the queue UI can abandon superseded YouTube Music HTTP requests instead of leaving stale searches running.
+- Resolver output should use `yt-dlp` for extraction, fetch playback bytes through Musicon's own ranged HTTP reader, decode the resulting WebM/Opus bytes in pure Go into a buffered seekable stream, and return a `beep`-compatible stream with title, artist, album, duration, and downstream cover-art metadata preserved.
 
 # Failure modes
 
-- Missing yt-dlp or ffmpeg dependencies must surface as explicit source/runtime errors.
-- Invalid auth configuration must surface explicitly instead of silently falling back to anonymous requests.
+- `yt-dlp` extraction failures, direct ranged media request failures, initial-buffer timeouts, unsupported out-of-window seek attempts, cue-based startup seek failures, or WebM/Opus decode failures must surface as explicit source/runtime errors.
 - Unresolvable or unavailable YouTube entries must fail clearly at search or resolve time.

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -55,14 +56,13 @@ type stubPlaybackService struct {
 	snapshot PlaybackSnapshot
 }
 
-func (s stubPlaybackService) Snapshot() PlaybackSnapshot     { return s.snapshot }
-func (s stubPlaybackService) TogglePause() error             { return nil }
-func (s stubPlaybackService) Previous() error                { return nil }
-func (s stubPlaybackService) Next() error                    { return nil }
-func (s stubPlaybackService) Seek(delta time.Duration) error { return nil }
-func (s stubPlaybackService) AdjustVolume(delta int) error   { return nil }
-func (s stubPlaybackService) SetRepeat(repeat bool) error    { return nil }
-func (s stubPlaybackService) SetStream(stream bool) error    { return nil }
+func (s stubPlaybackService) Snapshot() PlaybackSnapshot   { return s.snapshot }
+func (s stubPlaybackService) TogglePause() error           { return nil }
+func (s stubPlaybackService) Previous() error              { return nil }
+func (s stubPlaybackService) Next() error                  { return nil }
+func (s stubPlaybackService) AdjustVolume(delta int) error { return nil }
+func (s stubPlaybackService) SetRepeat(repeat bool) error  { return nil }
+func (s stubPlaybackService) SetStream(stream bool) error  { return nil }
 
 func TestQueueBrowserShowsQueuedItemsBeforeSearchResults(t *testing.T) {
 	screen := newQueueScreen(Services{})
@@ -234,12 +234,16 @@ func (s *blockingSearchService) Sources() []SourceDescriptor {
 	return []SourceDescriptor{{ID: "youtube-music", Name: "YouTube Music"}}
 }
 
-func (s *blockingSearchService) Search(SearchRequest) ([]SearchResult, error) {
+func (s *blockingSearchService) Search(ctx context.Context, request SearchRequest) ([]SearchResult, error) {
 	s.calls++
 	if s.started != nil {
 		s.started <- struct{}{}
 	}
-	<-s.block
+	select {
+	case <-s.block:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	return []SearchResult{{ID: "result-1", Title: "Async result", Source: "YouTube Music", Kind: MediaTrack}}, nil
 }
 
@@ -250,13 +254,14 @@ type multiSourceSearchService struct {
 func (s multiSourceSearchService) Sources() []SourceDescriptor {
 	return append([]SourceDescriptor(nil), s.sources...)
 }
-func (s multiSourceSearchService) Search(SearchRequest) ([]SearchResult, error) {
+func (s multiSourceSearchService) Search(context.Context, SearchRequest) ([]SearchResult, error) {
 	return nil, nil
 }
 
 func TestQueueBrowserTypingStartsAsyncSearch(t *testing.T) {
 	search := &blockingSearchService{block: make(chan struct{}), started: make(chan struct{}, 1)}
 	screen := newQueueScreen(Services{Search: search})
+	screen.searchDelay = 0
 
 	status, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Text: "y"}))
 	if !strings.Contains(status, `Searching YouTube Music for "y".`) {
@@ -270,6 +275,15 @@ func TestQueueBrowserTypingStartsAsyncSearch(t *testing.T) {
 	}
 	if !screen.searching {
 		t.Fatal("expected screen to remain in searching state until async results return")
+	}
+
+	startMsg := cmd()
+	status, cmd = screen.Update(startMsg)
+	if status != "" {
+		t.Fatalf("expected debounce message to keep status unchanged, got %q", status)
+	}
+	if cmd == nil {
+		t.Fatal("expected search command after debounce message")
 	}
 
 	done := make(chan tea.Msg, 1)
@@ -303,6 +317,69 @@ func TestQueueBrowserTypingShowsSearchingStateImmediately(t *testing.T) {
 	view := screen.View()
 	if !strings.Contains(view, "Searching") {
 		t.Fatalf("expected searching state in queue view, got %q", view)
+	}
+	close(search.block)
+}
+
+func TestQueueBrowserDebounceDropsSupersededSearchStart(t *testing.T) {
+	search := &blockingSearchService{block: make(chan struct{}), started: make(chan struct{}, 1)}
+	screen := newQueueScreen(Services{Search: search})
+	screen.searchDelay = 0
+
+	_, cmd1 := screen.Update(tea.KeyPressMsg(tea.Key{Text: "y"}))
+	_, cmd2 := screen.Update(tea.KeyPressMsg(tea.Key{Text: "o"}))
+	if cmd1 == nil || cmd2 == nil {
+		t.Fatal("expected debounce commands for both keypresses")
+	}
+
+	status, next := screen.Update(cmd1())
+	if status != "" || next != nil {
+		t.Fatalf("expected stale debounce message to be ignored, got status=%q cmd=%v", status, next)
+	}
+	if search.calls != 0 {
+		t.Fatalf("expected stale debounce not to start a search, got %d calls", search.calls)
+	}
+}
+
+func TestQueueBrowserNewSearchCancelsRunningSearch(t *testing.T) {
+	search := &blockingSearchService{block: make(chan struct{}), started: make(chan struct{}, 2)}
+	screen := newQueueScreen(Services{Search: search})
+	screen.searchDelay = 0
+
+	_, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Text: "y"}))
+	if cmd == nil {
+		t.Fatal("expected first debounce command")
+	}
+	_, searchCmd := screen.Update(cmd())
+	if searchCmd == nil {
+		t.Fatal("expected first search command")
+	}
+
+	firstDone := make(chan tea.Msg, 1)
+	go func() { firstDone <- searchCmd() }()
+	<-search.started
+
+	_, cmd = screen.Update(tea.KeyPressMsg(tea.Key{Text: "o"}))
+	if cmd == nil {
+		t.Fatal("expected second debounce command")
+	}
+	select {
+	case msg := <-firstDone:
+		if msg != nil {
+			t.Fatalf("expected canceled first search to return no message, got %#v", msg)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected first search to be canceled promptly")
+	}
+
+	_, searchCmd = screen.Update(cmd())
+	if searchCmd == nil {
+		t.Fatal("expected second search command")
+	}
+	go func() { _ = searchCmd() }()
+	<-search.started
+	if search.calls != 2 {
+		t.Fatalf("expected second search to start after cancellation, got %d calls", search.calls)
 	}
 	close(search.block)
 }

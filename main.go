@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io"
@@ -146,8 +147,6 @@ func main() {
 				NextTrack:     loaded.Config.Keybinds.Playback.NextTrack,
 				VolumeDown:    loaded.Config.Keybinds.Playback.VolumeDown,
 				VolumeUp:      loaded.Config.Keybinds.Playback.VolumeUp,
-				SeekBackward:  loaded.Config.Keybinds.Playback.SeekBackward,
-				SeekForward:   loaded.Config.Keybinds.Playback.SeekForward,
 			},
 		},
 	})
@@ -271,14 +270,17 @@ func (c combinedSearch) Sources() []ui.SourceDescriptor {
 	return descriptors
 }
 
-func (c combinedSearch) Search(request ui.SearchRequest) ([]ui.SearchResult, error) {
+func (c combinedSearch) Search(ctx context.Context, request ui.SearchRequest) ([]ui.SearchResult, error) {
 	results := make([]ui.SearchResult, 0, 64)
 	seen := make(map[string]struct{}, 64)
 	for _, provider := range c.providers {
 		if provider == nil {
 			continue
 		}
-		matches, err := provider.Search(request)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		matches, err := provider.Search(ctx, request)
 		if err != nil {
 			return nil, err
 		}
