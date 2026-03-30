@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -14,10 +16,21 @@ import (
 )
 
 func main() {
+	listBackends := flag.Bool("list-backends", false, "list usable audio backends in config-compatible form and exit")
+	flag.Parse()
+
 	loaded, err := config.LoadDefault()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "musicon: load config: %v\n", err)
 		os.Exit(1)
+	}
+
+	if *listBackends {
+		_ = os.Stderr.Close()
+		if err := printUsableBackends(os.Stdout, audio.CanonicalBackendName(loaded.Config.Audio.Backend), audio.ListUsableBackends); err != nil {
+			os.Exit(1)
+		}
+		return
 	}
 
 	library := local.NewLibrary(local.Options{Roots: loaded.Config.ResolvedLocalDirs()})
@@ -109,4 +122,20 @@ func modeFromConfig(raw string) ui.Mode {
 		return ui.ModePlayback
 	}
 	return ui.ModeQueue
+}
+
+func printUsableBackends(out io.Writer, selected string, list func() ([]string, error)) error {
+	backends, err := list()
+	if err != nil {
+		return err
+	}
+	for _, backend := range backends {
+		if backend == selected {
+			backend += " [selected]"
+		}
+		if _, err := fmt.Fprintln(out, backend); err != nil {
+			return err
+		}
+	}
+	return nil
 }

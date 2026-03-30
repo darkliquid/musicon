@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"runtime"
 	"testing"
 	"time"
 
@@ -83,6 +84,60 @@ func TestSelectSpeakerBackends(t *testing.T) {
 
 	if _, err := selectSpeakerBackends("mystery"); err == nil {
 		t.Fatal("expected unsupported backend error")
+	}
+}
+
+func TestBackendCandidatesMatchPlatform(t *testing.T) {
+	candidates := backendCandidates()
+	if len(candidates) == 0 {
+		t.Fatal("expected backend candidates")
+	}
+
+	got := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		got = append(got, candidate.name)
+	}
+
+	switch runtime.GOOS {
+	case "windows":
+		if got[0] != "wasapi" {
+			t.Fatalf("expected windows backends, got %#v", got)
+		}
+	case "darwin":
+		if len(got) != 1 || got[0] != "coreaudio" {
+			t.Fatalf("expected darwin backend, got %#v", got)
+		}
+	case "freebsd":
+		if got[0] != "oss" {
+			t.Fatalf("expected freebsd backends, got %#v", got)
+		}
+	case "netbsd":
+		if len(got) != 1 || got[0] != "audio4" {
+			t.Fatalf("expected netbsd backend, got %#v", got)
+		}
+	default:
+		if got[0] != "pulse" || got[1] != "alsa" || got[2] != "jack" {
+			t.Fatalf("expected unix backends, got %#v", got)
+		}
+	}
+}
+
+func TestCanonicalBackendNameNormalizesAliases(t *testing.T) {
+	cases := map[string]string{
+		"":             "auto",
+		"auto":         "auto",
+		"pulseaudio":   "pulse",
+		"pulse":        "pulse",
+		"directsound":  "dsound",
+		"dsound":       "dsound",
+		" CoreAudio  ": "coreaudio",
+		"mystery":      "mystery",
+	}
+
+	for raw, want := range cases {
+		if got := CanonicalBackendName(raw); got != want {
+			t.Fatalf("canonical backend for %q: got %q want %q", raw, got, want)
+		}
 	}
 }
 

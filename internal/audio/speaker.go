@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -221,6 +223,11 @@ func clampSample(v float64) float32 {
 	return float32(v)
 }
 
+type backendOption struct {
+	name    string
+	backend mago.Backend
+}
+
 func selectSpeakerBackends(raw string) ([]mago.Backend, error) {
 	raw = strings.ToLower(strings.TrimSpace(raw))
 	if raw == "" || raw == "auto" {
@@ -232,6 +239,96 @@ func selectSpeakerBackends(raw string) ([]mago.Backend, error) {
 		return nil, fmt.Errorf("unsupported audio backend %q", raw)
 	}
 	return []mago.Backend{backend}, nil
+}
+
+// ListUsableBackends reports config-compatible backend names that can be used
+// on the current machine. The result always starts with "auto".
+func ListUsableBackends() ([]string, error) {
+	names := []string{"auto"}
+
+	lib, err := mago.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer lib.Close()
+
+	for _, candidate := range backendCandidates() {
+		ctx, ctxErr := lib.NewContext(candidate.backend)
+		if ctxErr != nil {
+			continue
+		}
+		_ = ctx.Close()
+		names = append(names, candidate.name)
+	}
+
+	return slices.Compact(names), nil
+}
+
+func CanonicalBackendName(raw string) string {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "", "auto":
+		return "auto"
+	case "wasapi":
+		return "wasapi"
+	case "dsound", "directsound":
+		return "dsound"
+	case "winmm":
+		return "winmm"
+	case "coreaudio":
+		return "coreaudio"
+	case "sndio":
+		return "sndio"
+	case "audio4", "audio(4)":
+		return "audio4"
+	case "oss":
+		return "oss"
+	case "pulse", "pulseaudio":
+		return "pulse"
+	case "alsa":
+		return "alsa"
+	case "jack":
+		return "jack"
+	case "aaudio":
+		return "aaudio"
+	case "opensl":
+		return "opensl"
+	case "webaudio":
+		return "webaudio"
+	case "null":
+		return "null"
+	default:
+		return strings.TrimSpace(strings.ToLower(raw))
+	}
+}
+
+func backendCandidates() []backendOption {
+	switch runtime.GOOS {
+	case "windows":
+		return []backendOption{
+			{name: "wasapi", backend: mago.BackendWASAPI},
+			{name: "dsound", backend: mago.BackendDSound},
+			{name: "winmm", backend: mago.BackendWinMM},
+		}
+	case "darwin":
+		return []backendOption{
+			{name: "coreaudio", backend: mago.BackendCoreAudio},
+		}
+	case "freebsd":
+		return []backendOption{
+			{name: "oss", backend: mago.BackendOSS},
+			{name: "jack", backend: mago.BackendJACK},
+		}
+	case "netbsd":
+		return []backendOption{
+			{name: "audio4", backend: mago.BackendAudio4},
+		}
+	default:
+		return []backendOption{
+			{name: "pulse", backend: mago.BackendPulseAudio},
+			{name: "alsa", backend: mago.BackendALSA},
+			{name: "jack", backend: mago.BackendJACK},
+		}
+	}
 }
 
 func parseSpeakerBackend(raw string) (mago.Backend, bool) {

@@ -19,7 +19,7 @@ relations:
     failure: "Return startup or runtime errors to the terminal user instead of hiding them"
   - target: internal/audio
     type: calls
-    consumes: [NewEngine, QueueService, PlaybackService, Close]
+    consumes: [ListUsableBackends, NewEngine, QueueService, PlaybackService, Close]
     failure: "Surface audio runtime startup and shutdown failures instead of hiding them behind the terminal UI"
   - target: internal/mpris
     type: calls
