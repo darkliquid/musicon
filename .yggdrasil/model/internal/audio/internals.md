@@ -17,6 +17,8 @@ The expected shape is:
 - queue-carried artwork metadata is merged with resolver-provided track info so the UI artwork path keeps local paths, embedded-art hints, and external IDs even when different layers know different parts of the metadata
 - resolved track info can carry richer cover-art metadata forward to the UI artwork path without forcing the runtime itself to fetch or render artwork
 - snapshot reads should remain fast even while the runtime is busy resolving or swapping tracks, so UI polling can fall back to the last published playback snapshot instead of blocking the Bubble Tea render loop on the engine mutex
+- seek now exposes an absolute `SeekTo(time.Duration)` runtime surface: it first tries an in-place `StreamSeekCloser.Seek`, and if the active stream reports that the target is outside its cheap local seek window, the runtime asks that stream to prepare a replacement in the background, then atomically swaps the replacement stream in while preserving the prior paused/playing state
+- replacement-stream activation still flows through the runtime's normal controller/volume wiring, so seek swaps reuse the same queue metadata, now-playing callbacks, volume state, and cleanup rules as an ordinary track activation instead of introducing a special speaker path
 
 This node should own concurrency, lifecycle, and cleanup concerns so `internal/ui` stays presentation-focused.
 
@@ -27,3 +29,4 @@ This node should own concurrency, lifecycle, and cleanup concerns so `internal/u
 - Chose resolver-based playback over direct file decoding in the runtime so actual source implementations can be added later without rewriting the engine core.
 - Chose to probe only the current platform's canonical backend candidates and return config-safe names because the user wanted `--list-backends` output to be directly usable as config values, not a dump of every alias the parser accepts.
 - Chose to serve playback snapshot polling from the latest published snapshot when the engine mutex is already busy because the user reported rapid playback key input appearing to lock the input thread, and stale-but-fast UI state is safer than blocking the render loop behind slow resolver work.
+- Chose replacement-stream swapping over forcing all providers to implement far seeks in place because the user explicitly wanted seek preparation to happen away from the UI/input path while the old audio continues until the new stream is ready.

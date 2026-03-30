@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"errors"
 	"runtime"
 	"testing"
 	"time"
@@ -13,6 +14,8 @@ import (
 type stubStream struct {
 	length   int
 	position int
+	seekErr  error
+	closed   bool
 }
 
 func (s *stubStream) Stream(samples [][2]float64) (int, bool) { return 0, false }
@@ -20,10 +23,32 @@ func (s *stubStream) Err() error                              { return nil }
 func (s *stubStream) Len() int                                { return s.length }
 func (s *stubStream) Position() int                           { return s.position }
 func (s *stubStream) Seek(p int) error {
+	if s.seekErr != nil {
+		return s.seekErr
+	}
 	s.position = p
 	return nil
 }
-func (s *stubStream) Close() error { return nil }
+func (s *stubStream) Close() error { s.closed = true; return nil }
+
+type replacementStubStream struct {
+	stubStream
+	replacement     *stubStream
+	prepareTarget   int
+	prepareCalls    int
+	prepareErr      error
+	replacementMade bool
+}
+
+func (s *replacementStubStream) PrepareReplacement(target int) (beep.StreamSeekCloser, error) {
+	s.prepareCalls++
+	s.prepareTarget = target
+	if s.prepareErr != nil {
+		return nil, s.prepareErr
+	}
+	s.replacementMade = true
+	return s.replacement, nil
+}
 
 func TestEngineQueueSnapshot(t *testing.T) {
 	engine := NewEngine(Options{})
@@ -255,5 +280,72 @@ func TestPrepareTrackInfoMergesQueueArtworkMetadata(t *testing.T) {
 	}
 	if info.Duration != time.Second {
 		t.Fatalf("expected derived duration from resolved stream, got %v", info.Duration)
+	}
+}
+
+func TestEngineSeekToSeeksActiveStreamInPlace(t *testing.T) {
+	engine := NewEngine(Options{})
+	defer engine.Close()
+
+	stream := &stubStream{length: 48_000 * 60}
+	entry := teaui.QueueEntry{ID: "one", Title: "First", Source: "youtube"}
+	info := teaui.TrackInfo{ID: "one", Title: "First", Source: "youtube"}
+
+	engine.mu.Lock()
+	engine.currentIndex = 0
+	if err := engine.activateTrackLocked(entry, info, beep.Format{SampleRate: defaultSampleRate, NumChannels: 2, Precision: 2}, stream, false); err != nil {
+		engine.mu.Unlock()
+		t.Fatalf("activate track failed: %v", err)
+	}
+	engine.mu.Unlock()
+
+	if err := engine.SeekTo(10 * time.Second); err != nil {
+		t.Fatalf("seek failed: %v", err)
+	}
+	if got := stream.position; got != defaultSampleRate.N(10*time.Second) {
+		t.Fatalf("expected in-place seek to sample %d, got %d", defaultSampleRate.N(10*time.Second), got)
+	}
+}
+
+func TestEngineSeekToSwapsPreparedReplacementStream(t *testing.T) {
+	engine := NewEngine(Options{})
+	defer engine.Close()
+
+	replacement := &stubStream{length: 48_000 * 60, position: defaultSampleRate.N(25 * time.Second)}
+	stream := &replacementStubStream{
+		stubStream:  stubStream{length: 48_000 * 60, seekErr: errors.New("out of window")},
+		replacement: replacement,
+	}
+	entry := teaui.QueueEntry{ID: "one", Title: "First", Source: "youtube"}
+	info := teaui.TrackInfo{ID: "one", Title: "First", Source: "youtube"}
+
+	engine.mu.Lock()
+	engine.currentIndex = 0
+	if err := engine.activateTrackLocked(entry, info, beep.Format{SampleRate: defaultSampleRate, NumChannels: 2, Precision: 2}, stream, true); err != nil {
+		engine.mu.Unlock()
+		t.Fatalf("activate track failed: %v", err)
+	}
+	engine.mu.Unlock()
+
+	if err := engine.SeekTo(25 * time.Second); err != nil {
+		t.Fatalf("seek failed: %v", err)
+	}
+
+	if stream.prepareCalls != 1 {
+		t.Fatalf("expected one replacement preparation, got %d", stream.prepareCalls)
+	}
+	if got := stream.prepareTarget; got != defaultSampleRate.N(25*time.Second) {
+		t.Fatalf("expected replacement target %d, got %d", defaultSampleRate.N(25*time.Second), got)
+	}
+	if !stream.closed {
+		t.Fatal("expected original stream to be closed after swap")
+	}
+
+	snapshot := engine.PlaybackSnapshot()
+	if !snapshot.Paused {
+		t.Fatal("expected pause state to survive replacement swap")
+	}
+	if got := snapshot.Position; got != 25*time.Second {
+		t.Fatalf("expected replacement position 25s, got %s", got)
 	}
 }

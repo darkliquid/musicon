@@ -482,6 +482,12 @@ func mergeKeybindOptions(defaults, provided KeybindOptions) KeybindOptions {
 	if len(provided.Playback.NextTrack) > 0 {
 		merged.Playback.NextTrack = append([]string(nil), provided.Playback.NextTrack...)
 	}
+	if len(provided.Playback.SeekBackward) > 0 {
+		merged.Playback.SeekBackward = append([]string(nil), provided.Playback.SeekBackward...)
+	}
+	if len(provided.Playback.SeekForward) > 0 {
+		merged.Playback.SeekForward = append([]string(nil), provided.Playback.SeekForward...)
+	}
 	if len(provided.Playback.VolumeDown) > 0 {
 		merged.Playback.VolumeDown = append([]string(nil), provided.Playback.VolumeDown...)
 	}

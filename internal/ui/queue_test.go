@@ -56,13 +56,14 @@ type stubPlaybackService struct {
 	snapshot PlaybackSnapshot
 }
 
-func (s stubPlaybackService) Snapshot() PlaybackSnapshot   { return s.snapshot }
-func (s stubPlaybackService) TogglePause() error           { return nil }
-func (s stubPlaybackService) Previous() error              { return nil }
-func (s stubPlaybackService) Next() error                  { return nil }
-func (s stubPlaybackService) AdjustVolume(delta int) error { return nil }
-func (s stubPlaybackService) SetRepeat(repeat bool) error  { return nil }
-func (s stubPlaybackService) SetStream(stream bool) error  { return nil }
+func (s stubPlaybackService) Snapshot() PlaybackSnapshot        { return s.snapshot }
+func (s stubPlaybackService) TogglePause() error                { return nil }
+func (s stubPlaybackService) Previous() error                   { return nil }
+func (s stubPlaybackService) Next() error                       { return nil }
+func (s stubPlaybackService) SeekTo(target time.Duration) error { _ = target; return nil }
+func (s stubPlaybackService) AdjustVolume(delta int) error      { return nil }
+func (s stubPlaybackService) SetRepeat(repeat bool) error       { return nil }
+func (s stubPlaybackService) SetStream(stream bool) error       { return nil }
 
 func TestQueueBrowserShowsQueuedItemsBeforeSearchResults(t *testing.T) {
 	screen := newQueueScreen(Services{})

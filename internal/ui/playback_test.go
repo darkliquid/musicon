@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/darkliquid/musicon/pkg/components"
@@ -17,6 +18,9 @@ type playbackTestService struct {
 	togglePauseCh chan struct{}
 	toggleErr     error
 	toggleCalls   int
+	seekErr       error
+	seekCalls     int
+	seekTargets   []time.Duration
 }
 
 func (s *playbackTestService) Snapshot() PlaybackSnapshot {
@@ -43,8 +47,19 @@ func (s *playbackTestService) TogglePause() error {
 	s.mu.Unlock()
 	return nil
 }
-func (s *playbackTestService) Previous() error              { return nil }
-func (s *playbackTestService) Next() error                  { return nil }
+func (s *playbackTestService) Previous() error { return nil }
+func (s *playbackTestService) Next() error     { return nil }
+func (s *playbackTestService) SeekTo(target time.Duration) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.seekCalls++
+	s.seekTargets = append(s.seekTargets, target)
+	if s.seekErr != nil {
+		return s.seekErr
+	}
+	s.snapshot.Position = target
+	return nil
+}
 func (s *playbackTestService) AdjustVolume(delta int) error { return nil }
 func (s *playbackTestService) SetRepeat(repeat bool) error  { return nil }
 func (s *playbackTestService) SetStream(stream bool) error  { return nil }
@@ -156,6 +171,66 @@ func TestPlaybackUpdateSurfacesAsyncPlaybackErrors(t *testing.T) {
 	}
 	if screen.pending {
 		t.Fatal("expected pending action to clear after error")
+	}
+}
+
+func TestPlaybackUpdateDebouncesSeekUntilTickDeadline(t *testing.T) {
+	service := &playbackTestService{
+		snapshot: PlaybackSnapshot{
+			Volume:   70,
+			Position: 30 * time.Second,
+			Track:    &TrackInfo{ID: "track-1", Title: "Song"},
+		},
+	}
+	screen := newPlaybackScreen(Services{Playback: service}, AlbumArtOptions{})
+	screen.snapshot = service.snapshot
+
+	if got := screen.accumulateSeek(playbackSeekStep); got != "Seek +5s queued." {
+		t.Fatalf("unexpected first seek status: %q", got)
+	}
+	if got := screen.accumulateSeek(playbackSeekStep); got != "Seek +10s queued." {
+		t.Fatalf("unexpected second seek status: %q", got)
+	}
+	if service.seekCalls != 0 {
+		t.Fatalf("expected no immediate seek call, got %d", service.seekCalls)
+	}
+
+	status, cmd := screen.Update(tickMsg(time.Now()))
+	if status != "" || cmd != nil {
+		t.Fatalf("expected debounce to suppress early tick, got status=%q cmd=%v", status, cmd)
+	}
+
+	screen.seekDeadline = time.Now().Add(-time.Millisecond)
+	status, cmd = screen.Update(tickMsg(time.Now()))
+	if status != "" {
+		t.Fatalf("expected no status when dispatching seek, got %q", status)
+	}
+	if cmd == nil {
+		t.Fatal("expected debounced tick to dispatch seek command")
+	}
+	if !screen.pending {
+		t.Fatal("expected screen to be pending while async seek runs")
+	}
+	if screen.seekAdjustment != 0 {
+		t.Fatalf("expected queued seek to clear after dispatch, got %s", screen.seekAdjustment)
+	}
+
+	msg := cmd()
+	status, followUp := screen.Update(msg)
+	if status != "" || followUp != nil {
+		t.Fatalf("unexpected seek completion result: status=%q cmd=%v", status, followUp)
+	}
+	if screen.pending {
+		t.Fatal("expected pending flag cleared after seek completion")
+	}
+	if got := screen.snapshot.Position; got != 40*time.Second {
+		t.Fatalf("expected settled playback position 40s, got %s", got)
+	}
+	if service.seekCalls != 1 {
+		t.Fatalf("expected one seek call, got %d", service.seekCalls)
+	}
+	if got := service.seekTargets[0]; got != 40*time.Second {
+		t.Fatalf("expected seek target 40s, got %s", got)
 	}
 }
 

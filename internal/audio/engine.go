@@ -70,6 +70,10 @@ type activeTrack struct {
 	volumeFx   *effects.Volume
 }
 
+type replacementStreamPreparer interface {
+	PrepareReplacement(target int) (beep.StreamSeekCloser, error)
+}
+
 type queueService struct{ engine *Engine }
 type playbackService struct{ engine *Engine }
 
@@ -369,6 +373,64 @@ func (e *Engine) AdjustVolume(delta int) error {
 	return nil
 }
 
+func (e *Engine) SeekTo(target time.Duration) error {
+	e.mu.Lock()
+	if e.closed {
+		e.mu.Unlock()
+		return errors.New("audio runtime is closed")
+	}
+	if e.current == nil || e.current.stream == nil {
+		e.mu.Unlock()
+		return errors.New("no active track")
+	}
+	current := e.current
+	targetSample := current.format.SampleRate.N(target)
+	if targetSample < 0 {
+		targetSample = 0
+	}
+	if length := current.stream.Len(); length > 0 && targetSample > length {
+		targetSample = length
+	}
+	e.mu.Unlock()
+
+	var seekErr error
+	e.withSpeakerLock(func() {
+		seekErr = current.stream.Seek(targetSample)
+	})
+	if seekErr == nil {
+		return nil
+	}
+
+	preparer, ok := current.stream.(replacementStreamPreparer)
+	if !ok {
+		return seekErr
+	}
+	replacement, err := preparer.PrepareReplacement(targetSample)
+	if err != nil {
+		return err
+	}
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		_ = replacement.Close()
+		return errors.New("audio runtime is closed")
+	}
+	if e.current != current {
+		_ = replacement.Close()
+		return errors.New("active track changed during seek")
+	}
+	paused := current.controller != nil && current.controller.Paused
+	if e.speakerReady {
+		e.speaker.Clear()
+	}
+	if current.stream != nil {
+		_ = current.stream.Close()
+	}
+	e.current = nil
+	return e.activateTrackLocked(current.entry, current.info, current.format, replacement, paused)
+}
+
 func (e *Engine) SetRepeat(repeat bool) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -432,9 +494,15 @@ func (e *Engine) startCurrentLocked(paused bool) error {
 
 	e.stopCurrentLocked(false)
 
-	streamer := beep.Streamer(resolved.Stream)
-	if resolved.Format.SampleRate != e.speakerRate {
-		streamer = beep.Resample(3, resolved.Format.SampleRate, e.speakerRate, streamer)
+	info := resolved.Info
+	info = prepareTrackInfo(entry, resolved)
+	return e.activateTrackLocked(entry, info, resolved.Format, resolved.Stream, paused)
+}
+
+func (e *Engine) activateTrackLocked(entry teaui.QueueEntry, info teaui.TrackInfo, format beep.Format, stream beep.StreamSeekCloser, paused bool) error {
+	streamer := beep.Streamer(stream)
+	if format.SampleRate != e.speakerRate {
+		streamer = beep.Resample(3, format.SampleRate, e.speakerRate, streamer)
 	}
 
 	controller := &beep.Ctrl{Streamer: streamer, Paused: paused}
@@ -444,14 +512,11 @@ func (e *Engine) startCurrentLocked(paused bool) error {
 	sequence := beep.Seq(volumeFx, beep.Callback(func() { go e.onTrackFinished(index) }))
 	e.speaker.Play(sequence)
 
-	info := resolved.Info
-	info = prepareTrackInfo(entry, resolved)
-
 	e.current = &activeTrack{
 		entry:      entry,
 		info:       info,
-		format:     resolved.Format,
-		stream:     resolved.Stream,
+		format:     format,
+		stream:     stream,
 		controller: controller,
 		volumeFx:   volumeFx,
 	}
@@ -565,15 +630,16 @@ func percentToLevel(percent int) (float64, bool) {
 	return float64(percent-100) / 50.0, false
 }
 
-func (s queueService) Snapshot() []teaui.QueueEntry        { return s.engine.QueueSnapshot() }
-func (s queueService) Add(result teaui.SearchResult) error { return s.engine.AddToQueue(result) }
-func (s queueService) Move(id string, delta int) error     { return s.engine.MoveQueueEntry(id, delta) }
-func (s queueService) Remove(id string) error              { return s.engine.RemoveFromQueue(id) }
-func (s queueService) Clear() error                        { return s.engine.ClearQueue() }
-func (s playbackService) Snapshot() teaui.PlaybackSnapshot { return s.engine.PlaybackSnapshot() }
-func (s playbackService) TogglePause() error               { return s.engine.TogglePause() }
-func (s playbackService) Previous() error                  { return s.engine.Previous() }
-func (s playbackService) Next() error                      { return s.engine.Next() }
-func (s playbackService) AdjustVolume(delta int) error     { return s.engine.AdjustVolume(delta) }
-func (s playbackService) SetRepeat(repeat bool) error      { return s.engine.SetRepeat(repeat) }
-func (s playbackService) SetStream(stream bool) error      { return s.engine.SetStream(stream) }
+func (s queueService) Snapshot() []teaui.QueueEntry         { return s.engine.QueueSnapshot() }
+func (s queueService) Add(result teaui.SearchResult) error  { return s.engine.AddToQueue(result) }
+func (s queueService) Move(id string, delta int) error      { return s.engine.MoveQueueEntry(id, delta) }
+func (s queueService) Remove(id string) error               { return s.engine.RemoveFromQueue(id) }
+func (s queueService) Clear() error                         { return s.engine.ClearQueue() }
+func (s playbackService) Snapshot() teaui.PlaybackSnapshot  { return s.engine.PlaybackSnapshot() }
+func (s playbackService) TogglePause() error                { return s.engine.TogglePause() }
+func (s playbackService) Previous() error                   { return s.engine.Previous() }
+func (s playbackService) Next() error                       { return s.engine.Next() }
+func (s playbackService) SeekTo(target time.Duration) error { return s.engine.SeekTo(target) }
+func (s playbackService) AdjustVolume(delta int) error      { return s.engine.AdjustVolume(delta) }
+func (s playbackService) SetRepeat(repeat bool) error       { return s.engine.SetRepeat(repeat) }
+func (s playbackService) SetStream(stream bool) error       { return s.engine.SetStream(stream) }

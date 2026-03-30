@@ -47,6 +47,8 @@ type PlaybackKeybindOptions struct {
 	TogglePause   []string
 	PreviousTrack []string
 	NextTrack     []string
+	SeekBackward  []string
+	SeekForward   []string
 	VolumeDown    []string
 	VolumeUp      []string
 }
@@ -86,6 +88,8 @@ type PlaybackKeyMap struct {
 	TogglePause   bubblekey.Binding
 	PreviousTrack bubblekey.Binding
 	NextTrack     bubblekey.Binding
+	SeekBackward  bubblekey.Binding
+	SeekForward   bubblekey.Binding
 	VolumeDown    bubblekey.Binding
 	VolumeUp      bubblekey.Binding
 }
@@ -124,6 +128,8 @@ func defaultKeybindOptions() KeybindOptions {
 			TogglePause:   []string{"space"},
 			PreviousTrack: []string{"["},
 			NextTrack:     []string{"]"},
+			SeekBackward:  []string{"left"},
+			SeekForward:   []string{"right"},
 			VolumeDown:    []string{"-"},
 			VolumeUp:      []string{"=", "+"},
 		},
@@ -169,6 +175,8 @@ func normalizedKeyMap(options KeybindOptions) KeyMap {
 		TogglePause:   newBinding(options.Playback.TogglePause, defaults.Playback.TogglePause, "toggle play/pause"),
 		PreviousTrack: newBinding(options.Playback.PreviousTrack, defaults.Playback.PreviousTrack, "previous track"),
 		NextTrack:     newBinding(options.Playback.NextTrack, defaults.Playback.NextTrack, "next track"),
+		SeekBackward:  newBinding(options.Playback.SeekBackward, defaults.Playback.SeekBackward, "seek backward"),
+		SeekForward:   newBinding(options.Playback.SeekForward, defaults.Playback.SeekForward, "seek forward"),
 		VolumeDown:    newBinding(options.Playback.VolumeDown, defaults.Playback.VolumeDown, "lower volume"),
 		VolumeUp:      newBinding(options.Playback.VolumeUp, defaults.Playback.VolumeUp, "raise volume"),
 	}

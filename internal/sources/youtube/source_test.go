@@ -302,7 +302,7 @@ func TestRangeReadSeekerReusesDiskCachedBlocksOnReseek(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new range read seeker failed: %v", err)
 	}
-	cacheDir := reader.cacheDir
+	cacheDir := reader.cache.dir()
 
 	buf := make([]byte, 12)
 	if _, err := io.ReadFull(reader, buf); err != nil {
@@ -349,5 +349,62 @@ func TestCueSeekableOpusStreamAppendFramesZeroFillsGapAfterSeek(t *testing.T) {
 		if stream.buffer[idx] != 0 || stream.buffer[idx+1] != 0 {
 			t.Fatalf("expected zero-filled gap at sample %d, got %d/%d", sample, stream.buffer[idx], stream.buffer[idx+1])
 		}
+	}
+}
+
+func TestPreparedMediaStreamKeepsReplacementSeekCapabilityAcrossSwaps(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Range", "bytes 0-0/1")
+		w.WriteHeader(http.StatusPartialContent)
+		_, _ = w.Write([]byte{'x'})
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	reader, err := newRangeReadSeeker(ctx, server.Client(), server.URL, make(http.Header), 1)
+	if err != nil {
+		t.Fatalf("new range read seeker failed: %v", err)
+	}
+
+	factory := func(_ context.Context, _ io.ReadSeeker, _ time.Duration, startSample int) (beep.StreamSeekCloser, beep.Format, error) {
+		return &stubStream{length: 48_000 * 60, position: startSample}, beep.Format{SampleRate: 48_000, NumChannels: 2, Precision: 2}, nil
+	}
+
+	stream, _, err := openPreparedMediaStream(ctx, cancel, reader, time.Minute, 0, factory)
+	if err != nil {
+		t.Fatalf("open prepared media stream failed: %v", err)
+	}
+	defer stream.Close()
+
+	preparer, ok := stream.(interface {
+		PrepareReplacement(target int) (beep.StreamSeekCloser, error)
+	})
+	if !ok {
+		t.Fatal("expected prepared stream to support replacement seeking")
+	}
+
+	firstReplacement, err := preparer.PrepareReplacement(10)
+	if err != nil {
+		t.Fatalf("first replacement failed: %v", err)
+	}
+	defer firstReplacement.Close()
+	if got := firstReplacement.Position(); got != 10 {
+		t.Fatalf("expected first replacement position 10, got %d", got)
+	}
+
+	secondPreparer, ok := firstReplacement.(interface {
+		PrepareReplacement(target int) (beep.StreamSeekCloser, error)
+	})
+	if !ok {
+		t.Fatal("expected first replacement to preserve replacement capability")
+	}
+
+	secondReplacement, err := secondPreparer.PrepareReplacement(20)
+	if err != nil {
+		t.Fatalf("second replacement failed: %v", err)
+	}
+	defer secondReplacement.Close()
+	if got := secondReplacement.Position(); got != 20 {
+		t.Fatalf("expected second replacement position 20, got %d", got)
 	}
 }

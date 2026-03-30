@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	bubblekey "github.com/charmbracelet/bubbles/key"
@@ -34,6 +35,9 @@ type playbackScreen struct {
 	visualKey     string
 	visualContent string
 	visualErr     error
+
+	seekAdjustment time.Duration
+	seekDeadline   time.Time
 }
 
 type playbackActionResult struct {
@@ -41,6 +45,16 @@ type playbackActionResult struct {
 	status   string
 	err      error
 }
+
+type seekedMsg struct {
+	snapshot PlaybackSnapshot
+	err      error
+}
+
+const (
+	playbackSeekStep     = 5 * time.Second
+	playbackSeekDebounce = 120 * time.Millisecond
+)
 
 func newPlaybackScreen(services Services, options AlbumArtOptions) *playbackScreen {
 	return newPlaybackScreenWithKeyMap(services, options, normalizedKeyMap(KeybindOptions{}).Playback)
@@ -77,6 +91,29 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 		typed.snapshot.Volume = clamp(typed.snapshot.Volume, 0, 100)
 		p.snapshot = typed.snapshot
 		return typed.status, nil
+	case seekedMsg:
+		p.pending = false
+		if typed.err != nil {
+			return typed.err.Error(), nil
+		}
+		typed.snapshot.Volume = clamp(typed.snapshot.Volume, 0, 100)
+		p.snapshot = typed.snapshot
+		return "", nil
+	case tickMsg:
+		if p.services.Playback == nil || p.pending || p.seekAdjustment == 0 || time.Now().Before(p.seekDeadline) {
+			return "", nil
+		}
+		target := p.snapshot.Position + p.seekAdjustment
+		p.seekAdjustment = 0
+		p.seekDeadline = time.Time{}
+		p.pending = true
+		playback := p.services.Playback
+		return "", func() tea.Msg {
+			if err := playback.SeekTo(target); err != nil {
+				return seekedMsg{err: err}
+			}
+			return seekedMsg{snapshot: playback.Snapshot()}
+		}
 	}
 
 	keypress, ok := msg.(tea.KeyPressMsg)
@@ -153,6 +190,10 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			})
 		}
 		return "Next track requires a playback backend.", nil
+	case bubblekey.Matches(keypress, p.keymap.SeekBackward):
+		return p.accumulateSeek(-playbackSeekStep), nil
+	case bubblekey.Matches(keypress, p.keymap.SeekForward):
+		return p.accumulateSeek(playbackSeekStep), nil
 	case bubblekey.Matches(keypress, p.keymap.VolumeDown):
 		if p.services.Playback != nil {
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
@@ -203,6 +244,7 @@ func (p *playbackScreen) HelpView() string {
 	}, strings.Join([]string{
 		helpLine(p.keymap.TogglePause, "toggle play / pause state"),
 		helpLinePair(p.keymap.PreviousTrack, p.keymap.NextTrack, "previous / next track request"),
+		helpLinePair(p.keymap.SeekBackward, p.keymap.SeekForward, "seek backward / forward"),
 		helpLinePair(p.keymap.VolumeDown, p.keymap.VolumeUp, "lower / raise volume"),
 		helpLine(p.keymap.CyclePane, "cycle artwork, lyrics, eq, and visualizer panes"),
 		helpLine(p.keymap.ToggleInfo, "show or hide track information"),
@@ -432,10 +474,25 @@ func (p *playbackScreen) adjustVolume(delta int) string {
 	return fmt.Sprintf("Volume set to %d%%.", p.snapshot.Volume)
 }
 
+func (p *playbackScreen) accumulateSeek(delta time.Duration) string {
+	if p.services.Playback == nil || p.snapshot.Track == nil || p.pending {
+		return ""
+	}
+	p.seekAdjustment += delta
+	p.seekDeadline = time.Now().Add(playbackSeekDebounce)
+	seconds := int(p.seekAdjustment / time.Second)
+	if seconds >= 0 {
+		return fmt.Sprintf("Seek +%ds queued.", seconds)
+	}
+	return fmt.Sprintf("Seek %ds queued.", seconds)
+}
+
 func (p *playbackScreen) runPlaybackAction(run func(PlaybackService) error, status func(PlaybackSnapshot) string) tea.Cmd {
 	if p.services.Playback == nil || p.pending {
 		return nil
 	}
+	p.seekAdjustment = 0
+	p.seekDeadline = time.Time{}
 	p.pending = true
 	playback := p.services.Playback
 	return func() tea.Msg {

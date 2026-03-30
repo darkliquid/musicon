@@ -145,6 +145,8 @@ func main() {
 				TogglePause:   loaded.Config.Keybinds.Playback.TogglePause,
 				PreviousTrack: loaded.Config.Keybinds.Playback.PreviousTrack,
 				NextTrack:     loaded.Config.Keybinds.Playback.NextTrack,
+				SeekBackward:  loaded.Config.Keybinds.Playback.SeekBackward,
+				SeekForward:   loaded.Config.Keybinds.Playback.SeekForward,
 				VolumeDown:    loaded.Config.Keybinds.Playback.VolumeDown,
 				VolumeUp:      loaded.Config.Keybinds.Playback.VolumeUp,
 			},

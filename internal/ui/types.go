@@ -184,6 +184,7 @@ type PlaybackService interface {
 	TogglePause() error
 	Previous() error
 	Next() error
+	SeekTo(target time.Duration) error
 	AdjustVolume(delta int) error
 	SetRepeat(repeat bool) error
 	SetStream(stream bool) error

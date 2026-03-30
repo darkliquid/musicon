@@ -35,22 +35,54 @@ func (s *Source) openYTDLPMedia(ctx context.Context, rawURL string, duration tim
 	if err != nil {
 		return nil, beep.Format{}, err
 	}
+	return s.openResolvedMedia(info, duration)
+}
+
+func (s *Source) openResolvedMedia(info ytDLPStreamInfo, duration time.Duration) (beep.StreamSeekCloser, beep.Format, error) {
 	streamCtx, streamCancel := context.WithCancel(context.Background())
 	reader, err := newRangeReadSeeker(streamCtx, s.httpClient, info.URL, headerFromMap(info.HTTPHeaders), mediaRequestBlockSize)
 	if err != nil {
 		streamCancel()
 		return nil, beep.Format{}, err
 	}
-	stream, format, err := newSeekableWebMOpusStream(streamCtx, reader, duration, 0)
+	return openPreparedMediaStream(streamCtx, streamCancel, reader, duration, 0, func(ctx context.Context, media io.ReadSeeker, duration time.Duration, startSample int) (beep.StreamSeekCloser, beep.Format, error) {
+		return newSeekableWebMOpusStream(ctx, media, duration, startSample)
+	})
+}
+
+type seekableStreamFactory func(ctx context.Context, media io.ReadSeeker, duration time.Duration, startSample int) (beep.StreamSeekCloser, beep.Format, error)
+
+func openPreparedMediaStream(streamCtx context.Context, streamCancel context.CancelFunc, reader *rangeReadSeeker, duration time.Duration, startSample int, factory seekableStreamFactory) (beep.StreamSeekCloser, beep.Format, error) {
+	stream, format, err := factory(streamCtx, reader, duration, startSample)
 	if err != nil {
 		streamCancel()
 		_ = reader.Close()
 		return nil, beep.Format{}, err
 	}
-	return &mediaCloser{stream: stream, closer: func() error {
-		streamCancel()
-		return reader.Close()
-	}}, format, nil
+	return &mediaCloser{
+		stream: stream,
+		closer: func() error {
+			streamCancel()
+			return reader.Close()
+		},
+		prepareReplacement: func(target int) (beep.StreamSeekCloser, error) {
+			replacementCtx, replacementCancel := context.WithCancel(context.Background())
+			clone := reader.Clone(replacementCtx)
+			offset := estimatedMediaOffset(target, format.SampleRate.N(duration), clone.KnownSize())
+			if offset > 0 {
+				if err := clone.Prime(offset); err != nil {
+					replacementCancel()
+					_ = clone.Close()
+					return nil, err
+				}
+			}
+			replacement, _, err := openPreparedMediaStream(replacementCtx, replacementCancel, clone, duration, target, factory)
+			if err != nil {
+				return nil, err
+			}
+			return replacement, nil
+		},
+	}, format, nil
 }
 
 // openYTDLPStream is the older "stream bytes from yt-dlp stdout" path. It is
@@ -174,8 +206,9 @@ func headerFromMap(values map[string]string) http.Header {
 // mediaCloser keeps the decoded stream and the underlying transport lifecycle
 // tied together, so callers only have one thing to close.
 type mediaCloser struct {
-	stream beep.StreamSeekCloser
-	closer func() error
+	stream             beep.StreamSeekCloser
+	closer             func() error
+	prepareReplacement func(target int) (beep.StreamSeekCloser, error)
 }
 
 func (m *mediaCloser) Stream(samples [][2]float64) (int, bool) { return m.stream.Stream(samples) }
@@ -183,6 +216,12 @@ func (m *mediaCloser) Err() error                              { return m.stream
 func (m *mediaCloser) Len() int                                { return m.stream.Len() }
 func (m *mediaCloser) Position() int                           { return m.stream.Position() }
 func (m *mediaCloser) Seek(p int) error                        { return m.stream.Seek(p) }
+func (m *mediaCloser) PrepareReplacement(target int) (beep.StreamSeekCloser, error) {
+	if m.prepareReplacement == nil {
+		return nil, errors.New("replacement seek is not supported")
+	}
+	return m.prepareReplacement(target)
+}
 func (m *mediaCloser) Close() error {
 	var streamErr error
 	if m.stream != nil {
@@ -194,6 +233,16 @@ func (m *mediaCloser) Close() error {
 		}
 	}
 	return streamErr
+}
+
+func estimatedMediaOffset(target, totalFrames int, size int64) int64 {
+	if target <= 0 || totalFrames <= 0 || size <= 0 {
+		return 0
+	}
+	if target >= totalFrames {
+		target = totalFrames
+	}
+	return (int64(target) * size) / int64(totalFrames)
 }
 
 // rangeReadSeeker is the core transport primitive that makes direct HTTP range
@@ -209,7 +258,7 @@ type rangeReadSeeker struct {
 	url       string
 	headers   http.Header
 	blockSize int64
-	cacheDir  string
+	cache     *rangeReadCache
 
 	mu         sync.Mutex
 	pos        int64
@@ -217,8 +266,14 @@ type rangeReadSeeker struct {
 	block      []byte
 	blockStart int64
 	blockLen   int
-	blockLens  map[int64]int
 	closed     bool
+}
+
+type rangeReadCache struct {
+	mu        sync.Mutex
+	cacheDir  string
+	blockLens map[int64]int
+	refs      int
 }
 
 // newRangeReadSeeker initializes the fixed-size range reader used by the WebM
@@ -234,17 +289,41 @@ func newRangeReadSeeker(ctx context.Context, client *http.Client, rawURL string,
 	if err != nil {
 		return nil, fmt.Errorf("create media block cache: %w", err)
 	}
+	cache := &rangeReadCache{
+		cacheDir:  cacheDir,
+		blockLens: make(map[int64]int),
+		refs:      1,
+	}
 	return &rangeReadSeeker{
 		ctx:        ctx,
 		client:     client,
 		url:        rawURL,
 		headers:    headers.Clone(),
 		blockSize:  blockSize,
-		cacheDir:   cacheDir,
+		cache:      cache,
 		block:      make([]byte, blockSize),
 		blockStart: -1,
-		blockLens:  make(map[int64]int),
 	}, nil
+}
+
+func (r *rangeReadSeeker) Clone(ctx context.Context) *rangeReadSeeker {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	r.cache.mu.Lock()
+	r.cache.refs++
+	r.cache.mu.Unlock()
+	return &rangeReadSeeker{
+		ctx:        ctx,
+		client:     r.client,
+		url:        r.url,
+		headers:    r.headers.Clone(),
+		blockSize:  r.blockSize,
+		cache:      r.cache,
+		size:       r.size,
+		block:      make([]byte, r.blockSize),
+		blockStart: -1,
+	}
 }
 
 // Read serves bytes out of the cached block and refills it on demand when the
@@ -318,13 +397,11 @@ func (r *rangeReadSeeker) Seek(offset int64, whence int) (int64, error) {
 func (r *rangeReadSeeker) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.closed = true
-	if r.cacheDir == "" {
+	if r.closed {
 		return nil
 	}
-	err := os.RemoveAll(r.cacheDir)
-	r.cacheDir = ""
-	return err
+	r.closed = true
+	return r.cache.release()
 }
 
 func (r *rangeReadSeeker) hasCurrentBlockLocked() bool {
@@ -372,7 +449,7 @@ func (r *rangeReadSeeker) fetchBlockLocked(offset int64) error {
 	}
 	r.blockStart = start
 	r.blockLen = n
-	r.blockLens[start] = n
+	r.cache.storeBlockLen(start, n)
 	if size, ok := mediaSizeFromResponse(resp, start, int64(n)); ok {
 		r.size = size
 	}
@@ -386,7 +463,8 @@ func (r *rangeReadSeeker) fetchBlockLocked(offset int64) error {
 }
 
 func (r *rangeReadSeeker) loadCachedBlockLocked(start int64) (bool, error) {
-	if r.cacheDir == "" {
+	cacheDir := r.cache.dir()
+	if cacheDir == "" {
 		return false, nil
 	}
 	data, err := os.ReadFile(r.cachePath(start))
@@ -398,7 +476,7 @@ func (r *rangeReadSeeker) loadCachedBlockLocked(start int64) (bool, error) {
 	}
 	r.blockStart = start
 	r.blockLen = copy(r.block, data)
-	r.blockLens[start] = r.blockLen
+	r.cache.storeBlockLen(start, r.blockLen)
 	if r.blockLen < len(r.block) && r.size < start+int64(r.blockLen) {
 		r.size = start + int64(r.blockLen)
 	}
@@ -406,7 +484,7 @@ func (r *rangeReadSeeker) loadCachedBlockLocked(start int64) (bool, error) {
 }
 
 func (r *rangeReadSeeker) writeCachedBlockLocked(start int64, data []byte) error {
-	if r.cacheDir == "" {
+	if r.cache.dir() == "" {
 		return nil
 	}
 	if err := os.WriteFile(r.cachePath(start), data, 0o600); err != nil {
@@ -416,7 +494,54 @@ func (r *rangeReadSeeker) writeCachedBlockLocked(start int64, data []byte) error
 }
 
 func (r *rangeReadSeeker) cachePath(start int64) string {
-	return filepath.Join(r.cacheDir, fmt.Sprintf("%020d.block", start))
+	return filepath.Join(r.cache.dir(), fmt.Sprintf("%020d.block", start))
+}
+
+func (r *rangeReadSeeker) Prime(offset int64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return os.ErrClosed
+	}
+	current := r.pos
+	err := r.fetchBlockLocked(offset)
+	r.pos = current
+	return err
+}
+
+func (r *rangeReadSeeker) KnownSize() int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.size
+}
+
+func (c *rangeReadCache) dir() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.cacheDir
+}
+
+func (c *rangeReadCache) storeBlockLen(start int64, length int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.blockLens != nil {
+		c.blockLens[start] = length
+	}
+}
+
+func (c *rangeReadCache) release() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.refs > 0 {
+		c.refs--
+	}
+	if c.refs != 0 || c.cacheDir == "" {
+		return nil
+	}
+	err := os.RemoveAll(c.cacheDir)
+	c.cacheDir = ""
+	c.blockLens = nil
+	return err
 }
 
 // mediaSizeFromResponse infers total media size from the best available HTTP

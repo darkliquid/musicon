@@ -139,10 +139,11 @@ func newSeekableWebMOpusStream(ctx context.Context, media io.ReadSeeker, duratio
 		sampleRate:   sampleRate,
 		reader:       reader,
 		head:         head,
+		pos:          max(startSample, 0),
 	}
 	stream.cond = sync.NewCond(&stream.mu)
 	go stream.decodeLoop(ctx)
-	bufferTarget := 0
+	bufferTarget := max(startSample, 0)
 	if err := stream.waitForBuffered(ctx, bufferTarget, sampleRate.N(initialBufferDuration)); err != nil {
 		_ = stream.Close()
 		return nil, beep.Format{}, err
@@ -167,7 +168,7 @@ func (s *cueSeekableOpusStream) decodeLoop(ctx context.Context) {
 	defer decoder.Close()
 
 	currentSample := 0
-	dropUntil := 0
+	dropUntil := max(s.Position(), 0)
 
 	for {
 		if err := s.waitForDecodeDemand(ctx); err != nil {
