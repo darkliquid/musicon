@@ -1,11 +1,18 @@
 package components
 
+import "math"
+
 // SquareViewport describes the largest centered square that fits inside the
-// current terminal dimensions.
+// current terminal dimensions. Width and Height are terminal-cell dimensions
+// chosen to approximate a visual 1:1 square when terminal cells are not
+// physically square.
 type SquareViewport struct {
 	TerminalWidth  int
 	TerminalHeight int
+	Width          int
+	Height         int
 	Size           int
+	CellWidthRatio float64
 }
 
 // SizeRequirements describes explicit terminal and viewport minimums.
@@ -61,39 +68,81 @@ func (c SizeCheck) MissingSquare() int {
 
 // ClampSquare computes the usable square viewport from raw terminal dimensions.
 func ClampSquare(width, height int) SquareViewport {
+	return ClampSquareWithCellWidthRatio(width, height, 1)
+}
+
+// ClampSquareWithCellWidthRatio computes the usable visually square viewport
+// from raw terminal dimensions and a terminal cell width-to-height ratio.
+// A ratio below 1 means cells are taller than they are wide, so the viewport
+// uses more columns than rows to remain visually square.
+func ClampSquareWithCellWidthRatio(width, height int, cellWidthRatio float64) SquareViewport {
 	if width < 0 {
 		width = 0
 	}
 	if height < 0 {
 		height = 0
 	}
+	if cellWidthRatio <= 0 {
+		cellWidthRatio = 1
+	}
 
-	size := width
-	if height < size {
+	size := height
+	widthLimitedSize := int(math.Floor(float64(width) * cellWidthRatio))
+	if widthLimitedSize < size {
+		size = widthLimitedSize
+	}
+	if size < 0 {
+		size = 0
+	}
+
+	viewWidth := 0
+	if size > 0 {
+		viewWidth = int(math.Round(float64(size) / cellWidthRatio))
+	}
+	if viewWidth > width {
+		viewWidth = width
+		size = int(math.Round(float64(viewWidth) * cellWidthRatio))
+	}
+	if size > height {
 		size = height
 	}
+	viewHeight := size
 
 	return SquareViewport{
 		TerminalWidth:  width,
 		TerminalHeight: height,
+		Width:          viewWidth,
+		Height:         viewHeight,
 		Size:           size,
+		CellWidthRatio: cellWidthRatio,
 	}
 }
 
 // Check computes the current viewport and evaluates it against explicit
 // minimum-size requirements.
 func (r SizeRequirements) Check(width, height int) SizeCheck {
+	return r.CheckWithCellWidthRatio(width, height, 1)
+}
+
+// CheckWithCellWidthRatio computes the current viewport and evaluates it
+// against explicit minimum-size requirements while accounting for non-square
+// terminal cells.
+func (r SizeRequirements) CheckWithCellWidthRatio(width, height int, cellWidthRatio float64) SizeCheck {
 	return SizeCheck{
 		Requirements: r,
-		Viewport:     ClampSquare(width, height),
+		Viewport:     ClampSquareWithCellWidthRatio(width, height, cellWidthRatio),
 	}
 }
 
 // Inner returns the content area inside a border of the given thickness.
 func (v SquareViewport) Inner(border int) (int, int) {
-	inner := v.Size - border*2
-	if inner < 0 {
-		inner = 0
+	innerWidth := v.Width - border*2
+	if innerWidth < 0 {
+		innerWidth = 0
 	}
-	return inner, inner
+	innerHeight := v.Height - border*2
+	if innerHeight < 0 {
+		innerHeight = 0
+	}
+	return innerWidth, innerHeight
 }

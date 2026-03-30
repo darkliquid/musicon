@@ -103,6 +103,29 @@ func TestLibraryRefreshesSearchResultsWhenFilesChange(t *testing.T) {
 	}
 }
 
+func TestLibrarySearchFindsNestedFilesByPathFragment(t *testing.T) {
+	dir := t.TempDir()
+	nestedDir := filepath.Join(dir, "Artist", "Album")
+	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+	audioPath := filepath.Join(nestedDir, "Track.wav")
+	writeSilentWAV(t, audioPath)
+
+	library := NewLibrary(dir)
+	results, err := library.Search(teaui.SearchRequest{
+		SourceID: sourceID,
+		Query:    "artist/album/track.wav",
+		Filters:  teaui.DefaultSearchFilters(),
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(results) != 1 || results[0].ID != audioPath {
+		t.Fatalf("expected nested path result, got %#v", results)
+	}
+}
+
 func TestIDsFromRawTagsExtractsKnownExternalIDs(t *testing.T) {
 	ids := idsFromRawTags(map[string]interface{}{
 		"MUSICBRAINZ_ALBUMID":          "mb-release",

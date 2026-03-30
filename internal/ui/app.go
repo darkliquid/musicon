@@ -3,12 +3,16 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"math"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/darkliquid/musicon/pkg/components"
+	"golang.org/x/term"
 )
 
 var minimumViewportRequirements = components.SizeRequirements{
@@ -24,29 +28,32 @@ type App struct {
 type tickMsg time.Time
 
 type rootModel struct {
-	services Services
-	width    int
-	height   int
-	mode     Mode
-	showHelp bool
-	status   string
-	queue    *queueScreen
-	playback *playbackScreen
-	viewport components.SquareViewport
+	services       Services
+	width          int
+	height         int
+	cellWidthRatio float64
+	mode           Mode
+	showHelp       bool
+	status         string
+	queue          *queueScreen
+	playback       *playbackScreen
+	viewport       components.SquareViewport
 }
 
 // NewApp constructs the Bubble Tea application shell with injected UI-facing services.
 func NewApp(services Services) *App {
 	model := &rootModel{
-		services: services,
-		mode:     ModeQueue,
-		status:   "Ready. tab switches modes, ? toggles help, ctrl+c exits.",
+		services:       services,
+		cellWidthRatio: terminalCellWidthRatio(),
+		mode:           ModeQueue,
+		status:         "Ready. tab switches modes, ? toggles help, ctrl+c exits.",
 	}
 	model.queue = newQueueScreen(services)
 	model.playback = newPlaybackScreen(services)
+	width, height := initialTerminalSize()
 
 	return &App{
-		program: tea.NewProgram(model),
+		program: tea.NewProgram(model, tea.WithWindowSize(width, height)),
 	}
 }
 
@@ -60,7 +67,49 @@ func Run(app *App) error {
 }
 
 func (m *rootModel) Init() tea.Cmd {
-	return tickCmd()
+	return tea.Batch(
+		requestWindowSizeCmd(),
+		tickCmd(),
+	)
+}
+
+func requestWindowSizeCmd() tea.Cmd {
+	return func() tea.Msg { return tea.RequestWindowSize() }
+}
+
+func initialTerminalSize() (int, int) {
+	if width, height, err := term.GetSize(int(os.Stdout.Fd())); err == nil && width > 0 && height > 0 {
+		return width, height
+	}
+
+	if width, height, ok := terminalSizeFromEnv(); ok {
+		return width, height
+	}
+
+	return 80, 24
+}
+
+func terminalSizeFromEnv() (int, int, bool) {
+	width, widthOK := parsePositiveEnvInt("COLUMNS")
+	height, heightOK := parsePositiveEnvInt("LINES")
+	if !widthOK || !heightOK {
+		return 0, 0, false
+	}
+	return width, height, true
+}
+
+func parsePositiveEnvInt(key string) (int, bool) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return 0, false
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil || value <= 0 {
+		return 0, false
+	}
+
+	return value, true
 }
 
 func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -70,7 +119,7 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = typed.Width
 		m.height = typed.Height
-		m.viewport = components.ClampSquare(m.width, m.height)
+		m.viewport = components.ClampSquareWithCellWidthRatio(m.width, m.height, m.cellWidthRatio)
 		m.updateSizeStatus()
 		m.resizeScreens()
 		return m, nil
@@ -166,8 +215,9 @@ func (m *rootModel) View() tea.View {
 }
 
 func (m *rootModel) makeView(content, title string) tea.View {
-	view := tea.NewView(titleSequence(title) + content)
+	view := tea.NewView(content)
 	view.AltScreen = true
+	view.WindowTitle = sanitizeTitle(title)
 	return view
 }
 
@@ -203,7 +253,7 @@ func (m *rootModel) toggleMode() {
 }
 
 func (m *rootModel) layoutCheck() components.SizeCheck {
-	return minimumViewportRequirements.Check(m.width, m.height)
+	return minimumViewportRequirements.CheckWithCellWidthRatio(m.width, m.height, m.cellWidthRatio)
 }
 
 func (m *rootModel) updateSizeStatus() {
@@ -308,10 +358,6 @@ func (m *rootModel) playbackSnapshot() PlaybackSnapshot {
 	return m.playback.snapshot
 }
 
-func titleSequence(title string) string {
-	return "\x1b]2;" + sanitizeTitle(title) + "\x07"
-}
-
 func sanitizeTitle(title string) string {
 	replacer := strings.NewReplacer(
 		"\x1b", "",
@@ -321,4 +367,23 @@ func sanitizeTitle(title string) string {
 		"\t", " ",
 	)
 	return strings.TrimSpace(replacer.Replace(title))
+}
+
+func terminalCellWidthRatio() float64 {
+	if ratio, ok := parsePositiveEnvFloat("MUSICON_CELL_WIDTH_RATIO"); ok {
+		return ratio
+	}
+	return 0.5
+}
+
+func parsePositiveEnvFloat(key string) (float64, bool) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil || value <= 0 || math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0, false
+	}
+	return value, true
 }

@@ -7,7 +7,11 @@
 - `playbackScreen`, the Musicon-specific playback screen
 - shared UI-facing contracts and small rendering helpers
 
-The root model computes a square viewport from terminal size with `components.ClampSquare`, renders a bordered application frame, keeps queue/playback as dedicated top-level modes, emits periodic Bubble Tea ticks so playback state can refresh while audio is active, and prefixes rendered output with terminal OSC title sequences.
+The root model computes a visually square viewport from terminal size with `components.ClampSquareWithCellWidthRatio`, renders a bordered application frame, keeps queue/playback as dedicated top-level modes, emits periodic Bubble Tea ticks so playback state can refresh while audio is active, and updates the terminal title through Bubble Tea's `View.WindowTitle` field instead of embedding title control sequences in the visible frame content.
+
+Startup now seeds Bubble Tea with an initial terminal size derived from the live stdout TTY when available, then falls back to `COLUMNS`/`LINES`, then `80x24`. `Init` still explicitly requests the live window size so interactive terminals can correct the seeded dimensions immediately. This avoids a blank startup state in PTYs or terminal emulators that never answer Bubble Tea's size probe.
+
+The root model assumes a default terminal cell width ratio of `0.5`, meaning a typical terminal glyph is roughly twice as tall as it is wide. Users can override that assumption with `MUSICON_CELL_WIDTH_RATIO` when their font differs. This keeps the rendered frame visually square instead of merely using the same number of rows and columns.
 
 It now also evaluates explicit minimum viewport requirements before rendering the main shell. If the terminal is smaller than the supported `20×20` minimum, the root model renders a dedicated resize warning and blocks normal application interactions until the terminal is large enough again.
 
@@ -30,3 +34,5 @@ The node delegates reusable widgets such as lists, inputs, panels, progress bars
 - Chose a root-owned help toggle with screen-specific help views so shared chrome stays consistent while each mode can document its own controls.
 - Chose to keep `go-termimg` usage out of `internal/ui` by pushing terminal-image rendering into `pkg/components`, so playback mode remains focused on choosing panes and handling fallback messaging instead of protocol details.
 - Chose to pass full cover-art metadata into artwork providers instead of a bare track ID so the future reusable provider chain can use local paths, embedded art, and multiple external IDs without making the playback screen aware of lookup policy.
+- Chose to seed Bubble Tea with a best-effort initial terminal size instead of waiting only on `RequestWindowSize`, because some PTYs never answer the size query and would otherwise leave the UI stuck in the zero-dimension loading state.
+- Chose a configurable default cell width ratio of `0.5` instead of treating terminal cells as square because visual squareness in real terminals depends on glyph geometry, not only on row and column counts.

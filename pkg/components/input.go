@@ -83,12 +83,14 @@ func (i Input) View() string {
 	}
 
 	cursor := ""
+	cursorWidth := 0
 	if i.focused {
 		cursor = lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Render("█")
+		cursorWidth = 1
 	}
 
 	prefix := lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Render("› ")
-	textWidth := i.width - 2
+	textWidth := i.width - lipgloss.Width(prefix) - cursorWidth
 	if textWidth < 1 {
 		textWidth = 1
 	}

@@ -84,7 +84,7 @@ func (l *Library) Search(request teaui.SearchRequest) ([]teaui.SearchResult, err
 		return nil, err
 	}
 	query := normalizeQuery(request.Query)
-	if len(query) == 0 {
+	if query.raw == "" {
 		return nil, nil
 	}
 
@@ -168,7 +168,7 @@ func (l *Library) scan() ([]indexedTrack, error) {
 		if _, ok := supportedExtensions[strings.ToLower(filepath.Ext(path))]; !ok {
 			return nil
 		}
-		track, err := indexTrack(path)
+		track, err := indexTrack(root, path)
 		if err != nil {
 			return nil
 		}
@@ -196,10 +196,14 @@ func (l *Library) needsRefreshLocked() bool {
 	return time.Since(l.lastScan) >= interval
 }
 
-func indexTrack(path string) (indexedTrack, error) {
+func indexTrack(root, path string) (indexedTrack, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return indexedTrack{}, err
+	}
+	relPath, err := filepath.Rel(root, absPath)
+	if err != nil {
+		relPath = filepath.Base(absPath)
 	}
 	baseTitle := strings.TrimSuffix(filepath.Base(absPath), filepath.Ext(absPath))
 	result := teaui.SearchResult{
@@ -237,7 +241,16 @@ func indexTrack(path string) (indexedTrack, error) {
 		result.Artwork = metadata
 	}
 
-	haystack := searchableText(result.Title, track.Artist, track.Album, filepath.Base(absPath), absPath)
+	haystack := searchableText(
+		result.Title,
+		track.Artist,
+		track.Album,
+		filepath.Base(absPath),
+		absPath,
+		relPath,
+		filepath.ToSlash(absPath),
+		filepath.ToSlash(relPath),
+	)
 	return indexedTrack{
 		path:     absPath,
 		result:   result,
@@ -347,29 +360,81 @@ func stringifyTagValue(value interface{}) string {
 func searchableText(values ...string) string {
 	parts := make([]string, 0, len(values))
 	for _, value := range values {
-		value = strings.ToLower(strings.TrimSpace(value))
-		if value != "" {
-			parts = append(parts, value)
+		for _, variant := range normalizedSearchVariants(value) {
+			if variant != "" {
+				parts = append(parts, variant)
+			}
 		}
 	}
 	return strings.Join(parts, " ")
 }
 
-func normalizeQuery(query string) []string {
-	fields := strings.Fields(strings.ToLower(strings.TrimSpace(query)))
-	return fields
+type normalizedQuery struct {
+	raw    string
+	tokens []string
 }
 
-func matchesQuery(haystack string, tokens []string) bool {
-	if len(tokens) == 0 {
+func normalizeQuery(query string) normalizedQuery {
+	raw := normalizeSearchText(query)
+	if raw == "" {
+		return normalizedQuery{}
+	}
+	return normalizedQuery{
+		raw:    raw,
+		tokens: strings.Fields(raw),
+	}
+}
+
+func matchesQuery(haystack string, query normalizedQuery) bool {
+	if query.raw == "" {
 		return false
 	}
-	for _, token := range tokens {
+
+	if strings.Contains(haystack, query.raw) {
+		return true
+	}
+
+	for _, token := range query.tokens {
 		if !strings.Contains(haystack, token) {
 			return false
 		}
 	}
 	return true
+}
+
+func normalizedSearchVariants(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+
+	variants := []string{
+		normalizeSearchText(value),
+		normalizeSearchText(filepath.ToSlash(value)),
+		normalizeSearchText(strings.ReplaceAll(filepath.ToSlash(value), "/", " ")),
+	}
+
+	seen := make(map[string]struct{}, len(variants))
+	unique := make([]string, 0, len(variants))
+	for _, variant := range variants {
+		if variant == "" {
+			continue
+		}
+		if _, ok := seen[variant]; ok {
+			continue
+		}
+		seen[variant] = struct{}{}
+		unique = append(unique, variant)
+	}
+	return unique
+}
+
+func normalizeSearchText(value string) string {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return ""
+	}
+	return strings.Join(strings.Fields(value), " ")
 }
 
 func firstNonEmpty(values ...string) string {
