@@ -215,6 +215,7 @@ type Options struct {
 	Theme          string
 	CellWidthRatio float64
 	AlbumArt       AlbumArtOptions
+	Keybinds       KeybindOptions
 }
 
 type AlbumArtOptions struct {

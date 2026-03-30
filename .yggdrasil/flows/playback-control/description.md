@@ -19,6 +19,7 @@ Make core playback actions and status easy to understand at a glance while prior
 - `internal/audio` resolves queue entries into playable streams and manages actual audio output.
 - `internal/mpris` mirrors playback state to desktop media controls and forwards remote transport requests back into Musicon.
 - `internal/sources/local` resolves queued local files into decoded audio streams and preserves local metadata for playback.
+- `internal/sources/youtube` resolves queued YouTube and YouTube Music entries into cached decoded audio streams and preserves remote metadata for playback.
 - `pkg/coverart/core` provides reusable lookup metadata plus provider-chain and cache contracts.
 - `pkg/coverart/providers/local` implements the local-file and embedded-art artwork sources.
 - `pkg/coverart/providers/remote` implements the remote metadata-service artwork sources.
@@ -30,7 +31,7 @@ Make core playback actions and status easy to understand at a glance while prior
 1. The user enters playback mode.
 2. The UI shows the current track inside the square playback layout.
 3. The user uses keyboard controls to play, pause, skip, seek, or adjust volume.
-4. The local source resolver turns the queued file into a decoded playable stream and carries local metadata forward.
+4. The active source resolver turns the queued item into a decoded playable stream and carries source metadata forward.
 5. When artwork metadata is available, the artwork path routes it through the reusable priority-ordered cover-art resolver with local files first, then embedded art, MusicBrainz, Spotify, Apple Music, and Last.fm before the playback pane renders the resulting image through the terminal-image component.
 6. The audio runtime applies the transport request to the active output stream and returns updated playback state to the UI.
 7. The MPRIS bridge reflects the updated playback state to the desktop session when available.

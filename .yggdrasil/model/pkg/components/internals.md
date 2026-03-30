@@ -19,6 +19,8 @@ The reusable `List` widget now supports an optional leading marker per item. Thi
 
 The same list now also exposes explicit selected-index restoration so callers that rebuild their item set from live state can preserve which logical row stays highlighted after reordering or snapshot refreshes.
 
+The same list now also accepts a Bubble-style configurable keymap for navigation actions. This keeps reusable scrolling behavior in `pkg/components` while letting `internal/ui` supply app-configured bindings for queue browsing without forking list logic.
+
 The reusable `TerminalImage` widget now defaults Chafa to the Unicode halfblock/symbol renderer so artwork remains visible even in terminals that do not actually display richer graphics protocols reliably. Callers and users can still opt into `auto`, `kitty`, `sixel`, or `iterm2` through `MUSICON_IMAGE_PROTOCOL` when they want higher-fidelity rendering in a compatible terminal.
 
 The same widget now uses a fill-oriented scaling mode by default so album art expands to occupy more of the available viewport instead of sitting centered with large margins. Users who prefer preserved framing or exact stretching can override this with `MUSICON_IMAGE_SCALE`, and that env override takes precedence even when the application passes explicit render settings from config.
@@ -45,3 +47,4 @@ Renderer scaling keeps the existing config surface (`fill`, `stretch`, `fit`, `a
 - Chose an explicit cell width ratio input for square viewport math instead of assuming terminal cells are square because the user observed the visual frame distortion caused by tall terminal glyphs.
 - Chose a generic leading marker field on list items instead of hard-coding queue icons into the widget because callers may need lightweight row state cues without turning the shared list into a Musicon-specific queue component.
 - Chose an explicit `SetSelectedIndex` hook on the shared list instead of forcing every caller to infer selection through synthetic key events because identity-preserving rebuilds are generic widget behavior, not queue-specific logic.
+- Chose a configurable list keymap over hardcoding `up/down/j/k` forever because the user wanted all existing UI shortcuts to be configurable from TOML and list navigation is part of that surface.

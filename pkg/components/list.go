@@ -4,8 +4,29 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	bubblekey "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 )
+
+type ListKeyMap struct {
+	Up       bubblekey.Binding
+	Down     bubblekey.Binding
+	Home     bubblekey.Binding
+	End      bubblekey.Binding
+	PageUp   bubblekey.Binding
+	PageDown bubblekey.Binding
+}
+
+func DefaultListKeyMap() ListKeyMap {
+	return ListKeyMap{
+		Up:       bubblekey.NewBinding(bubblekey.WithKeys("up", "k"), bubblekey.WithHelp("up / k", "move up")),
+		Down:     bubblekey.NewBinding(bubblekey.WithKeys("down", "j"), bubblekey.WithHelp("down / j", "move down")),
+		Home:     bubblekey.NewBinding(bubblekey.WithKeys("home"), bubblekey.WithHelp("home", "jump to top")),
+		End:      bubblekey.NewBinding(bubblekey.WithKeys("end"), bubblekey.WithHelp("end", "jump to bottom")),
+		PageUp:   bubblekey.NewBinding(bubblekey.WithKeys("pgup"), bubblekey.WithHelp("pgup", "page up")),
+		PageDown: bubblekey.NewBinding(bubblekey.WithKeys("pgdown"), bubblekey.WithHelp("pgdown", "page down")),
+	}
+}
 
 // ListItem is a generic single-row list entry.
 type ListItem struct {
@@ -22,6 +43,7 @@ type List struct {
 	width      int
 	height     int
 	focused    bool
+	keymap     ListKeyMap
 	emptyTitle string
 	emptyBody  string
 }
@@ -30,6 +52,7 @@ func NewList() List {
 	return List{
 		width:      20,
 		height:     5,
+		keymap:     DefaultListKeyMap(),
 		emptyTitle: "Nothing here",
 		emptyBody:  "No items are available in this panel yet.",
 	}
@@ -64,6 +87,10 @@ func (l *List) SetFocused(focused bool) {
 	l.focused = focused
 }
 
+func (l *List) SetKeyMap(keymap ListKeyMap) {
+	l.keymap = keymap
+}
+
 func (l *List) SetEmptyState(title, body string) {
 	l.emptyTitle = title
 	l.emptyBody = body
@@ -75,23 +102,23 @@ func (l *List) Update(msg tea.Msg) bool {
 		return false
 	}
 
-	switch keypress.String() {
-	case "up", "k":
+	switch {
+	case bubblekey.Matches(keypress, l.keymap.Up):
 		l.Move(-1)
 		return true
-	case "down", "j":
+	case bubblekey.Matches(keypress, l.keymap.Down):
 		l.Move(1)
 		return true
-	case "home":
+	case bubblekey.Matches(keypress, l.keymap.Home):
 		l.selected = 0
 		return true
-	case "end":
+	case bubblekey.Matches(keypress, l.keymap.End):
 		l.selected = len(l.items) - 1
 		return true
-	case "pgup":
+	case bubblekey.Matches(keypress, l.keymap.PageUp):
 		l.Move(-max(1, l.height-1))
 		return true
-	case "pgdown":
+	case bubblekey.Matches(keypress, l.keymap.PageDown):
 		l.Move(max(1, l.height-1))
 		return true
 	default:

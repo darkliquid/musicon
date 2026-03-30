@@ -1,5 +1,5 @@
 {
-  "hash": "6d7571abbe4ede8a68055758175cb286460373223eba4c1f1a9fb9a91ffc6948",
+  "hash": "a161ef5d4ee653f1f88e0b90329f5555fba8b94428d3e1625273a2e3370e5af4",
   "files": {
     ".yggdrasil/model/internal/mpris/yg-node.yaml": "10a0662b5809919455925f069d5909c503495c0a48060b59692c1ea1b3171eae",
     ".yggdrasil/model/internal/mpris/interface.md": "62fbf14617ad28cd12df02bd2f611be0f26120b91e10cf5fa7bf854875b2e7c5",
@@ -8,11 +8,11 @@
     ".yggdrasil/model/internal/yg-node.yaml": "c15c09ee704d84db6ab9d46f43837aeba2d3fcc8cef65ec7918fd970bac90223",
     ".yggdrasil/model/internal/responsibility.md": "90fa17d80db7c3265833b84cf53518ceac4f367db6fef86dd3ea8b4adf3ddee7",
     ".yggdrasil/model/internal/ui/responsibility.md": "fb311ab57a4553d9dd13ac0b0a204908c343140677af3de650b6a6853e155077",
-    ".yggdrasil/flows/playback-control/yg-flow.yaml": "44d5688fdc0efdd1afcc442006e3cb8ce8c2ffdbaef716bf9817604c1432e91f",
-    ".yggdrasil/flows/playback-control/description.md": "a774146f3b8e97761e3b53e66ff893281fc78fc0d8760a7784aebc32846a13f6",
-    "internal/mpris/bridge.go": "76498206ee986baedd8d2f18a17801d3cd3d92f40d999ea7dce8b537460c8746",
+    ".yggdrasil/flows/playback-control/yg-flow.yaml": "666c6c47dd8548c0493894f1253272333073718f892b8dacab887ab9143c529d",
+    ".yggdrasil/flows/playback-control/description.md": "bb98b04756342cbd0bdf68daac097a616a32ae5ca08997dc828ff9a36cf83f17",
+    "internal/mpris/bridge.go": "4788345d80f1f084e3a0e270eefc6384ccc94800b197f52a5ffeb57c058ec833",
     "internal/mpris/bridge_test.go": "2a5ed7a6ed9cc4cd82488118d52ac4367af68809e7c19f95ad746fb877bbd18c",
-    ".yggdrasil/model/internal/ui/interface.md": "6923c1e4875038ac4bc203500efb2b91e9ec5dde903b450775ae121cf87b1dda"
+    ".yggdrasil/model/internal/ui/interface.md": "2d16b0a887604e25ddfe2a9917d4c769ee2e289e6ceb23d7c1be29c476742513"
   },
   "mtimes": {
     ".yggdrasil/model/internal/mpris/yg-node.yaml": 1774843402731.5164,
@@ -22,10 +22,10 @@
     ".yggdrasil/model/internal/yg-node.yaml": 1774839903015.8567,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
     ".yggdrasil/model/internal/ui/responsibility.md": 1774853820657.9028,
-    ".yggdrasil/model/internal/ui/interface.md": 1774863965278.5989,
-    ".yggdrasil/flows/playback-control/yg-flow.yaml": 1774848349003.8003,
-    ".yggdrasil/flows/playback-control/description.md": 1774848349004.8003,
-    "internal/mpris/bridge.go": 1774843584930.1416,
+    ".yggdrasil/model/internal/ui/interface.md": 1774882778856.8198,
+    ".yggdrasil/flows/playback-control/yg-flow.yaml": 1774878370612.8774,
+    ".yggdrasil/flows/playback-control/description.md": 1774878372940.832,
+    "internal/mpris/bridge.go": 1774875009824.6035,
     "internal/mpris/bridge_test.go": 1774843584929.1416
   }
 }

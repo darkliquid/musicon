@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	bubblekey "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/darkliquid/musicon/pkg/components"
 )
@@ -14,6 +15,7 @@ type playbackScreen struct {
 	services  Services
 	width     int
 	height    int
+	keymap    PlaybackKeyMap
 	pane      PlaybackPane
 	showInfo  bool
 	snapshot  PlaybackSnapshot
@@ -23,8 +25,13 @@ type playbackScreen struct {
 }
 
 func newPlaybackScreen(services Services, options AlbumArtOptions) *playbackScreen {
+	return newPlaybackScreenWithKeyMap(services, options, normalizedKeyMap(KeybindOptions{}).Playback)
+}
+
+func newPlaybackScreenWithKeyMap(services Services, options AlbumArtOptions, keymap PlaybackKeyMap) *playbackScreen {
 	screen := &playbackScreen{
 		services: services,
+		keymap:   keymap,
 		pane:     PaneArtwork,
 		snapshot: PlaybackSnapshot{Volume: 60},
 		status:   "Playback mode ready. Connect a playback backend to drive live state.",
@@ -48,17 +55,17 @@ func (p *playbackScreen) Update(msg tea.Msg) string {
 		return ""
 	}
 
-	switch keypress.String() {
-	case "v":
+	switch {
+	case bubblekey.Matches(keypress, p.keymap.CyclePane):
 		p.pane = (p.pane + 1) % 4
 		return fmt.Sprintf("Playback pane: %s", p.pane.String())
-	case "i":
+	case bubblekey.Matches(keypress, p.keymap.ToggleInfo):
 		p.showInfo = !p.showInfo
 		if p.showInfo {
 			return "Track information shown."
 		}
 		return "Track information hidden."
-	case "r":
+	case bubblekey.Matches(keypress, p.keymap.ToggleRepeat):
 		if p.services.Playback != nil {
 			next := !p.snapshot.Repeat
 			if err := p.services.Playback.SetRepeat(next); err != nil {
@@ -69,7 +76,7 @@ func (p *playbackScreen) Update(msg tea.Msg) string {
 			p.snapshot.Repeat = !p.snapshot.Repeat
 		}
 		return fmt.Sprintf("Repeat %s.", onOff(p.snapshot.Repeat))
-	case "s":
+	case bubblekey.Matches(keypress, p.keymap.ToggleStream):
 		if p.services.Playback != nil {
 			next := !p.snapshot.Stream
 			if err := p.services.Playback.SetStream(next); err != nil {
@@ -80,7 +87,7 @@ func (p *playbackScreen) Update(msg tea.Msg) string {
 			p.snapshot.Stream = !p.snapshot.Stream
 		}
 		return fmt.Sprintf("Stream continuation %s.", onOff(p.snapshot.Stream))
-	case "space":
+	case bubblekey.Matches(keypress, p.keymap.TogglePause):
 		if p.services.Playback != nil {
 			if err := p.services.Playback.TogglePause(); err != nil {
 				return err.Error()
@@ -93,7 +100,7 @@ func (p *playbackScreen) Update(msg tea.Msg) string {
 			return "Playback paused."
 		}
 		return "Playback resumed."
-	case "[":
+	case bubblekey.Matches(keypress, p.keymap.PreviousTrack):
 		if p.services.Playback != nil {
 			if err := p.services.Playback.Previous(); err != nil {
 				return err.Error()
@@ -102,7 +109,7 @@ func (p *playbackScreen) Update(msg tea.Msg) string {
 			return "Moved to the previous track."
 		}
 		return "Previous track requires a playback backend."
-	case "]":
+	case bubblekey.Matches(keypress, p.keymap.NextTrack):
 		if p.services.Playback != nil {
 			if err := p.services.Playback.Next(); err != nil {
 				return err.Error()
@@ -111,13 +118,13 @@ func (p *playbackScreen) Update(msg tea.Msg) string {
 			return "Moved to the next track."
 		}
 		return "Next track requires a playback backend."
-	case "-":
+	case bubblekey.Matches(keypress, p.keymap.VolumeDown):
 		return p.adjustVolume(-5)
-	case "=", "+":
+	case bubblekey.Matches(keypress, p.keymap.VolumeUp):
 		return p.adjustVolume(5)
-	case "left":
+	case bubblekey.Matches(keypress, p.keymap.SeekBackward):
 		return p.seek(-5 * time.Second)
-	case "right":
+	case bubblekey.Matches(keypress, p.keymap.SeekForward):
 		return p.seek(5 * time.Second)
 	default:
 		return ""
@@ -150,15 +157,13 @@ func (p *playbackScreen) HelpView() string {
 		Height:   height,
 		Focused:  true,
 	}, strings.Join([]string{
-		"space             toggle play / pause state",
-		"[ / ]             previous / next track request",
-		"left / right      scrub backward / forward by five seconds",
-		"- / +             lower / raise volume",
-		"v                 cycle artwork, lyrics, eq, and visualizer panes",
-		"i                 show or hide track information",
-		"r / s             toggle repeat and stream continuation flags",
-		"tab               switch back to queue mode",
-		"?                 toggle this help view",
+		helpLine(p.keymap.TogglePause, "toggle play / pause state"),
+		helpLinePair(p.keymap.PreviousTrack, p.keymap.NextTrack, "previous / next track request"),
+		helpLinePair(p.keymap.SeekBackward, p.keymap.SeekForward, "scrub backward / forward by five seconds"),
+		helpLinePair(p.keymap.VolumeDown, p.keymap.VolumeUp, "lower / raise volume"),
+		helpLine(p.keymap.CyclePane, "cycle artwork, lyrics, eq, and visualizer panes"),
+		helpLine(p.keymap.ToggleInfo, "show or hide track information"),
+		helpLinePair(p.keymap.ToggleRepeat, p.keymap.ToggleStream, "toggle repeat and stream continuation flags"),
 	}, "\n"))
 }
 
@@ -191,11 +196,17 @@ func (p *playbackScreen) infoOverlay() string {
 func (p *playbackScreen) controlsOverlay() string {
 	width := min(p.width, max(36, p.width-4))
 	return components.RenderPanel(components.PanelOptions{
-		Title:    "Playback",
-		Subtitle: "space pause · [ ] next/prev · ← → seek",
-		Width:    width,
-		Height:   6,
-		Focused:  false,
+		Title: "Playback",
+		Subtitle: fmt.Sprintf("%s pause · %s / %s next/prev · %s / %s seek",
+			bindingLabel(p.keymap.TogglePause),
+			bindingLabel(p.keymap.PreviousTrack),
+			bindingLabel(p.keymap.NextTrack),
+			bindingLabel(p.keymap.SeekBackward),
+			bindingLabel(p.keymap.SeekForward),
+		),
+		Width:   width,
+		Height:  6,
+		Focused: false,
 	}, p.controlsView(width-4))
 }
 
@@ -220,7 +231,7 @@ func (p *playbackScreen) controlsView(width int) string {
 	return lipgloss.JoinVertical(lipgloss.Left,
 		components.RenderProgress(width, ratio, fmt.Sprintf("%s / %s", formatDuration(position), formatDuration(duration))),
 		lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render(strings.Join(statusBits, " · ")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Render("visual mode: v · info: i · help: ? · mode toggle: tab"),
+		lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Render(fmt.Sprintf("visual mode: %s · info: %s", bindingLabel(p.keymap.CyclePane), bindingLabel(p.keymap.ToggleInfo))),
 	)
 }
 

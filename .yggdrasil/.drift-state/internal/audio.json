@@ -1,5 +1,5 @@
 {
-  "hash": "900a38242c6e40b09560323c9d5afed48c6a5674b654e0facf6a65bbe4d0cab6",
+  "hash": "8b6c1d5fecb56df16e572e9c131ba004f9091ed289b62163ef62f1ba76146381",
   "files": {
     ".yggdrasil/model/internal/audio/yg-node.yaml": "9e8af2b2796a93f8a24cf08c904c97ea1e87e8e2392ebb6dcf8298ec7e2280e9",
     ".yggdrasil/model/internal/audio/interface.md": "76006d9d4fc6c5c3d896778edda0ba339996719e378d6a38bd3e41e27c7b9505",
@@ -8,12 +8,12 @@
     ".yggdrasil/model/internal/yg-node.yaml": "c15c09ee704d84db6ab9d46f43837aeba2d3fcc8cef65ec7918fd970bac90223",
     ".yggdrasil/model/internal/responsibility.md": "90fa17d80db7c3265833b84cf53518ceac4f367db6fef86dd3ea8b4adf3ddee7",
     ".yggdrasil/model/internal/ui/responsibility.md": "fb311ab57a4553d9dd13ac0b0a204908c343140677af3de650b6a6853e155077",
-    ".yggdrasil/flows/playback-control/yg-flow.yaml": "44d5688fdc0efdd1afcc442006e3cb8ce8c2ffdbaef716bf9817604c1432e91f",
-    ".yggdrasil/flows/playback-control/description.md": "a774146f3b8e97761e3b53e66ff893281fc78fc0d8760a7784aebc32846a13f6",
+    ".yggdrasil/flows/playback-control/yg-flow.yaml": "666c6c47dd8548c0493894f1253272333073718f892b8dacab887ab9143c529d",
+    ".yggdrasil/flows/playback-control/description.md": "bb98b04756342cbd0bdf68daac097a616a32ae5ca08997dc828ff9a36cf83f17",
     "internal/audio/engine.go": "e6e2edf02631060dd2c04ad8dbcf7c0f902d42a2647d98dc670909a919a5bc81",
     "internal/audio/engine_test.go": "abf5f9efd67c97e06fb912682f740d0a2533acd98ddd84a9587cfc54c8a96ea2",
     "internal/audio/speaker.go": "a7100f3a1f2f28ef17bffa5a32f4f721dcf295c48836ccb2ffcd3dfeb69e093d",
-    ".yggdrasil/model/internal/ui/interface.md": "6923c1e4875038ac4bc203500efb2b91e9ec5dde903b450775ae121cf87b1dda"
+    ".yggdrasil/model/internal/ui/interface.md": "2d16b0a887604e25ddfe2a9917d4c769ee2e289e6ceb23d7c1be29c476742513"
   },
   "mtimes": {
     ".yggdrasil/model/internal/audio/yg-node.yaml": 1774842788587.9082,
@@ -23,9 +23,9 @@
     ".yggdrasil/model/internal/yg-node.yaml": 1774839903015.8567,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
     ".yggdrasil/model/internal/ui/responsibility.md": 1774853820657.9028,
-    ".yggdrasil/model/internal/ui/interface.md": 1774863965278.5989,
-    ".yggdrasil/flows/playback-control/yg-flow.yaml": 1774848349003.8003,
-    ".yggdrasil/flows/playback-control/description.md": 1774848349004.8003,
+    ".yggdrasil/model/internal/ui/interface.md": 1774882778856.8198,
+    ".yggdrasil/flows/playback-control/yg-flow.yaml": 1774878370612.8774,
+    ".yggdrasil/flows/playback-control/description.md": 1774878372940.832,
     "internal/audio/engine.go": 1774859256408.992,
     "internal/audio/engine_test.go": 1774860691191.765,
     "internal/audio/speaker.go": 1774860691190.765

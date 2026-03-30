@@ -27,7 +27,10 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - The root model must render only the centered square itself during normal operation; persistent outer chrome such as tab bars, footer bars, or mode banners should not live outside the square.
 - Help stays in the active mode instead of replacing it with a separate screen: the root model overlays the current mode's help card inside the square viewport.
 - Queue mode owns source cycling, query input, filter toggles, and a single merged browser list where queued items remain pinned before the current search results.
-- Queue mode must keep query editing and browser navigation live at the same time: typing and deletion refresh the active search while movement keys continue to change the selected row, `enter` toggles the selected item between enqueued and not enqueued, and dedicated reorder keys move queued items without leaving the merged browser.
+- Queue mode must keep query editing and browser navigation live at the same time: when search is focused, typing and deletion refresh the active search while non-printing navigation keys continue to change the selected row; when search is unfocused, queue-management shortcuts such as source switching, filter toggles, removal, and reorder actions become active again.
+- Queue mode must expose a dedicated search-focus toggle so users can type literal characters that may also be bound as queue shortcuts.
+- Queue mode must not block the Bubble Tea event loop on source-backed searches; slow or networked searches should resolve asynchronously so quit, mode switching, and navigation remain responsive.
+- The UI must accept typed, config-driven keybindings for global shell actions and per-screen controls instead of hardcoding Bubble Tea key strings inside each update loop.
 - Queue mode should clearly mark the currently playing queued item so users can tell which pinned row is active even while browsing or reordering the rest of the queue.
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
 - Playback mode owns pane switching, transport key routing, scrubber controls, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.

@@ -13,8 +13,10 @@ This node exposes a small startup-facing configuration surface:
 - When no config file is present, the loader should return sane defaults instead of failing startup.
 - When the user explicitly points Musicon at a config file and that file is unreadable or invalid, startup must fail explicitly.
 - Default config loading should layer the global XDG config first and then overlay the user XDG config on top when both are present.
-- The config surface should centralize tunables that were previously scattered across env-based startup behavior, especially audio backend selection, UI startup defaults, album-art rendering mode, and local source directories.
+- The config surface should centralize tunables that were previously scattered across env-based startup behavior, especially audio backend selection, UI startup defaults, album-art rendering mode, local source directories, and YouTube source auth/cache settings.
+- The config surface should also centralize configurable UI keybindings under `[keybinds]`, covering global shell actions plus queue and playback screen shortcuts.
 - Album-art renderer configuration should accept a user-facing `backend` key while still tolerating the older `protocol` spelling as a compatibility alias.
+- YouTube source configuration should support cookie-file auth, browser-cookie import, bounded search-result counts, deterministic cache locations, and advanced raw yt-dlp arguments without pushing TOML parsing into the source implementation.
 - When `ui.cell_width_ratio` is omitted or non-positive, the loader should fall back to the shared fixed ratio used by `pkg/components` instead of attempting terminal font-metric auto-detection.
 - UI configuration should remain app-owned: `internal/config` may normalize values, but `internal/ui` should still receive typed options instead of parsing TOML itself.
 

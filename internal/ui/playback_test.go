@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/coverart"
 )
@@ -66,5 +67,20 @@ func TestPlaybackScreenViewUsesOverlaysInsteadOfStackedPanels(t *testing.T) {
 	}
 	if strings.Contains(got, "Playback controls") {
 		t.Fatalf("expected stacked controls panel title to be removed, got %q", got)
+	}
+}
+
+func TestPlaybackScreenUsesConfiguredPauseBinding(t *testing.T) {
+	screen := newPlaybackScreenWithKeyMap(Services{}, AlbumArtOptions{}, normalizedKeyMap(KeybindOptions{
+		Playback: PlaybackKeybindOptions{
+			TogglePause: []string{"p"},
+		},
+	}).Playback)
+
+	if got := screen.Update(tea.KeyPressMsg(tea.Key{Text: "p"})); got != "Playback paused." {
+		t.Fatalf("expected custom pause keybind to pause playback, got %q", got)
+	}
+	if got := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeySpace})); got != "" {
+		t.Fatalf("expected default space binding to stop matching after override, got %q", got)
 	}
 }

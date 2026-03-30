@@ -17,6 +17,7 @@ Build a queue that reflects what the user wants to hear now while keeping the in
 - `app/cli` starts the terminal application and hands control to the UI.
 - `internal/ui` renders the queue screen, collects user input, and routes actions to backend-facing contracts.
 - `internal/sources/local` provides concrete local-file search results and queueable metadata.
+- `internal/sources/youtube` provides yt-dlp-backed search results, URL inspection, and queueable metadata for YouTube Music content.
 
 # Paths
 
@@ -24,7 +25,7 @@ Build a queue that reflects what the user wants to hear now while keeping the in
 
 1. The user enters queue mode.
 2. The user chooses or cycles a source and enters search text.
-3. The UI asks the active source contract for matching items.
+3. The UI asks the active source contract for matching items without blocking the rest of the queue-mode controls.
 4. The user reviews search results and adds one or more items to the queue.
 5. The user inspects the queue and optionally removes or clears entries.
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	bubblekey "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/darkliquid/musicon/pkg/components"
 	"golang.org/x/term"
@@ -36,6 +37,7 @@ type rootModel struct {
 	mode           Mode
 	showHelp       bool
 	status         string
+	keymap         KeyMap
 	queue          *queueScreen
 	playback       *playbackScreen
 	viewport       components.SquareViewport
@@ -49,10 +51,11 @@ func NewApp(services Services, options Options) *App {
 		options:        options,
 		cellWidthRatio: options.CellWidthRatio,
 		mode:           options.StartMode,
-		status:         "Ready. tab switches modes, ? toggles help, ctrl+c exits.",
+		keymap:         normalizedKeyMap(options.Keybinds),
 	}
-	model.queue = newQueueScreen(services)
-	model.playback = newPlaybackScreen(services, options.AlbumArt)
+	model.status = readyStatus(model.keymap.Global)
+	model.queue = newQueueScreenWithKeyMap(services, model.keymap.Queue)
+	model.playback = newPlaybackScreenWithKeyMap(services, options.AlbumArt, model.keymap.Playback)
 	width, height := initialTerminalSize()
 
 	return &App{
@@ -127,8 +130,8 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.resizeScreens()
 		return m, nil
 	case tea.KeyPressMsg:
-		switch typed.String() {
-		case "ctrl+c":
+		switch {
+		case bubblekey.Matches(typed, m.keymap.Global.Quit):
 			return m, tea.Quit
 		}
 
@@ -136,11 +139,11 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		switch typed.String() {
-		case "tab":
+		switch {
+		case bubblekey.Matches(typed, m.keymap.Global.ToggleMode):
 			m.toggleMode()
 			return m, nil
-		case "?":
+		case bubblekey.Matches(typed, m.keymap.Global.ToggleHelp):
 			m.showHelp = !m.showHelp
 			if m.showHelp {
 				m.status = fmt.Sprintf("%s help shown.", m.mode.String())
@@ -152,9 +155,11 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.mode == ModeQueue {
-		if status := m.queue.Update(msg); status != "" {
+		status, cmd := m.queue.Update(msg)
+		if status != "" {
 			m.status = status
 		}
+		return m, cmd
 	} else {
 		if status := m.playback.Update(msg); status != "" {
 			m.status = status
@@ -248,7 +253,7 @@ func (m *rootModel) updateSizeStatus() {
 	}
 
 	if m.status == "" || strings.HasPrefix(m.status, "Resize terminal to at least 20×20") {
-		m.status = "Terminal size accepted. Ready. tab switches modes, ? toggles help, ctrl+c exits."
+		m.status = "Terminal size accepted. " + readyStatus(m.keymap.Global)
 	}
 }
 
@@ -354,6 +359,7 @@ func sanitizeTitle(title string) string {
 }
 
 func normalizedOptions(options Options) Options {
+	providedKeybinds := options.Keybinds
 	if options.CellWidthRatio <= 0 {
 		options.CellWidthRatio = terminalCellWidthRatio()
 	}
@@ -371,7 +377,118 @@ func normalizedOptions(options Options) Options {
 	if options.AlbumArt.Protocol == "" {
 		options.AlbumArt.Protocol = "halfblocks"
 	}
+	options.Keybinds = mergeKeybindOptions(defaultKeybindOptions(), providedKeybinds)
 	return options
+}
+
+func readyStatus(keymap GlobalKeyMap) string {
+	return fmt.Sprintf("Ready. %s switches modes, %s toggles help, %s exits.",
+		bindingLabel(keymap.ToggleMode),
+		bindingLabel(keymap.ToggleHelp),
+		bindingLabel(keymap.Quit),
+	)
+}
+
+func mergeKeybindOptions(defaults, provided KeybindOptions) KeybindOptions {
+	merged := defaults
+
+	if len(provided.Global.Quit) > 0 {
+		merged.Global.Quit = append([]string(nil), provided.Global.Quit...)
+	}
+	if len(provided.Global.ToggleMode) > 0 {
+		merged.Global.ToggleMode = append([]string(nil), provided.Global.ToggleMode...)
+	}
+	if len(provided.Global.ToggleHelp) > 0 {
+		merged.Global.ToggleHelp = append([]string(nil), provided.Global.ToggleHelp...)
+	}
+
+	if len(provided.Queue.ToggleSearchFocus) > 0 {
+		merged.Queue.ToggleSearchFocus = append([]string(nil), provided.Queue.ToggleSearchFocus...)
+	}
+	if len(provided.Queue.SourcePrev) > 0 {
+		merged.Queue.SourcePrev = append([]string(nil), provided.Queue.SourcePrev...)
+	}
+	if len(provided.Queue.SourceNext) > 0 {
+		merged.Queue.SourceNext = append([]string(nil), provided.Queue.SourceNext...)
+	}
+	if len(provided.Queue.FilterTracks) > 0 {
+		merged.Queue.FilterTracks = append([]string(nil), provided.Queue.FilterTracks...)
+	}
+	if len(provided.Queue.FilterStreams) > 0 {
+		merged.Queue.FilterStreams = append([]string(nil), provided.Queue.FilterStreams...)
+	}
+	if len(provided.Queue.FilterPlaylists) > 0 {
+		merged.Queue.FilterPlaylists = append([]string(nil), provided.Queue.FilterPlaylists...)
+	}
+	if len(provided.Queue.ActivateSelected) > 0 {
+		merged.Queue.ActivateSelected = append([]string(nil), provided.Queue.ActivateSelected...)
+	}
+	if len(provided.Queue.MoveSelectedUp) > 0 {
+		merged.Queue.MoveSelectedUp = append([]string(nil), provided.Queue.MoveSelectedUp...)
+	}
+	if len(provided.Queue.MoveSelectedDown) > 0 {
+		merged.Queue.MoveSelectedDown = append([]string(nil), provided.Queue.MoveSelectedDown...)
+	}
+	if len(provided.Queue.ClearQueue) > 0 {
+		merged.Queue.ClearQueue = append([]string(nil), provided.Queue.ClearQueue...)
+	}
+	if len(provided.Queue.RemoveSelected) > 0 {
+		merged.Queue.RemoveSelected = append([]string(nil), provided.Queue.RemoveSelected...)
+	}
+	if len(provided.Queue.BrowserUp) > 0 {
+		merged.Queue.BrowserUp = append([]string(nil), provided.Queue.BrowserUp...)
+	}
+	if len(provided.Queue.BrowserDown) > 0 {
+		merged.Queue.BrowserDown = append([]string(nil), provided.Queue.BrowserDown...)
+	}
+	if len(provided.Queue.BrowserHome) > 0 {
+		merged.Queue.BrowserHome = append([]string(nil), provided.Queue.BrowserHome...)
+	}
+	if len(provided.Queue.BrowserEnd) > 0 {
+		merged.Queue.BrowserEnd = append([]string(nil), provided.Queue.BrowserEnd...)
+	}
+	if len(provided.Queue.BrowserPageUp) > 0 {
+		merged.Queue.BrowserPageUp = append([]string(nil), provided.Queue.BrowserPageUp...)
+	}
+	if len(provided.Queue.BrowserPageDown) > 0 {
+		merged.Queue.BrowserPageDown = append([]string(nil), provided.Queue.BrowserPageDown...)
+	}
+
+	if len(provided.Playback.CyclePane) > 0 {
+		merged.Playback.CyclePane = append([]string(nil), provided.Playback.CyclePane...)
+	}
+	if len(provided.Playback.ToggleInfo) > 0 {
+		merged.Playback.ToggleInfo = append([]string(nil), provided.Playback.ToggleInfo...)
+	}
+	if len(provided.Playback.ToggleRepeat) > 0 {
+		merged.Playback.ToggleRepeat = append([]string(nil), provided.Playback.ToggleRepeat...)
+	}
+	if len(provided.Playback.ToggleStream) > 0 {
+		merged.Playback.ToggleStream = append([]string(nil), provided.Playback.ToggleStream...)
+	}
+	if len(provided.Playback.TogglePause) > 0 {
+		merged.Playback.TogglePause = append([]string(nil), provided.Playback.TogglePause...)
+	}
+	if len(provided.Playback.PreviousTrack) > 0 {
+		merged.Playback.PreviousTrack = append([]string(nil), provided.Playback.PreviousTrack...)
+	}
+	if len(provided.Playback.NextTrack) > 0 {
+		merged.Playback.NextTrack = append([]string(nil), provided.Playback.NextTrack...)
+	}
+	if len(provided.Playback.VolumeDown) > 0 {
+		merged.Playback.VolumeDown = append([]string(nil), provided.Playback.VolumeDown...)
+	}
+	if len(provided.Playback.VolumeUp) > 0 {
+		merged.Playback.VolumeUp = append([]string(nil), provided.Playback.VolumeUp...)
+	}
+	if len(provided.Playback.SeekBackward) > 0 {
+		merged.Playback.SeekBackward = append([]string(nil), provided.Playback.SeekBackward...)
+	}
+	if len(provided.Playback.SeekForward) > 0 {
+		merged.Playback.SeekForward = append([]string(nil), provided.Playback.SeekForward...)
+	}
+
+	return merged
 }
 
 func terminalCellWidthRatio() float64 {

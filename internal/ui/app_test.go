@@ -95,6 +95,45 @@ func TestNormalizedOptionsUsesConfiguredStartModeAndCellRatio(t *testing.T) {
 	}
 }
 
+func TestNormalizedOptionsUsesConfiguredKeybinds(t *testing.T) {
+	options := normalizedOptions(Options{
+		Keybinds: KeybindOptions{
+			Global: GlobalKeybindOptions{
+				ToggleMode: []string{"ctrl+o"},
+			},
+		},
+	})
+
+	if len(options.Keybinds.Global.ToggleMode) != 1 || options.Keybinds.Global.ToggleMode[0] != "ctrl+o" {
+		t.Fatalf("expected configured toggle-mode keybind, got %#v", options.Keybinds.Global.ToggleMode)
+	}
+	if len(options.Keybinds.Global.Quit) != 1 || options.Keybinds.Global.Quit[0] != "ctrl+c" {
+		t.Fatalf("expected default quit keybind, got %#v", options.Keybinds.Global.Quit)
+	}
+}
+
+func TestRootModelUsesConfiguredModeToggleBinding(t *testing.T) {
+	model := &rootModel{
+		width:          80,
+		height:         40,
+		cellWidthRatio: 1,
+		mode:           ModeQueue,
+		keymap: normalizedKeyMap(KeybindOptions{
+			Global: GlobalKeybindOptions{
+				ToggleMode: []string{"ctrl+o"},
+			},
+		}),
+		queue:    newQueueScreen(Services{}),
+		playback: newPlaybackScreen(Services{}, AlbumArtOptions{}),
+	}
+
+	next, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: 'o', Mod: tea.ModCtrl}))
+	updated := next.(*rootModel)
+	if updated.mode != ModePlayback {
+		t.Fatalf("expected custom toggle-mode binding to switch to playback, got %v", updated.mode)
+	}
+}
+
 func TestLayoutCheckAccountsForNonSquareTerminalCells(t *testing.T) {
 	model := &rootModel{width: 120, height: 40, cellWidthRatio: 0.5}
 

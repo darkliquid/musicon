@@ -11,6 +11,7 @@ import (
 	"github.com/darkliquid/musicon/internal/config"
 	"github.com/darkliquid/musicon/internal/mpris"
 	"github.com/darkliquid/musicon/internal/sources/local"
+	"github.com/darkliquid/musicon/internal/sources/youtube"
 	"github.com/darkliquid/musicon/internal/ui"
 	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/coverart"
@@ -65,10 +66,23 @@ func main() {
 
 	debuglog("Loading Local Library")
 	library := local.NewLibrary(local.Options{Roots: loaded.Config.ResolvedLocalDirs()})
+	ytmusic := youtube.NewSource(youtube.Options{
+		Enabled:            loaded.Config.Sources.YouTube.Enabled,
+		MaxResults:         loaded.Config.Sources.YouTube.MaxResults,
+		CookiesFile:        loaded.Config.Sources.YouTube.CookiesFile,
+		CookiesFromBrowser: loaded.Config.Sources.YouTube.CookiesFromBrowser,
+		ExtraArgs:          loaded.Config.Sources.YouTube.ExtraArgs,
+		CacheDir:           loaded.Config.Sources.YouTube.CacheDir,
+	})
+	search := combinedSearch{providers: []ui.SearchService{library, ytmusic}}
+	resolver := combinedResolver{
+		local:   library,
+		youtube: ytmusic,
+	}
 
 	debuglog("Initializing Musicon Engine...")
 	engine := audio.NewEngine(audio.Options{
-		Resolver: library,
+		Resolver: resolver,
 		Backend:  loaded.Config.Audio.Backend,
 	})
 	defer engine.Close()
@@ -85,7 +99,7 @@ func main() {
 	}
 
 	app := ui.NewApp(ui.Services{
-		Search:   library,
+		Search:   search,
 		Queue:    engine.QueueService(),
 		Playback: playback,
 		Artwork:  buildArtworkProvider(),
@@ -96,6 +110,45 @@ func main() {
 		AlbumArt: ui.AlbumArtOptions{
 			FillMode: loaded.Config.UI.AlbumArt.FillMode,
 			Protocol: loaded.Config.UI.AlbumArt.Protocol,
+		},
+		Keybinds: ui.KeybindOptions{
+			Global: ui.GlobalKeybindOptions{
+				Quit:       loaded.Config.Keybinds.Global.Quit,
+				ToggleMode: loaded.Config.Keybinds.Global.ToggleMode,
+				ToggleHelp: loaded.Config.Keybinds.Global.ToggleHelp,
+			},
+			Queue: ui.QueueKeybindOptions{
+				ToggleSearchFocus: loaded.Config.Keybinds.Queue.ToggleSearchFocus,
+				SourcePrev:        loaded.Config.Keybinds.Queue.SourcePrev,
+				SourceNext:        loaded.Config.Keybinds.Queue.SourceNext,
+				FilterTracks:      loaded.Config.Keybinds.Queue.FilterTracks,
+				FilterStreams:     loaded.Config.Keybinds.Queue.FilterStreams,
+				FilterPlaylists:   loaded.Config.Keybinds.Queue.FilterPlaylists,
+				ActivateSelected:  loaded.Config.Keybinds.Queue.ActivateSelected,
+				MoveSelectedUp:    loaded.Config.Keybinds.Queue.MoveSelectedUp,
+				MoveSelectedDown:  loaded.Config.Keybinds.Queue.MoveSelectedDown,
+				ClearQueue:        loaded.Config.Keybinds.Queue.ClearQueue,
+				RemoveSelected:    loaded.Config.Keybinds.Queue.RemoveSelected,
+				BrowserUp:         loaded.Config.Keybinds.Queue.BrowserUp,
+				BrowserDown:       loaded.Config.Keybinds.Queue.BrowserDown,
+				BrowserHome:       loaded.Config.Keybinds.Queue.BrowserHome,
+				BrowserEnd:        loaded.Config.Keybinds.Queue.BrowserEnd,
+				BrowserPageUp:     loaded.Config.Keybinds.Queue.BrowserPageUp,
+				BrowserPageDown:   loaded.Config.Keybinds.Queue.BrowserPageDown,
+			},
+			Playback: ui.PlaybackKeybindOptions{
+				CyclePane:     loaded.Config.Keybinds.Playback.CyclePane,
+				ToggleInfo:    loaded.Config.Keybinds.Playback.ToggleInfo,
+				ToggleRepeat:  loaded.Config.Keybinds.Playback.ToggleRepeat,
+				ToggleStream:  loaded.Config.Keybinds.Playback.ToggleStream,
+				TogglePause:   loaded.Config.Keybinds.Playback.TogglePause,
+				PreviousTrack: loaded.Config.Keybinds.Playback.PreviousTrack,
+				NextTrack:     loaded.Config.Keybinds.Playback.NextTrack,
+				VolumeDown:    loaded.Config.Keybinds.Playback.VolumeDown,
+				VolumeUp:      loaded.Config.Keybinds.Playback.VolumeUp,
+				SeekBackward:  loaded.Config.Keybinds.Playback.SeekBackward,
+				SeekForward:   loaded.Config.Keybinds.Playback.SeekForward,
+			},
 		},
 	})
 
@@ -185,3 +238,75 @@ func debuglog(format string, args ...interface{}) {
 }
 
 var debug = flag.Bool("debug", false, "enable debug logging to stderr")
+
+type combinedSearch struct {
+	providers []ui.SearchService
+}
+
+func (c combinedSearch) Sources() []ui.SourceDescriptor {
+	descriptors := make([]ui.SourceDescriptor, 0, len(c.providers)+1)
+	seen := make(map[string]struct{}, len(c.providers)+1)
+	for _, provider := range c.providers {
+		if provider == nil {
+			continue
+		}
+		for _, descriptor := range provider.Sources() {
+			if descriptor.ID == "" {
+				continue
+			}
+			if _, exists := seen[descriptor.ID]; exists {
+				continue
+			}
+			seen[descriptor.ID] = struct{}{}
+			descriptors = append(descriptors, descriptor)
+		}
+	}
+	if len(descriptors) > 1 {
+		return append([]ui.SourceDescriptor{{
+			ID:          "all",
+			Name:        "All sources",
+			Description: "Search across every configured music source.",
+		}}, descriptors...)
+	}
+	return descriptors
+}
+
+func (c combinedSearch) Search(request ui.SearchRequest) ([]ui.SearchResult, error) {
+	results := make([]ui.SearchResult, 0, 64)
+	seen := make(map[string]struct{}, 64)
+	for _, provider := range c.providers {
+		if provider == nil {
+			continue
+		}
+		matches, err := provider.Search(request)
+		if err != nil {
+			return nil, err
+		}
+		for _, result := range matches {
+			if _, exists := seen[result.ID]; exists {
+				continue
+			}
+			seen[result.ID] = struct{}{}
+			results = append(results, result)
+		}
+	}
+	return results, nil
+}
+
+type combinedResolver struct {
+	local   audio.Resolver
+	youtube audio.Resolver
+}
+
+func (c combinedResolver) Resolve(entry ui.QueueEntry) (audio.ResolvedTrack, error) {
+	if youtube.OwnsEntryID(entry.ID) {
+		if c.youtube == nil {
+			return audio.ResolvedTrack{}, fmt.Errorf("no resolver configured for %q", entry.Source)
+		}
+		return c.youtube.Resolve(entry)
+	}
+	if c.local == nil {
+		return audio.ResolvedTrack{}, fmt.Errorf("no resolver configured for %q", entry.Source)
+	}
+	return c.local.Resolve(entry)
+}

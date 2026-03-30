@@ -122,9 +122,12 @@ func TestQueueBrowserBackspaceReturnsFocusToSearchAndClearsQuery(t *testing.T) {
 	screen.resultData = []SearchResult{{ID: "result-1", Title: "Search result", Source: "Local files", Kind: MediaTrack}}
 	screen.rebuildBrowser()
 
-	got := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyBackspace}))
+	got, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyBackspace}))
 	if got != "Search cleared." {
 		t.Fatalf("expected search cleared status, got %q", got)
+	}
+	if cmd != nil {
+		t.Fatalf("expected no search command for cleared query, got %v", cmd)
 	}
 	if screen.searchInput.Value() != "" {
 		t.Fatalf("expected cleared search input, got %q", screen.searchInput.Value())
@@ -142,7 +145,7 @@ func TestQueueBrowserArrowKeysBrowseWhileSearchRemainsActive(t *testing.T) {
 	}
 	screen.rebuildBrowser()
 
-	screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	got := screen.browser.SelectedIndex()
 	if got != 1 {
 		t.Fatalf("expected browser selection to move down, got %d", got)
@@ -160,7 +163,7 @@ func TestQueueBrowserEnterTogglesSearchResultQueueMembership(t *testing.T) {
 	screen.resultData = []SearchResult{{ID: "result-1", Title: "Search result", Source: "Local files", Kind: MediaTrack}}
 	screen.rebuildBrowser()
 
-	got := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	got, _ := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if !strings.Contains(got, `Added "Search result"`) {
 		t.Fatalf("expected add status, got %q", got)
 	}
@@ -168,7 +171,7 @@ func TestQueueBrowserEnterTogglesSearchResultQueueMembership(t *testing.T) {
 		t.Fatalf("expected queued item after first enter, got %#v", screen.queueData)
 	}
 
-	got = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
+	got, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter}))
 	if !strings.Contains(got, `Removed "Search result"`) {
 		t.Fatalf("expected remove status, got %q", got)
 	}
@@ -219,4 +222,182 @@ func TestQueueBrowserMarksNowPlayingQueuedItem(t *testing.T) {
 
 func (r queueBrowserRow) resultMatchesID(id string) bool {
 	return r.kind == queueRowSearchResult && r.result.ID == id
+}
+
+type blockingSearchService struct {
+	calls   int
+	block   chan struct{}
+	started chan struct{}
+}
+
+func (s *blockingSearchService) Sources() []SourceDescriptor {
+	return []SourceDescriptor{{ID: "youtube-music", Name: "YouTube Music"}}
+}
+
+func (s *blockingSearchService) Search(SearchRequest) ([]SearchResult, error) {
+	s.calls++
+	if s.started != nil {
+		s.started <- struct{}{}
+	}
+	<-s.block
+	return []SearchResult{{ID: "result-1", Title: "Async result", Source: "YouTube Music", Kind: MediaTrack}}, nil
+}
+
+type multiSourceSearchService struct {
+	sources []SourceDescriptor
+}
+
+func (s multiSourceSearchService) Sources() []SourceDescriptor {
+	return append([]SourceDescriptor(nil), s.sources...)
+}
+func (s multiSourceSearchService) Search(SearchRequest) ([]SearchResult, error) {
+	return nil, nil
+}
+
+func TestQueueBrowserTypingStartsAsyncSearch(t *testing.T) {
+	search := &blockingSearchService{block: make(chan struct{}), started: make(chan struct{}, 1)}
+	screen := newQueueScreen(Services{Search: search})
+
+	status, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Text: "y"}))
+	if !strings.Contains(status, `Searching YouTube Music for "y".`) {
+		t.Fatalf("expected search status, got %q", status)
+	}
+	if cmd == nil {
+		t.Fatal("expected async search cmd")
+	}
+	if search.calls != 0 {
+		t.Fatalf("expected search not to run inline, got %d calls", search.calls)
+	}
+	if !screen.searching {
+		t.Fatal("expected screen to remain in searching state until async results return")
+	}
+
+	done := make(chan tea.Msg, 1)
+	go func() { done <- cmd() }()
+	<-search.started
+	if search.calls != 1 {
+		t.Fatalf("expected search to run when cmd executes, got %d calls", search.calls)
+	}
+
+	close(search.block)
+	msg := <-done
+	status, _ = screen.Update(msg)
+	if status != "" {
+		t.Fatalf("expected result application to keep status unchanged, got %q", status)
+	}
+	if len(screen.resultData) != 1 || screen.resultData[0].Title != "Async result" {
+		t.Fatalf("expected async results applied, got %#v", screen.resultData)
+	}
+}
+
+func TestQueueBrowserTypingShowsSearchingStateImmediately(t *testing.T) {
+	search := &blockingSearchService{block: make(chan struct{}), started: make(chan struct{}, 1)}
+	screen := newQueueScreen(Services{Search: search})
+	screen.SetSize(50, 12)
+
+	_, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Text: "y"}))
+	if cmd == nil {
+		t.Fatal("expected async search cmd")
+	}
+
+	view := screen.View()
+	if !strings.Contains(view, "Searching") {
+		t.Fatalf("expected searching state in queue view, got %q", view)
+	}
+	close(search.block)
+}
+
+func TestQueueBrowserSourceHotkeysDoNotEditSearchInput(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{
+				{ID: "local", Name: "Local files"},
+				{ID: "youtube-music", Name: "YouTube Music"},
+			},
+		},
+	})
+	screen.searchInput.SetValue("mix")
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Text: "]"}))
+	if status != "Active source: YouTube Music" {
+		t.Fatalf("expected source switch status, got %q", status)
+	}
+	if screen.searchInput.Value() != "mix" {
+		t.Fatalf("expected source hotkey to leave query unchanged, got %q", screen.searchInput.Value())
+	}
+	if screen.activeSource().ID != "youtube-music" {
+		t.Fatalf("expected active source to switch, got %#v", screen.activeSource())
+	}
+}
+
+func TestQueueBrowserFilterHotkeysDoNotEditSearchInput(t *testing.T) {
+	screen := newQueueScreen(Services{})
+	screen.searchInput.SetValue("mix")
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Text: "1"}))
+	if status != "Filters: streams, playlists" {
+		t.Fatalf("expected filter toggle status, got %q", status)
+	}
+	if screen.searchInput.Value() != "mix" {
+		t.Fatalf("expected filter hotkey to leave query unchanged, got %q", screen.searchInput.Value())
+	}
+	if screen.filters.Tracks {
+		t.Fatal("expected track filter to toggle off")
+	}
+}
+
+func TestQueueSearchFocusToggleAllowsLiteralReservedCharacters(t *testing.T) {
+	screen := newQueueScreen(Services{})
+	screen.searchInput.SetValue("mix")
+
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+	if !strings.Contains(status, "Search unfocused") {
+		t.Fatalf("expected search unfocused status, got %q", status)
+	}
+	if screen.searchFocused {
+		t.Fatal("expected search to be unfocused")
+	}
+
+	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+	if !strings.Contains(status, "Search focused") {
+		t.Fatalf("expected search focused status, got %q", status)
+	}
+	if !screen.searchFocused {
+		t.Fatal("expected search to be focused")
+	}
+
+	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Text: "]"}))
+	if !strings.Contains(status, `Searching`) {
+		t.Fatalf("expected literal keypress to update search while focused, got %q", status)
+	}
+	if screen.searchInput.Value() != "mix]" {
+		t.Fatalf("expected reserved character to be inserted into search, got %q", screen.searchInput.Value())
+	}
+}
+
+func TestQueueSourceHotkeysRequireUnfocusedSearch(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{
+				{ID: "local", Name: "Local files"},
+				{ID: "youtube-music", Name: "YouTube Music"},
+			},
+		},
+	})
+
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Text: "]"}))
+	if !strings.Contains(status, `Searching`) {
+		t.Fatalf("expected focused search to treat ] as text, got %q", status)
+	}
+	if screen.activeSource().ID != "local" {
+		t.Fatalf("expected source to stay unchanged while search is focused, got %#v", screen.activeSource())
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Text: "]"}))
+	if status != "Active source: YouTube Music" {
+		t.Fatalf("expected source switch once search is unfocused, got %q", status)
+	}
 }

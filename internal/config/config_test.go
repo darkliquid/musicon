@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -21,8 +22,17 @@ func TestDefaultProvidesExpectedTunables(t *testing.T) {
 	if cfg.UI.AlbumArt.FillMode != "fill" {
 		t.Fatalf("expected fill mode, got %q", cfg.UI.AlbumArt.FillMode)
 	}
+	if len(cfg.Keybinds.Queue.ToggleSearchFocus) != 1 || cfg.Keybinds.Queue.ToggleSearchFocus[0] != "ctrl+f" {
+		t.Fatalf("expected default queue search focus toggle, got %#v", cfg.Keybinds.Queue.ToggleSearchFocus)
+	}
 	if len(cfg.Sources.Local.Dirs) == 0 {
 		t.Fatal("expected default local dirs")
+	}
+	if !cfg.Sources.YouTube.Enabled {
+		t.Fatal("expected youtube source enabled by default")
+	}
+	if cfg.Sources.YouTube.MaxResults != 20 {
+		t.Fatalf("expected default youtube max results, got %d", cfg.Sources.YouTube.MaxResults)
 	}
 }
 
@@ -42,8 +52,26 @@ cell_width_ratio = 0.6
 fill_mode = "stretch"
 protocol = "kitty"
 
+[keybinds.global]
+toggle_mode = [" ctrl+o "]
+
+[keybinds.queue]
+toggle_search_focus = [" ctrl+g "]
+browser_down = [" down ", " j "]
+
+[keybinds.playback]
+toggle_pause = [" p "]
+volume_up = [" = ", " + "]
+
 [sources.local]
 dirs = ["~/Music", " /tmp/library "]
+
+[sources.youtube]
+max_results = 35
+cookies_file = "~/cookies.txt"
+cookies_from_browser = " firefox "
+extra_args = [" --extractor-args ", "youtube:player-client=web_music", ""]
+cache_dir = "~/yt-cache"
 `), 0o644); err != nil {
 		t.Fatalf("write config failed: %v", err)
 	}
@@ -68,8 +96,32 @@ dirs = ["~/Music", " /tmp/library "]
 	if cfg.UI.AlbumArt.FillMode != "stretch" || cfg.UI.AlbumArt.Protocol != "kitty" || cfg.UI.AlbumArt.Backend != "kitty" {
 		t.Fatalf("unexpected album art settings: %#v", cfg.UI.AlbumArt)
 	}
+	if len(cfg.Keybinds.Global.ToggleMode) != 1 || cfg.Keybinds.Global.ToggleMode[0] != "ctrl+o" {
+		t.Fatalf("expected normalized toggle-mode keybind, got %#v", cfg.Keybinds.Global.ToggleMode)
+	}
+	if len(cfg.Keybinds.Queue.ToggleSearchFocus) != 1 || cfg.Keybinds.Queue.ToggleSearchFocus[0] != "ctrl+g" {
+		t.Fatalf("expected normalized queue search focus keybind, got %#v", cfg.Keybinds.Queue.ToggleSearchFocus)
+	}
+	if len(cfg.Keybinds.Playback.TogglePause) != 1 || cfg.Keybinds.Playback.TogglePause[0] != "p" {
+		t.Fatalf("expected normalized playback pause keybind, got %#v", cfg.Keybinds.Playback.TogglePause)
+	}
 	if got := cfg.Sources.Local.Dirs[1]; got != "/tmp/library" {
 		t.Fatalf("expected trimmed dir, got %q", got)
+	}
+	if cfg.Sources.YouTube.MaxResults != 35 {
+		t.Fatalf("expected youtube max results, got %d", cfg.Sources.YouTube.MaxResults)
+	}
+	if !strings.HasSuffix(cfg.Sources.YouTube.CookiesFile, "cookies.txt") {
+		t.Fatalf("expected expanded cookies path, got %q", cfg.Sources.YouTube.CookiesFile)
+	}
+	if cfg.Sources.YouTube.CookiesFromBrowser != "firefox" {
+		t.Fatalf("expected trimmed browser cookies config, got %q", cfg.Sources.YouTube.CookiesFromBrowser)
+	}
+	if len(cfg.Sources.YouTube.ExtraArgs) != 2 {
+		t.Fatalf("expected trimmed youtube extra args, got %#v", cfg.Sources.YouTube.ExtraArgs)
+	}
+	if !strings.HasSuffix(cfg.Sources.YouTube.CacheDir, "yt-cache") {
+		t.Fatalf("expected expanded youtube cache dir, got %q", cfg.Sources.YouTube.CacheDir)
 	}
 }
 

@@ -3,8 +3,10 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	tea "charm.land/bubbletea/v2"
+	bubblekey "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/darkliquid/musicon/pkg/components"
 )
@@ -23,39 +25,60 @@ type queueBrowserRow struct {
 }
 
 type queueScreen struct {
-	services     Services
-	width        int
-	height       int
-	sources      []SourceDescriptor
-	sourceIndex  int
-	filters      SearchFilters
-	searchInput  components.Input
-	browser      components.List
-	browserData  []queueBrowserRow
-	resultData   []SearchResult
-	queueData    []QueueEntry
-	status       string
-	lastQuery    string
-	lastSourceID string
+	services      Services
+	width         int
+	height        int
+	keymap        QueueKeyMap
+	sources       []SourceDescriptor
+	sourceIndex   int
+	filters       SearchFilters
+	searchInput   components.Input
+	browser       components.List
+	searchFocused bool
+	browserData   []queueBrowserRow
+	resultData    []SearchResult
+	queueData     []QueueEntry
+	status        string
+	lastQuery     string
+	lastSourceID  string
+	searchSeq     uint64
+	searching     bool
+}
+
+type queueSearchResultsMsg struct {
+	seq      uint64
+	query    string
+	sourceID string
+	filters  SearchFilters
+	results  []SearchResult
+	err      error
 }
 
 func newQueueScreen(services Services) *queueScreen {
+	return newQueueScreenWithKeyMap(services, normalizedKeyMap(KeybindOptions{}).Queue)
+}
+
+func newQueueScreenWithKeyMap(services Services, keymap QueueKeyMap) *queueScreen {
 	searchInput := components.NewInput("type to search the active source")
 	searchInput.SetFocused(true)
 
 	browser := components.NewList()
 	browser.SetEmptyState("Queue is empty", "Queued items stay at the top. Type to append matching search results below them.")
-	browser.SetFocused(false)
+	browser.SetKeyMap(keymap.Browser)
+	browser.SetFocused(true)
 
 	screen := &queueScreen{
-		services:    services,
-		filters:     DefaultSearchFilters(),
-		searchInput: searchInput,
-		browser:     browser,
-		sources:     configuredSources(services),
-		status:      "Queue mode ready. Type to search and use tab to switch modes.",
+		services:      services,
+		keymap:        keymap,
+		filters:       DefaultSearchFilters(),
+		searchInput:   searchInput,
+		browser:       browser,
+		searchFocused: true,
+		sources:       configuredSources(services),
+		status:        "Queue mode ready. Focus search to type, unfocus it to use queue shortcuts.",
 	}
 
+	screen.syncFocus()
 	screen.syncQueue()
 	return screen
 }
@@ -83,63 +106,91 @@ func (q *queueScreen) resizeBrowser() {
 	q.browser.SetSize(max(6, q.width), listHeight)
 }
 
-func (q *queueScreen) Update(msg tea.Msg) string {
-	keypress, ok := msg.(tea.KeyPressMsg)
-	if ok {
-		if shouldEditSearch(keypress) && q.searchInput.Update(msg) {
-			q.refreshResults()
-			if strings.TrimSpace(q.searchInput.Value()) == "" {
-				return "Search cleared."
-			}
-			return fmt.Sprintf("Searching %s for %q.", q.activeSource().Name, q.searchInput.Value())
+func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
+	switch typed := msg.(type) {
+	case queueSearchResultsMsg:
+		if typed.seq != q.searchSeq || typed.query != q.lastQuery || typed.sourceID != q.lastSourceID || typed.filters != q.filters {
+			return "", nil
+		}
+		q.searching = false
+		if typed.err != nil {
+			q.resultData = nil
+			q.browser.SetEmptyState("Search failed", typed.err.Error())
+			q.rebuildBrowser()
+			return typed.err.Error(), nil
 		}
 
-		switch keypress.String() {
-		case "ctrl+l":
-			return "Search and browser stay active together."
-		case "ctrl+h":
-			return "Search and browser stay active together."
-		case "[":
-			q.sourceIndex--
-			if q.sourceIndex < 0 {
-				q.sourceIndex = len(q.sources) - 1
+		filtered := make([]SearchResult, 0, len(typed.results))
+		for _, result := range typed.results {
+			if q.filters.Matches(result.Kind) {
+				filtered = append(filtered, result)
 			}
-			q.refreshResults()
-			return fmt.Sprintf("Active source: %s", q.activeSource().Name)
-		case "]":
-			q.sourceIndex = (q.sourceIndex + 1) % len(q.sources)
-			q.refreshResults()
-			return fmt.Sprintf("Active source: %s", q.activeSource().Name)
-		case "1":
-			q.filters.Toggle(MediaTrack)
-			q.refreshResults()
-			return q.filterStatus()
-		case "2":
-			q.filters.Toggle(MediaStream)
-			q.refreshResults()
-			return q.filterStatus()
-		case "3":
-			q.filters.Toggle(MediaPlaylist)
-			q.refreshResults()
-			return q.filterStatus()
-		case "enter":
-			return q.activateSelectedRow()
-		case "ctrl+k":
-			return q.moveSelectedQueueEntry(-1)
-		case "ctrl+j":
-			return q.moveSelectedQueueEntry(1)
-		case "ctrl+x":
-			return q.clearQueue()
-		case "x":
-			return q.removeSelectedQueueItem()
+		}
+		q.resultData = filtered
+		q.rebuildBrowser()
+		return "", nil
+	}
+
+	keypress, ok := msg.(tea.KeyPressMsg)
+	if ok {
+		if bubblekey.Matches(keypress, q.keymap.ToggleSearchFocus) {
+			q.searchFocused = !q.searchFocused
+			q.syncFocus()
+			if q.searchFocused {
+				return fmt.Sprintf("Search focused. Type freely; %s returns to queue shortcuts.", bindingLabel(q.keymap.ToggleSearchFocus)), nil
+			}
+			return "Search unfocused. Queue shortcuts are active again.", nil
+		}
+
+		if q.searchFocused && shouldEditSearch(keypress) && q.searchInput.Update(msg) {
+			cmd := q.refreshResultsCmd()
+			if strings.TrimSpace(q.searchInput.Value()) == "" {
+				return "Search cleared.", cmd
+			}
+			return fmt.Sprintf("Searching %s for %q.", q.activeSource().Name, q.searchInput.Value()), cmd
+		}
+
+		if !q.searchFocused {
+			switch {
+			case bubblekey.Matches(keypress, q.keymap.SourcePrev):
+				q.sourceIndex--
+				if q.sourceIndex < 0 {
+					q.sourceIndex = len(q.sources) - 1
+				}
+				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
+			case bubblekey.Matches(keypress, q.keymap.SourceNext):
+				q.sourceIndex = (q.sourceIndex + 1) % len(q.sources)
+				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
+			case bubblekey.Matches(keypress, q.keymap.FilterTracks):
+				q.filters.Toggle(MediaTrack)
+				return q.filterStatus(), q.refreshResultsCmd()
+			case bubblekey.Matches(keypress, q.keymap.FilterStreams):
+				q.filters.Toggle(MediaStream)
+				return q.filterStatus(), q.refreshResultsCmd()
+			case bubblekey.Matches(keypress, q.keymap.FilterPlaylists):
+				q.filters.Toggle(MediaPlaylist)
+				return q.filterStatus(), q.refreshResultsCmd()
+			case bubblekey.Matches(keypress, q.keymap.MoveSelectedUp):
+				return q.moveSelectedQueueEntry(-1), nil
+			case bubblekey.Matches(keypress, q.keymap.MoveSelectedDown):
+				return q.moveSelectedQueueEntry(1), nil
+			case bubblekey.Matches(keypress, q.keymap.ClearQueue):
+				return q.clearQueue(), nil
+			case bubblekey.Matches(keypress, q.keymap.RemoveSelected):
+				return q.removeSelectedQueueItem(), nil
+			}
+		}
+
+		if bubblekey.Matches(keypress, q.keymap.ActivateSelected) {
+			return q.activateSelectedRow(), nil
 		}
 	}
 
-	if ok {
+	if ok && !(q.searchFocused && keypress.Key().Text != "") {
 		q.browser.Update(msg)
 	}
 
-	return ""
+	return "", nil
 }
 
 func shouldEditSearch(keypress tea.KeyPressMsg) bool {
@@ -169,28 +220,28 @@ func (q *queueScreen) View() string {
 
 func (q *queueScreen) HelpView() string {
 	width := min(q.width, 64)
-	height := min(q.height, 13)
+	height := min(q.height, 14)
 	return components.RenderPanel(components.PanelOptions{
 		Title:    "Queue help",
-		Subtitle: "search and browse stay live together",
+		Subtitle: "focus search to type, unfocus it for queue shortcuts",
 		Width:    width,
 		Height:   height,
 		Focused:  true,
 	}, strings.Join([]string{
-		"[ / ]            switch active source",
-		"1 / 2 / 3        toggle Track / Stream / Playlist filters",
-		"type text         update the active search query while keeping browser selection live",
-		"up / down         move through queued items and current search results",
-		"ctrl+k / ctrl+j   move the selected queued item up or down",
-		"enter             toggle the selected item between enqueued and not enqueued",
-		"x / ctrl+x        remove selected queued item / clear the entire queue",
-		"tab               switch to playback mode",
-		"?                 toggle this help view",
+		helpLine(q.keymap.ToggleSearchFocus, "focus or unfocus the search input"),
+		"type text          update the search query while search is focused",
+		helpLinePair(q.keymap.SourcePrev, q.keymap.SourceNext, "switch active source when search is unfocused"),
+		helpLinePair(q.keymap.FilterTracks, q.keymap.FilterStreams, "toggle Track and Stream filters when unfocused"),
+		helpLine(q.keymap.FilterPlaylists, "toggle Playlist filter when unfocused"),
+		helpLinePair(q.keymap.Browser.Up, q.keymap.Browser.Down, "move through queued items and search results"),
+		helpLinePair(q.keymap.MoveSelectedUp, q.keymap.MoveSelectedDown, "move the selected queued item up or down"),
+		helpLine(q.keymap.ActivateSelected, "toggle the selected item between enqueued and not enqueued"),
+		helpLinePair(q.keymap.RemoveSelected, q.keymap.ClearQueue, "remove selected queued item or clear the queue"),
 	}, "\n"))
 }
 
 func (q *queueScreen) syncFocus() {
-	q.searchInput.SetFocused(true)
+	q.searchInput.SetFocused(q.searchFocused)
 	q.browser.SetFocused(true)
 }
 
@@ -204,45 +255,41 @@ func (q *queueScreen) activeSource() SourceDescriptor {
 	return q.sources[q.sourceIndex]
 }
 
-func (q *queueScreen) refreshResults() {
+func (q *queueScreen) refreshResultsCmd() tea.Cmd {
 	query := strings.TrimSpace(q.searchInput.Value())
 	sourceID := q.activeSource().ID
+	q.lastQuery = query
+	q.lastSourceID = sourceID
+
 	if query == "" {
 		q.resultData = nil
-		q.lastQuery = ""
-		q.lastSourceID = sourceID
+		q.searching = false
 		q.rebuildBrowser()
-		return
+		return nil
 	}
 	if q.services.Search == nil {
 		q.resultData = nil
-		q.lastQuery = query
-		q.lastSourceID = sourceID
+		q.searching = false
 		q.rebuildBrowser()
-		return
+		return nil
 	}
 
-	results, err := q.services.Search.Search(SearchRequest{SourceID: sourceID, Query: query, Filters: q.filters})
-	if err != nil {
-		q.resultData = nil
-		q.browser.SetEmptyState("Search failed", err.Error())
-		q.status = err.Error()
-		q.lastQuery = query
-		q.lastSourceID = sourceID
-		q.rebuildBrowser()
-		return
-	}
-
-	filtered := make([]SearchResult, 0, len(results))
-	for _, result := range results {
-		if q.filters.Matches(result.Kind) {
-			filtered = append(filtered, result)
+	q.searching = true
+	q.rebuildBrowser()
+	seq := atomic.AddUint64(&q.searchSeq, 1)
+	filters := q.filters
+	search := q.services.Search
+	return func() tea.Msg {
+		results, err := search.Search(SearchRequest{SourceID: sourceID, Query: query, Filters: filters})
+		return queueSearchResultsMsg{
+			seq:      seq,
+			query:    query,
+			sourceID: sourceID,
+			filters:  filters,
+			results:  results,
+			err:      err,
 		}
 	}
-	q.resultData = filtered
-	q.lastQuery = query
-	q.lastSourceID = sourceID
-	q.rebuildBrowser()
 }
 
 func firstNonEmpty(values ...string) string {
@@ -472,6 +519,8 @@ func (q *queueScreen) rebuildBrowser() {
 		}
 	}
 	switch {
+	case q.searching:
+		q.browser.SetEmptyState("Searching…", "The source is working in the background. Input and quit keys stay responsive.")
 	case len(q.queueData) == 0 && strings.TrimSpace(q.searchInput.Value()) == "":
 		q.browser.SetEmptyState("Queue is empty", "Type to search. Queued items will stay pinned above search results.")
 	case len(q.queueData) > 0 && len(q.resultData) == 0:
