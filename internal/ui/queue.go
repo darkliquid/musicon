@@ -124,6 +124,10 @@ func (q *queueScreen) Update(msg tea.Msg) string {
 			return q.filterStatus()
 		case "enter":
 			return q.activateSelectedRow()
+		case "ctrl+k":
+			return q.moveSelectedQueueEntry(-1)
+		case "ctrl+j":
+			return q.moveSelectedQueueEntry(1)
 		case "ctrl+x":
 			return q.clearQueue()
 		case "x":
@@ -150,6 +154,7 @@ func (q *queueScreen) View() string {
 	if q.width <= 0 || q.height <= 0 {
 		return ""
 	}
+	q.syncPlaybackState()
 	q.resizeBrowser()
 
 	body := joinLines(
@@ -176,6 +181,7 @@ func (q *queueScreen) HelpView() string {
 		"1 / 2 / 3        toggle Track / Stream / Playlist filters",
 		"type text         update the active search query while keeping browser selection live",
 		"up / down         move through queued items and current search results",
+		"ctrl+k / ctrl+j   move the selected queued item up or down",
 		"enter             toggle the selected item between enqueued and not enqueued",
 		"x / ctrl+x        remove selected queued item / clear the entire queue",
 		"tab               switch to playback mode",
@@ -309,6 +315,65 @@ func (q *queueScreen) removeSelectedQueueItem() string {
 	}
 }
 
+func (q *queueScreen) moveSelectedQueueEntry(delta int) string {
+	index := q.browser.SelectedIndex()
+	if index < 0 || index >= len(q.browserData) {
+		return "Select a queued item to move it."
+	}
+
+	entry, ok := q.selectedQueueEntry(q.browserData[index])
+	if !ok {
+		return "Selected item is not currently queued."
+	}
+	newIndex, moved := q.moveQueueEntry(entry, delta)
+	if !moved {
+		return fmt.Sprintf("%q is already at the edge of the queue.", entry.Title)
+	}
+	return fmt.Sprintf("Moved %q to queue position %d.", entry.Title, newIndex+1)
+}
+
+func (q *queueScreen) moveQueueEntry(entry QueueEntry, delta int) (int, bool) {
+	currentIndex := -1
+	for index, queued := range q.queueData {
+		if queued.ID == entry.ID {
+			currentIndex = index
+			break
+		}
+	}
+	if currentIndex == -1 {
+		return -1, false
+	}
+
+	target := clamp(currentIndex+delta, 0, len(q.queueData)-1)
+	if target == currentIndex {
+		return currentIndex, false
+	}
+
+	if q.services.Queue != nil {
+		if err := q.services.Queue.Move(entry.ID, delta); err != nil {
+			q.status = err.Error()
+			return currentIndex, false
+		}
+		q.syncQueue()
+	} else {
+		queued := q.queueData[currentIndex]
+		q.queueData = append(q.queueData[:currentIndex], q.queueData[currentIndex+1:]...)
+		head := append([]QueueEntry(nil), q.queueData[:target]...)
+		head = append(head, queued)
+		q.queueData = append(head, q.queueData[target:]...)
+		q.rebuildBrowser()
+	}
+
+	for rowIndex, row := range q.browserData {
+		if row.kind == queueRowQueued && row.queue.ID == entry.ID {
+			q.browser.SetSelectedIndex(rowIndex)
+			break
+		}
+	}
+
+	return target, true
+}
+
 func (q *queueScreen) removeQueueEntry(entry QueueEntry) string {
 	if q.services.Queue != nil {
 		if err := q.services.Queue.Remove(entry.ID); err != nil {
@@ -351,18 +416,32 @@ func (q *queueScreen) syncQueue() {
 	q.rebuildBrowser()
 }
 
+func (q *queueScreen) syncPlaybackState() {
+	if q.services.Playback == nil {
+		return
+	}
+	q.rebuildBrowser()
+}
+
 func (q *queueScreen) rebuildBrowser() {
+	selectedKey := q.selectedRowKey()
+	nowPlayingID := q.nowPlayingID()
 	rows := make([]queueBrowserRow, 0, len(q.queueData)+len(q.resultData))
 	items := make([]components.ListItem, 0, len(q.queueData)+len(q.resultData))
 
 	for index, entry := range q.queueData {
 		rows = append(rows, queueBrowserRow{kind: queueRowQueued, queue: entry})
 		meta := fmt.Sprintf("%d", index+1)
+		leading := "●"
+		if entry.ID == nowPlayingID {
+			leading = "▶"
+			meta = "playing · " + meta
+		}
 		if entry.Duration > 0 {
 			meta += " · " + formatDuration(entry.Duration)
 		}
 		items = append(items, components.ListItem{
-			Leading:  "●",
+			Leading:  leading,
 			Title:    entry.Title,
 			Subtitle: firstNonEmpty(entry.Subtitle, entry.Source),
 			Meta:     meta,
@@ -384,6 +463,14 @@ func (q *queueScreen) rebuildBrowser() {
 
 	q.browserData = rows
 	q.browser.SetItems(items)
+	if selectedKey != "" {
+		for index, row := range q.browserData {
+			if row.key() == selectedKey {
+				q.browser.SetSelectedIndex(index)
+				break
+			}
+		}
+	}
 	switch {
 	case len(q.queueData) == 0 && strings.TrimSpace(q.searchInput.Value()) == "":
 		q.browser.SetEmptyState("Queue is empty", "Type to search. Queued items will stay pinned above search results.")
@@ -395,7 +482,7 @@ func (q *queueScreen) rebuildBrowser() {
 }
 
 func (q *queueScreen) browserSubtitle() string {
-	return fmt.Sprintf("%d queued · %d results · type to search, arrows to browse, enter to toggle", len(q.queueData), len(q.resultData))
+	return fmt.Sprintf("%d queued · %d results · type to search, ctrl+k/j to reorder, enter to toggle", len(q.queueData), len(q.resultData))
 }
 
 func (q *queueScreen) findQueuedEntryByID(id string) (QueueEntry, bool) {
@@ -405,6 +492,36 @@ func (q *queueScreen) findQueuedEntryByID(id string) (QueueEntry, bool) {
 		}
 	}
 	return QueueEntry{}, false
+}
+
+func (q *queueScreen) nowPlayingID() string {
+	if q.services.Playback == nil {
+		return ""
+	}
+	snapshot := q.services.Playback.Snapshot()
+	if snapshot.Track != nil && strings.TrimSpace(snapshot.Track.ID) != "" {
+		return snapshot.Track.ID
+	}
+	return ""
+}
+
+func (q *queueScreen) selectedRowKey() string {
+	index := q.browser.SelectedIndex()
+	if index < 0 || index >= len(q.browserData) {
+		return ""
+	}
+	return q.browserData[index].key()
+}
+
+func (q *queueScreen) selectedQueueEntry(row queueBrowserRow) (QueueEntry, bool) {
+	switch row.kind {
+	case queueRowQueued:
+		return row.queue, true
+	case queueRowSearchResult:
+		return q.findQueuedEntryByID(row.result.ID)
+	default:
+		return QueueEntry{}, false
+	}
 }
 
 func (q *queueScreen) filterStatus() string {
@@ -435,4 +552,15 @@ func renderFilterChips(filters SearchFilters) string {
 		pill("2 Stream", filters.Streams),
 		pill("3 Playlist", filters.Playlists),
 	)
+}
+
+func (r queueBrowserRow) key() string {
+	switch r.kind {
+	case queueRowQueued:
+		return "queue:" + r.queue.ID
+	case queueRowSearchResult:
+		return "result:" + r.result.ID
+	default:
+		return ""
+	}
 }

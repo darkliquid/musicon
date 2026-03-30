@@ -173,6 +173,58 @@ func (e *Engine) RemoveFromQueue(id string) error {
 	return nil
 }
 
+func (e *Engine) MoveQueueEntry(id string, delta int) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return errors.New("audio runtime is closed")
+	}
+	if len(e.queue) == 0 {
+		return errors.New("queue is empty")
+	}
+	if delta == 0 {
+		return nil
+	}
+
+	index := -1
+	for i, entry := range e.queue {
+		if entry.ID == id {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return fmt.Errorf("queue item %q not found", id)
+	}
+
+	target := index + delta
+	if target < 0 {
+		target = 0
+	}
+	if target >= len(e.queue) {
+		target = len(e.queue) - 1
+	}
+	if target == index {
+		return nil
+	}
+
+	entry := e.queue[index]
+	e.queue = append(e.queue[:index], e.queue[index+1:]...)
+	head := append([]teaui.QueueEntry(nil), e.queue[:target]...)
+	head = append(head, entry)
+	e.queue = append(head, e.queue[target:]...)
+
+	switch {
+	case e.currentIndex == index:
+		e.currentIndex = target
+	case index < e.currentIndex && target >= e.currentIndex:
+		e.currentIndex--
+	case index > e.currentIndex && target <= e.currentIndex:
+		e.currentIndex++
+	}
+	return nil
+}
+
 func (e *Engine) ClearQueue() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -520,6 +572,7 @@ func percentToLevel(percent int) (float64, bool) {
 
 func (s queueService) Snapshot() []teaui.QueueEntry        { return s.engine.QueueSnapshot() }
 func (s queueService) Add(result teaui.SearchResult) error { return s.engine.AddToQueue(result) }
+func (s queueService) Move(id string, delta int) error     { return s.engine.MoveQueueEntry(id, delta) }
 func (s queueService) Remove(id string) error              { return s.engine.RemoveFromQueue(id) }
 func (s queueService) Clear() error                        { return s.engine.ClearQueue() }
 func (s playbackService) Snapshot() teaui.PlaybackSnapshot { return s.engine.PlaybackSnapshot() }

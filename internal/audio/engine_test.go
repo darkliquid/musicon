@@ -45,6 +45,25 @@ func TestEngineQueueSnapshot(t *testing.T) {
 	}
 }
 
+func TestEngineMoveQueueEntryReordersSnapshot(t *testing.T) {
+	engine := NewEngine(Options{})
+	defer engine.Close()
+
+	queue := engine.QueueService()
+	_ = queue.Add(teaui.SearchResult{ID: "one", Title: "First"})
+	_ = queue.Add(teaui.SearchResult{ID: "two", Title: "Second"})
+	_ = queue.Add(teaui.SearchResult{ID: "three", Title: "Third"})
+
+	if err := queue.Move("one", 1); err != nil {
+		t.Fatalf("move failed: %v", err)
+	}
+
+	snapshot := queue.Snapshot()
+	if got, want := []string{snapshot[0].ID, snapshot[1].ID, snapshot[2].ID}, []string{"two", "one", "three"}; got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("unexpected queue order: %#v", got)
+	}
+}
+
 func TestEngineToggleFlags(t *testing.T) {
 	engine := NewEngine(Options{})
 	defer engine.Close()

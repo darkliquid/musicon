@@ -1,5 +1,5 @@
 {
-  "hash": "94efd98db115e87b5e3c2895ffce3514fc565e5fde9f5c054d4ba9114af6bf28",
+  "hash": "cb521abbec8e0eb8d5725b61633f62928bf25578860578ef4f0bdaf53477b058",
   "files": {
     ".yggdrasil/model/internal/ui/yg-node.yaml": "a1776d7ba822c96cb8e36c238d82fc9e3b57508ea3111252bf5e9f320ee8dcb5",
     ".yggdrasil/model/internal/ui/responsibility.md": "fb311ab57a4553d9dd13ac0b0a204908c343140677af3de650b6a6853e155077",
@@ -25,20 +25,20 @@
     "internal/ui/artwork.go": "4c9dbbf150a84f3dcfe66c672b136371ea0f81be81d76683dfb4991906f94d1e",
     "internal/ui/artwork_test.go": "49f89a28b09f3f1e556f7037fd43d00683df8dadf82580fb02a8cc99be780f7f",
     "internal/ui/helpers.go": "f7293f7c47a766365aa9cb8f512fe8d60f8257019d9a125f21194b5ad3aeb431",
-    "internal/ui/queue.go": "9f508ab681764bee5d6be5c2a19e056f653ee1908c4e7e839489b08dd3180f71",
-    "internal/ui/queue_test.go": "3c94af4653fbdef93d9ffcc050aa85a9a2c920b1be062fb32463d3220484ad65",
-    "internal/ui/types.go": "9ffaa7c64cbc8a80501d10fd5ad7f0e1e8aa2c603412c28b4c0495ed4981768e",
-    "internal/ui/types_test.go": "352424668d87f71c552bb4cab083af4a6cb25e9803e37f48690b22a6b0214c9c",
-    ".yggdrasil/model/internal/ui/interface.md": "2395a6d1f4beb64183158e4805eba0449fd5e0ec6344e94b1a6cd1b63eabca03",
-    ".yggdrasil/model/internal/ui/internals.md": "36b5b0779c24dbd5e55e97f888e7d7ee6aa87768b8b3be94738a406eb136f990",
-    ".yggdrasil/model/pkg/components/interface.md": "266e846c2163695d55fbf6bac1d17c2df7658233873d2ae51dc1af5975728a7a",
     "internal/ui/playback.go": "cab8546527796bbf75e6cd88a3c8283b47f33a2152b16f5cc91026aa48c9e99d",
-    "internal/ui/playback_test.go": "a3238613f1c884801c8bcddca26a10aa3da81ad5996aeebf5b90606b5ea03000"
+    "internal/ui/playback_test.go": "a3238613f1c884801c8bcddca26a10aa3da81ad5996aeebf5b90606b5ea03000",
+    "internal/ui/types_test.go": "352424668d87f71c552bb4cab083af4a6cb25e9803e37f48690b22a6b0214c9c",
+    ".yggdrasil/model/internal/ui/interface.md": "30dde5e7b085e4969bc6e6adb846d999258b636334108444d2fd337348fe3f7a",
+    ".yggdrasil/model/internal/ui/internals.md": "7fec84f0fdb3fd853c9cffbcfccadb75b51e489abfe05153b9571c59bad99f02",
+    ".yggdrasil/model/pkg/components/interface.md": "6561376f36832edb55544dda0f599e6a6ccd194c13e543296dc1463cb4178203",
+    "internal/ui/queue.go": "b40c99430c49c8d0b1283ac857de13f361f8c21a8603423ebfab3f743169a0e2",
+    "internal/ui/queue_test.go": "d6718c4ad17595c537f1fd7557944882ef39a28b146a776896207cdb44aab790",
+    "internal/ui/types.go": "26eade031c3f5f7858c247d46e80f6b0994534c73f0a9419b837dbe7b52ffbf1"
   },
   "mtimes": {
     ".yggdrasil/model/internal/ui/yg-node.yaml": 1774846657811.7551,
-    ".yggdrasil/model/internal/ui/interface.md": 1774857591006.329,
-    ".yggdrasil/model/internal/ui/internals.md": 1774857600882.4666,
+    ".yggdrasil/model/internal/ui/interface.md": 1774858258732.7925,
+    ".yggdrasil/model/internal/ui/internals.md": 1774858269160.9421,
     ".yggdrasil/model/internal/ui/responsibility.md": 1774853820657.9028,
     ".yggdrasil/model/internal/yg-node.yaml": 1774839903015.8567,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
@@ -48,7 +48,7 @@
     ".yggdrasil/aspects/ui/mode-toggle/yg-aspect.yaml": 1774839519036.7817,
     ".yggdrasil/aspects/ui/mode-toggle/requirements.md": 1774839520278.8047,
     ".yggdrasil/model/pkg/components/responsibility.md": 1774844282702.2576,
-    ".yggdrasil/model/pkg/components/interface.md": 1774857305304.4194,
+    ".yggdrasil/model/pkg/components/interface.md": 1774858284833.1672,
     ".yggdrasil/model/pkg/responsibility.md": 1774845840022.5544,
     ".yggdrasil/model/pkg/coverart/core/responsibility.md": 1774846540110.4302,
     ".yggdrasil/model/pkg/coverart/core/interface.md": 1774847720374.7205,
@@ -65,9 +65,9 @@
     "internal/ui/helpers.go": 1774853680944.9346,
     "internal/ui/playback.go": 1774857567797.007,
     "internal/ui/playback_test.go": 1774857575179.1094,
-    "internal/ui/queue.go": 1774853715180.6716,
-    "internal/ui/queue_test.go": 1774853002360.975,
-    "internal/ui/types.go": 1774847653118.963,
+    "internal/ui/queue.go": 1774858190984.821,
+    "internal/ui/queue_test.go": 1774858299549.3787,
+    "internal/ui/types.go": 1774858104136.5781,
     "internal/ui/types_test.go": 1774847675438.2144
   }
 }

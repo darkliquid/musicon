@@ -116,6 +116,20 @@ func (l List) SelectedIndex() int {
 	return l.selected
 }
 
+func (l *List) SetSelectedIndex(index int) {
+	if len(l.items) == 0 {
+		l.selected = 0
+		return
+	}
+	if index < 0 {
+		index = 0
+	}
+	if index >= len(l.items) {
+		index = len(l.items) - 1
+	}
+	l.selected = index
+}
+
 func (l List) View() string {
 	if l.width <= 0 || l.height <= 0 {
 		return ""

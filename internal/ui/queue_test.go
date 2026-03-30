@@ -3,9 +3,66 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+type stubQueueService struct {
+	entries []QueueEntry
+}
+
+func (s *stubQueueService) Snapshot() []QueueEntry { return append([]QueueEntry(nil), s.entries...) }
+func (s *stubQueueService) Add(result SearchResult) error {
+	s.entries = append(s.entries, QueueEntry{ID: result.ID, Title: result.Title, Subtitle: result.Subtitle, Source: result.Source, Kind: result.Kind, Duration: result.Duration, Artwork: result.Artwork})
+	return nil
+}
+func (s *stubQueueService) Move(id string, delta int) error {
+	index := -1
+	for i, entry := range s.entries {
+		if entry.ID == id {
+			index = i
+			break
+		}
+	}
+	if index == -1 {
+		return nil
+	}
+	target := index + delta
+	if target < 0 {
+		target = 0
+	}
+	if target >= len(s.entries) {
+		target = len(s.entries) - 1
+	}
+	if target == index {
+		return nil
+	}
+	entry := s.entries[index]
+	s.entries = append(s.entries[:index], s.entries[index+1:]...)
+	head := append([]QueueEntry(nil), s.entries[:target]...)
+	head = append(head, entry)
+	s.entries = append(head, s.entries[target:]...)
+	return nil
+}
+func (s *stubQueueService) Remove(id string) error { return nil }
+func (s *stubQueueService) Clear() error {
+	s.entries = nil
+	return nil
+}
+
+type stubPlaybackService struct {
+	snapshot PlaybackSnapshot
+}
+
+func (s stubPlaybackService) Snapshot() PlaybackSnapshot     { return s.snapshot }
+func (s stubPlaybackService) TogglePause() error             { return nil }
+func (s stubPlaybackService) Previous() error                { return nil }
+func (s stubPlaybackService) Next() error                    { return nil }
+func (s stubPlaybackService) Seek(delta time.Duration) error { return nil }
+func (s stubPlaybackService) AdjustVolume(delta int) error   { return nil }
+func (s stubPlaybackService) SetRepeat(repeat bool) error    { return nil }
+func (s stubPlaybackService) SetStream(stream bool) error    { return nil }
 
 func TestQueueBrowserShowsQueuedItemsBeforeSearchResults(t *testing.T) {
 	screen := newQueueScreen(Services{})
@@ -117,6 +174,46 @@ func TestQueueBrowserEnterTogglesSearchResultQueueMembership(t *testing.T) {
 	}
 	if len(screen.queueData) != 0 {
 		t.Fatalf("expected queue emptied after second enter, got %#v", screen.queueData)
+	}
+}
+
+func TestQueueBrowserMoveSelectedQueuedItem(t *testing.T) {
+	queue := &stubQueueService{entries: []QueueEntry{
+		{ID: "one", Title: "First"},
+		{ID: "two", Title: "Second"},
+	}}
+	screen := newQueueScreen(Services{Queue: queue})
+	screen.rebuildBrowser()
+
+	got := screen.moveSelectedQueueEntry(1)
+	if !strings.Contains(got, `Moved "First" to queue position 2.`) {
+		t.Fatalf("expected move status, got %q", got)
+	}
+	if len(screen.queueData) != 2 || screen.queueData[0].ID != "two" || screen.queueData[1].ID != "one" {
+		t.Fatalf("expected reordered queue, got %#v", screen.queueData)
+	}
+	if screen.browser.SelectedIndex() != 1 {
+		t.Fatalf("expected moved row to remain selected, got %d", screen.browser.SelectedIndex())
+	}
+}
+
+func TestQueueBrowserMarksNowPlayingQueuedItem(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Playback: stubPlaybackService{
+			snapshot: PlaybackSnapshot{
+				Track: &TrackInfo{ID: "queued-1", Title: "Queued track"},
+			},
+		},
+	})
+	screen.queueData = []QueueEntry{{ID: "queued-1", Title: "Queued track", Source: "Queue"}}
+	screen.SetSize(40, 10)
+
+	view := screen.View()
+	if !strings.Contains(view, "▶ Queued track") {
+		t.Fatalf("expected now-playing marker in queue view, got %q", view)
+	}
+	if !strings.Contains(view, "playing") {
+		t.Fatalf("expected now-playing meta in queue view, got %q", view)
 	}
 }
 

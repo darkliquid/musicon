@@ -173,6 +173,7 @@ type SearchService interface {
 type QueueService interface {
 	Snapshot() []QueueEntry
 	Add(SearchResult) error
+	Move(id string, delta int) error
 	Remove(id string) error
 	Clear() error
 }
