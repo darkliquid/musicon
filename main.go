@@ -4,15 +4,18 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/darkliquid/musicon/internal/audio"
 	"github.com/darkliquid/musicon/internal/mpris"
+	"github.com/darkliquid/musicon/internal/sources/local"
 	"github.com/darkliquid/musicon/internal/ui"
 	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
 func main() {
-	engine := audio.NewEngine(audio.Options{})
+	library := local.NewLibrary(defaultLocalRoot())
+	engine := audio.NewEngine(audio.Options{Resolver: library})
 	defer engine.Close()
 
 	playback := engine.PlaybackService()
@@ -24,6 +27,7 @@ func main() {
 	}
 
 	app := ui.NewApp(ui.Services{
+		Search:   library,
 		Queue:    engine.QueueService(),
 		Playback: playback,
 		Artwork:  buildArtworkProvider(),
@@ -81,4 +85,17 @@ func getenv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func defaultLocalRoot() string {
+	if root := strings.TrimSpace(os.Getenv("MUSICON_LOCAL_ROOT")); root != "" {
+		return root
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		candidate := filepath.Join(home, "Music")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	return "."
 }

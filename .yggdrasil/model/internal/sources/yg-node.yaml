@@ -1,0 +1,3 @@
+name: InternalSources
+type: module
+description: "Repository-internal concrete music source implementations"

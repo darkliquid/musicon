@@ -16,6 +16,7 @@ Build a queue that reflects what the user wants to hear now while keeping the in
 
 - `app/cli` starts the terminal application and hands control to the UI.
 - `internal/ui` renders the queue screen, collects user input, and routes actions to backend-facing contracts.
+- `internal/sources/local` provides concrete local-file search results and queueable metadata.
 
 # Paths
 
@@ -38,3 +39,4 @@ Build a queue that reflects what the user wants to hear now while keeping the in
 - Queue interactions stay within the square application frame.
 - Queue management remains a dedicated mode, separate from playback mode.
 - Source-specific search behavior is delegated through interfaces rather than implemented directly in the UI layer.
+- Real source implementations should preserve enough metadata for later playback and artwork resolution, not just display labels.

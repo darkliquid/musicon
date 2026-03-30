@@ -1,0 +1,19 @@
+name: LocalFileSource
+type: service
+description: "Concrete local-file source that supports discovery and decoding for playback"
+relations:
+  - target: internal/ui
+    type: implements
+    consumes: [SearchService]
+    failure: "Surface local search errors through the UI search contract without embedding source logic in the UI"
+  - target: internal/audio
+    type: implements
+    consumes: [Resolver]
+    failure: "Surface local decode or file access failures through the audio resolver contract"
+  - target: pkg/coverart/core
+    type: uses
+    consumes: [Metadata, Image]
+    failure: "Preserve local artwork metadata for downstream cover-art resolution instead of resolving artwork inside the source"
+mapping:
+  paths:
+    - internal/sources/local/

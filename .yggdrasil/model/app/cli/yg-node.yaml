@@ -21,6 +21,10 @@ relations:
     type: calls
     consumes: [NewBridge, Start, Close]
     failure: "Log or surface MPRIS bridge startup failures without breaking terminal playback"
+  - target: internal/sources/local
+    type: calls
+    consumes: [NewLibrary]
+    failure: "Degrade cleanly when the local source root is unavailable while preserving the terminal UI"
   - target: pkg/coverart/core
     type: calls
     consumes: [NewDiskCache, NewCachedProvider, NewChain]

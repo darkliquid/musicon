@@ -3,3 +3,4 @@ description: "The user searches sources, reviews candidates, and curates the act
 nodes:
   - app/cli
   - internal/ui
+  - internal/sources/local
