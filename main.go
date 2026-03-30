@@ -16,6 +16,8 @@ import (
 	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
+var debug = flag.Bool("debug", false, "enable debug logging to stderr")
+
 func main() {
 	listBackends := flag.Bool("list-backends", false, "list usable audio backends in config-compatible form and exit")
 	listImageRenderers := flag.Bool("list-image-renderers", false, "list usable image renderers and exit")
@@ -26,12 +28,13 @@ func main() {
 		_ = os.Stderr.Close()
 	}
 
+	debuglog("Loading Musicon Config...")
 	loaded, err := config.LoadDefault()
 	if err != nil {
 		if listingOnly {
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stderr, "musicon: load config: %v\n", err)
+		debuglog("musicon: load config: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -50,17 +53,23 @@ func main() {
 		return
 	}
 
+	debuglog("Loading Local Library")
 	library := local.NewLibrary(local.Options{Roots: loaded.Config.ResolvedLocalDirs()})
+
+	debuglog("Initializing Musicon Engine...")
 	engine := audio.NewEngine(audio.Options{
 		Resolver: library,
 		Backend:  loaded.Config.Audio.Backend,
 	})
 	defer engine.Close()
 
+	debuglog("Creating Playback Service...")
 	playback := engine.PlaybackService()
+
+	debuglog("Connecting MPRIS...")
 	bridge := mpris.NewBridge(playback)
 	if err := bridge.Start(); err != nil {
-		fmt.Fprintf(os.Stderr, "musicon: mpris unavailable: %v\n", err)
+		debuglog("musicon: mpris unavailable: %v\n", err)
 	} else {
 		defer bridge.Close()
 	}
@@ -79,8 +88,10 @@ func main() {
 			Protocol: loaded.Config.UI.AlbumArt.Protocol,
 		},
 	})
+
+	debuglog("Booting Musicon...")
 	if err := ui.Run(app); err != nil {
-		fmt.Fprintf(os.Stderr, "musicon: %v\n", err)
+		debuglog("musicon: %v\n", err)
 		os.Exit(1)
 	}
 }
@@ -155,4 +166,10 @@ func printSelectedOptions(out io.Writer, selected string, list func() ([]string,
 		}
 	}
 	return nil
+}
+
+func debuglog(format string, args ...interface{}) {
+	if *debug {
+		fmt.Fprintf(os.Stderr, format+"\n", args...)
+	}
 }
