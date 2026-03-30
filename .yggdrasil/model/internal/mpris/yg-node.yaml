@@ -1,0 +1,11 @@
+name: MPRISBridge
+type: service
+description: "D-Bus MPRIS bridge that exposes Musicon playback state and transport controls to the desktop session"
+relations:
+  - target: internal/ui
+    type: implements
+    consumes: [PlaybackService]
+    failure: "Surface bridge startup or export errors without breaking local terminal playback"
+mapping:
+  paths:
+    - internal/mpris/

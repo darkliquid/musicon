@@ -4,3 +4,4 @@ nodes:
   - app/cli
   - internal/ui
   - internal/audio
+  - internal/mpris

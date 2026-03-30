@@ -17,7 +17,7 @@ relations:
     type: calls
     consumes: [NewEngine, QueueService, PlaybackService, Close]
     failure: "Surface audio runtime startup and shutdown failures instead of hiding them behind the terminal UI"
-  - target: internal/audio
+  - target: internal/mpris
     type: calls
-    consumes: [NewEngine, QueueService, PlaybackService, Close]
-    failure: "Surface audio runtime startup and teardown failures instead of hiding them behind the terminal UI"
+    consumes: [NewBridge, Start, Close]
+    failure: "Log or surface MPRIS bridge startup failures without breaking terminal playback"

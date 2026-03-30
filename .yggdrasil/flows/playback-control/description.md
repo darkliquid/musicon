@@ -17,6 +17,7 @@ Make core playback actions and status easy to understand at a glance while prior
 - `app/cli` starts the application loop.
 - `internal/ui` renders playback state, accepts key input, and delegates transport requests through UI-facing contracts.
 - `internal/audio` resolves queue entries into playable streams and manages actual audio output.
+- `internal/mpris` mirrors playback state to desktop media controls and forwards remote transport requests back into Musicon.
 
 # Paths
 
@@ -26,7 +27,8 @@ Make core playback actions and status easy to understand at a glance while prior
 2. The UI shows the current track inside the square playback layout.
 3. The user uses keyboard controls to play, pause, skip, seek, or adjust volume.
 4. The audio runtime applies the transport request to the active output stream and returns updated playback state to the UI.
-5. The user optionally toggles metadata, help, or an alternate center pane such as lyrics or visualization.
+5. The MPRIS bridge reflects the updated playback state to the desktop session when available.
+6. The user optionally toggles metadata, help, or an alternate center pane such as lyrics or visualization.
 
 ## Alternate path: information-first viewing
 
@@ -40,3 +42,4 @@ Make core playback actions and status easy to understand at a glance while prior
 - The primary layout stays inside the square application frame.
 - Non-artwork panes exist as UI surfaces with backend hooks, even when no real data is supplied yet.
 - Playback transport depends on a concrete runtime capable of turning queue items into live output.
+- Desktop media controls must not become an alternate source of truth; they reflect and control the same playback runtime used by the terminal UI.
