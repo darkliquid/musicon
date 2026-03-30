@@ -378,7 +378,7 @@ func terminalCellWidthRatio() float64 {
 	if ratio, ok := parsePositiveEnvFloat("MUSICON_CELL_WIDTH_RATIO"); ok {
 		return ratio
 	}
-	return 0.5
+	return components.TerminalCellWidthRatio()
 }
 
 func parsePositiveEnvFloat(key string) (float64, bool) {

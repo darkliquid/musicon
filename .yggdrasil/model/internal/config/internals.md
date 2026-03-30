@@ -7,7 +7,8 @@ The expected shape is:
 - look for an explicit config path first
 - otherwise load the global XDG config and then overlay the user XDG config if it is present
 - start from code defaults, then overlay TOML values
-- normalize values such as backend names, start mode, fill mode, and local directories
+- normalize values such as audio backend names, image-renderer backend names, start mode, fill mode, and local directories
+- derive default cell geometry from terminal feature detection when the config does not pin a ratio explicitly
 - pass typed options into `internal/audio`, `internal/ui`, and `internal/sources/local`
 
 Path handling belongs here so the rest of the application can work with cleaned, expanded filesystem paths instead of user-facing shorthand.
@@ -18,3 +19,5 @@ Path handling belongs here so the rest of the application can work with cleaned,
 - Chose to keep config parsing in `internal/config` and pass typed options into runtime/UI/source constructors over letting each package read files or env for itself because startup policy belongs in the application wiring layer.
 - Chose defaults-plus-overlay loading over requiring a fully populated config file because startup should still work out of the box when no config file is present.
 - Chose XDG global config plus user overlay over a single first-match config search because the user explicitly wanted site-wide defaults that can still be overridden per user.
+- Chose to accept both `backend` and legacy `protocol` keys for album-art renderer selection so the config surface can use clearer language without breaking earlier config files.
+- Chose to derive the default `cell_width_ratio` from terminal font metrics via `go-termimg` instead of baking in `0.5` everywhere because the user explicitly wanted square sizing based on detected terminal features.

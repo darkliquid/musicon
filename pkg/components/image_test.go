@@ -8,6 +8,15 @@ import (
 	termimg "github.com/blacktop/go-termimg"
 )
 
+func withStubTerminalFeatures(t *testing.T, features *termimg.TerminalFeatures) {
+	t.Helper()
+	original := queryTerminalFeatures
+	queryTerminalFeatures = func() *termimg.TerminalFeatures { return features }
+	t.Cleanup(func() {
+		queryTerminalFeatures = original
+	})
+}
+
 func TestTerminalImageCachesRepeatedRender(t *testing.T) {
 	calls := 0
 	image := NewTerminalImageWithRenderer(ImageRendererFunc(func(source ImageSource, width, height int) (string, error) {
@@ -143,6 +152,81 @@ func TestConfiguredImageScaleModeFromEnv(t *testing.T) {
 func TestConfiguredImageProtocolWithOverride(t *testing.T) {
 	if got := configuredImageProtocolWithOverride("kitty"); got != termimg.Kitty {
 		t.Fatalf("expected kitty override, got %v", got)
+	}
+}
+
+func TestCanonicalImageRendererNormalizesAliases(t *testing.T) {
+	cases := map[string]string{
+		"":          "halfblocks",
+		"unicode":   "halfblocks",
+		"halfblock": "halfblocks",
+		"iterm":     "iterm2",
+		"iterm2":    "iterm2",
+		"kitty":     "kitty",
+		"something": "halfblocks",
+	}
+
+	for raw, want := range cases {
+		if got := CanonicalImageRenderer(raw); got != want {
+			t.Fatalf("canonical renderer for %q: got %q want %q", raw, got, want)
+		}
+	}
+}
+
+func TestListUsableImageRenderersIncludesAutoAndHalfblocks(t *testing.T) {
+	withStubTerminalFeatures(t, &termimg.TerminalFeatures{})
+
+	renderers := ListUsableImageRenderers()
+	if len(renderers) == 0 || renderers[0] != "auto" {
+		t.Fatalf("expected auto first, got %#v", renderers)
+	}
+	foundHalfblocks := false
+	for _, renderer := range renderers {
+		if renderer == "halfblocks" {
+			foundHalfblocks = true
+			break
+		}
+	}
+	if !foundHalfblocks {
+		t.Fatalf("expected halfblocks fallback in %#v", renderers)
+	}
+}
+
+func TestListUsableImageRenderersUsesDetectedFeatures(t *testing.T) {
+	withStubTerminalFeatures(t, &termimg.TerminalFeatures{
+		KittyGraphics:  true,
+		ITerm2Graphics: true,
+		SixelGraphics:  true,
+	})
+
+	renderers := ListUsableImageRenderers()
+	want := []string{"auto", "kitty", "iterm2", "sixel", "halfblocks"}
+	if len(renderers) != len(want) {
+		t.Fatalf("unexpected renderers %#v", renderers)
+	}
+	for i := range want {
+		if renderers[i] != want[i] {
+			t.Fatalf("unexpected renderers %#v", renderers)
+		}
+	}
+}
+
+func TestTerminalCellWidthRatioUsesDetectedFontMetrics(t *testing.T) {
+	withStubTerminalFeatures(t, &termimg.TerminalFeatures{
+		FontWidth:  8,
+		FontHeight: 16,
+	})
+
+	if got := TerminalCellWidthRatio(); got != 0.5 {
+		t.Fatalf("expected derived ratio 0.5, got %v", got)
+	}
+}
+
+func TestTerminalCellWidthRatioFallsBackWhenFeaturesMissing(t *testing.T) {
+	withStubTerminalFeatures(t, &termimg.TerminalFeatures{})
+
+	if got := TerminalCellWidthRatio(); got != 0.5 {
+		t.Fatalf("expected fallback ratio 0.5, got %v", got)
 	}
 }
 

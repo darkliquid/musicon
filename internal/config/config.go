@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/darkliquid/musicon/pkg/components"
 )
 
 const (
@@ -17,7 +18,6 @@ const (
 	defaultBackend    = "auto"
 	defaultFillMode   = "fill"
 	defaultProtocol   = "halfblocks"
-	defaultCellRatio  = 0.5
 	defaultSourceName = "local"
 )
 
@@ -40,6 +40,7 @@ type UIConfig struct {
 
 type AlbumArtConfig struct {
 	FillMode string `toml:"fill_mode"`
+	Backend  string `toml:"backend"`
 	Protocol string `toml:"protocol"`
 }
 
@@ -64,7 +65,7 @@ func Default() Config {
 		UI: UIConfig{
 			Theme:          defaultTheme,
 			StartMode:      defaultStartMode,
-			CellWidthRatio: defaultCellRatio,
+			CellWidthRatio: components.TerminalCellWidthRatio(),
 			AlbumArt: AlbumArtConfig{
 				FillMode: defaultFillMode,
 				Protocol: defaultProtocol,
@@ -151,10 +152,11 @@ func (c *Config) normalize() {
 	c.UI.Theme = normalizeString(c.UI.Theme, defaultTheme)
 	c.UI.StartMode = normalizeStartMode(c.UI.StartMode)
 	if c.UI.CellWidthRatio <= 0 {
-		c.UI.CellWidthRatio = defaultCellRatio
+		c.UI.CellWidthRatio = components.TerminalCellWidthRatio()
 	}
 	c.UI.AlbumArt.FillMode = normalizeFillMode(c.UI.AlbumArt.FillMode)
-	c.UI.AlbumArt.Protocol = normalizeProtocol(c.UI.AlbumArt.Protocol)
+	c.UI.AlbumArt.Protocol = normalizeProtocol(c.UI.AlbumArt.Backend, c.UI.AlbumArt.Protocol)
+	c.UI.AlbumArt.Backend = c.UI.AlbumArt.Protocol
 	if len(c.Sources.Local.Dirs) == 0 {
 		c.Sources.Local.Dirs = defaultLocalDirs()
 		return
@@ -200,13 +202,22 @@ func normalizeFillMode(raw string) string {
 	}
 }
 
-func normalizeProtocol(raw string) string {
-	switch normalizeString(raw, defaultProtocol) {
-	case "auto", "kitty", "sixel", "iterm2", "iterm", "unicode", "halfblock":
-		return normalizeString(raw, defaultProtocol)
-	default:
-		return defaultProtocol
+func normalizeProtocol(values ...string) string {
+	for _, raw := range values {
+		switch normalizeString(raw, "") {
+		case "auto":
+			return "auto"
+		case "kitty":
+			return "kitty"
+		case "sixel":
+			return "sixel"
+		case "iterm2", "iterm":
+			return "iterm2"
+		case "unicode", "halfblock", "halfblocks":
+			return "halfblocks"
+		}
 	}
+	return defaultProtocol
 }
 
 func explicitPath() (path string, explicit bool, err error) {

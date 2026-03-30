@@ -1,5 +1,5 @@
 {
-  "hash": "75bbb092895339fe97b6c6b1f8d346ddd436b618f339baf4228ee2b284785443",
+  "hash": "c4effaa67152d1ad1768b4a68e7ede4a8419cf3e52884acdb982efd5698e51eb",
   "files": {
     ".yggdrasil/model/pkg/components/yg-node.yaml": "58e7da7140aa30d4998ef7305d2101fe775fafaf5ea94cd31c52251e24e397a6",
     ".yggdrasil/model/pkg/components/responsibility.md": "b39043908b94539d2b930fcc3e65ed1e3d95975af253f792159fc422668cfcd6",
@@ -17,15 +17,15 @@
     "pkg/components/list_test.go": "e55e19d4771d7cff6a59ed2a9de4664774f427778995e6c48dcef0eb3cfeed83",
     "pkg/components/panel.go": "833eea664e342b5d392821592c8ab61417d383c2592239f903c8ad85e14b180e",
     "pkg/components/progress.go": "6c2174bce34cc3f62e7dfcd2dee2ec30c447d384649afc1e3823cf51fb2abbe1",
-    ".yggdrasil/model/pkg/components/interface.md": "7a97f407c6d336af0d5d1b402b4b15f47820e955a82bbe7ed290ef6cdb5602c4",
-    ".yggdrasil/model/pkg/components/internals.md": "c1d0a75aea6d66ba3b4a396433094666fc569c4118c2d353955a503da7cba23a",
-    "pkg/components/image.go": "c2e25aad22eadb2513dc715bbbcb8594bb013e3894963623cbe52e226c7c26f3",
-    "pkg/components/image_test.go": "1d1ff6feef4ca4c8d3c0789b530b77f4c9f1e362aca52d14fdfeeb82e9511164"
+    ".yggdrasil/model/pkg/components/interface.md": "df9e67363961be131ae8feca47e8ea4c435efccf394b0d0f6a311d782ac8cc6b",
+    ".yggdrasil/model/pkg/components/internals.md": "6995230c13d241061abc699eb48b33d6c550c93f5d2255a7cbbb37363a5e931b",
+    "pkg/components/image.go": "e79d8a8f15dad5dbaff2166efc7573242cfd7828b1d29f3a96be433b8b1cdc4d",
+    "pkg/components/image_test.go": "75761408effefc81a515deac73d4c1296d688f52152218ffd04145182f075563"
   },
   "mtimes": {
     ".yggdrasil/model/pkg/components/yg-node.yaml": 1774839552214.396,
-    ".yggdrasil/model/pkg/components/interface.md": 1774859625592.1985,
-    ".yggdrasil/model/pkg/components/internals.md": 1774859625592.1985,
+    ".yggdrasil/model/pkg/components/interface.md": 1774861893426.1228,
+    ".yggdrasil/model/pkg/components/internals.md": 1774861893427.1228,
     ".yggdrasil/model/pkg/components/responsibility.md": 1774844282702.2576,
     ".yggdrasil/model/pkg/yg-node.yaml": 1774839904936.892,
     ".yggdrasil/model/pkg/responsibility.md": 1774845840022.5544,
@@ -33,8 +33,8 @@
     ".yggdrasil/aspects/ui/square-viewport/guidance.md": 1774841857338.4783,
     ".yggdrasil/aspects/ui/square-viewport/requirements.md": 1774841848320.3142,
     "pkg/components/empty.go": 1774840790851.5664,
-    "pkg/components/image.go": 1774859280542.739,
-    "pkg/components/image_test.go": 1774859345417.0244,
+    "pkg/components/image.go": 1774861829645.1428,
+    "pkg/components/image_test.go": 1774861829658.143,
     "pkg/components/input.go": 1774850372157.5862,
     "pkg/components/input_test.go": 1774850405617.9631,
     "pkg/components/layout.go": 1774851632271.7786,

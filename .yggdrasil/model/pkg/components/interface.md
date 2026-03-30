@@ -7,6 +7,7 @@ The node currently exposes generic rendering primitives and widgets including:
 - `Input` with `Update`, `View`, `SetSize`, and `SetFocused`
 - `List` with `SetItems`, `Update`, `View`, `SetSize`, `SetFocused`, and `SetSelectedIndex`, plus optional leading markers on items
 - `ImageSource` plus `TerminalImage` with `SetSource`, `SetSize`, `View`, `Ready`, and `Error`, plus construction with explicit render settings when callers want config-driven behavior
+- terminal-image renderer helpers that can canonicalize configured renderer names, list the currently usable renderer backends for the active terminal, and expose terminal-derived cell geometry
 - `RenderPanel`, `RenderProgress`, and `RenderEmptyState` helpers
 
 # Contracts
@@ -21,6 +22,8 @@ The node currently exposes generic rendering primitives and widgets including:
 - The terminal-image component should default to a guaranteed-visible Unicode halfblock renderer and allow richer protocol selection through `MUSICON_IMAGE_PROTOCOL` (`auto`, `kitty`, `sixel`, `iterm2`, `halfblocks`).
 - The terminal-image component should default to a fill-oriented scale mode so artwork occupies more of the available pane, while allowing `MUSICON_IMAGE_SCALE` (`fill`, `stretch`, `fit`, `auto`, `none`) to tune how aggressively it expands.
 - The terminal-image component should also allow callers to provide explicit protocol and scale settings so application config can drive image rendering without relying on process env reads.
+- Image-renderer listing should use the same canonical labels and capability detection as the renderer itself so CLI output matches what the widget can actually use.
+- Terminal feature helpers should derive renderer support and cell geometry from `go-termimg` queries so image policy and square-layout policy share the same terminal model.
 
 # Failure modes
 

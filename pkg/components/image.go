@@ -9,10 +9,13 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"os"
+	"slices"
 	"strings"
 
 	termimg "github.com/blacktop/go-termimg"
 )
+
+var queryTerminalFeatures = termimg.QueryTerminalFeatures
 
 // ImageSource describes encoded image data that can be rendered in a terminal.
 type ImageSource struct {
@@ -212,9 +215,52 @@ func configuredImageProtocol() termimg.Protocol {
 	return configuredImageProtocolWithOverride(os.Getenv("MUSICON_IMAGE_PROTOCOL"))
 }
 
-func configuredImageProtocolWithOverride(raw string) termimg.Protocol {
+func CanonicalImageRenderer(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", "halfblocks", "halfblock", "unicode":
+		return "halfblocks"
+	case "auto":
+		return "auto"
+	case "kitty":
+		return "kitty"
+	case "sixel":
+		return "sixel"
+	case "iterm2", "iterm":
+		return "iterm2"
+	default:
+		return "halfblocks"
+	}
+}
+
+func ListUsableImageRenderers() []string {
+	renderers := []string{"auto"}
+	features := queryTerminalFeatures()
+	if features != nil {
+		if features.KittyGraphics {
+			renderers = append(renderers, "kitty")
+		}
+		if features.ITerm2Graphics {
+			renderers = append(renderers, "iterm2")
+		}
+		if features.SixelGraphics {
+			renderers = append(renderers, "sixel")
+		}
+	}
+	renderers = append(renderers, "halfblocks")
+	return slices.Compact(renderers)
+}
+
+func TerminalCellWidthRatio() float64 {
+	features := queryTerminalFeatures()
+	if features == nil || features.FontWidth <= 0 || features.FontHeight <= 0 {
+		return 0.5
+	}
+	return float64(features.FontWidth) / float64(features.FontHeight)
+}
+
+func configuredImageProtocolWithOverride(raw string) termimg.Protocol {
+	switch CanonicalImageRenderer(raw) {
+	case "halfblocks":
 		return termimg.Halfblocks
 	case "auto":
 		return termimg.Auto

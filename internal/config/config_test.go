@@ -65,11 +65,31 @@ dirs = ["~/Music", " /tmp/library "]
 	if cfg.UI.CellWidthRatio != 0.6 {
 		t.Fatalf("expected cell width ratio 0.6, got %v", cfg.UI.CellWidthRatio)
 	}
-	if cfg.UI.AlbumArt.FillMode != "stretch" || cfg.UI.AlbumArt.Protocol != "kitty" {
+	if cfg.UI.AlbumArt.FillMode != "stretch" || cfg.UI.AlbumArt.Protocol != "kitty" || cfg.UI.AlbumArt.Backend != "kitty" {
 		t.Fatalf("unexpected album art settings: %#v", cfg.UI.AlbumArt)
 	}
 	if got := cfg.Sources.Local.Dirs[1]; got != "/tmp/library" {
 		t.Fatalf("expected trimmed dir, got %q", got)
+	}
+}
+
+func TestLoadNormalizesLegacyAlbumArtProtocolAlias(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "musicon.toml")
+	if err := os.WriteFile(path, []byte(`
+[ui.album_art]
+protocol = "unicode"
+`), 0o644); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	if cfg.UI.AlbumArt.Protocol != "halfblocks" || cfg.UI.AlbumArt.Backend != "halfblocks" {
+		t.Fatalf("expected legacy protocol alias normalized, got %#v", cfg.UI.AlbumArt)
 	}
 }
 

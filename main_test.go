@@ -6,13 +6,13 @@ import (
 	"testing"
 )
 
-func TestPrintUsableBackendsWritesOnePerLine(t *testing.T) {
+func TestPrintSelectedOptionsWritesOnePerLine(t *testing.T) {
 	var out bytes.Buffer
-	err := printUsableBackends(&out, "", func() ([]string, error) {
+	err := printSelectedOptions(&out, "", func() ([]string, error) {
 		return []string{"auto", "alsa", "jack"}, nil
 	})
 	if err != nil {
-		t.Fatalf("print usable backends failed: %v", err)
+		t.Fatalf("print selected options failed: %v", err)
 	}
 
 	if got := out.String(); got != "auto\nalsa\njack\n" {
@@ -20,13 +20,13 @@ func TestPrintUsableBackendsWritesOnePerLine(t *testing.T) {
 	}
 }
 
-func TestPrintUsableBackendsMarksSelectedBackend(t *testing.T) {
+func TestPrintSelectedOptionsMarksSelectedOption(t *testing.T) {
 	var out bytes.Buffer
-	err := printUsableBackends(&out, "alsa", func() ([]string, error) {
+	err := printSelectedOptions(&out, "alsa", func() ([]string, error) {
 		return []string{"auto", "alsa", "jack"}, nil
 	})
 	if err != nil {
-		t.Fatalf("print usable backends failed: %v", err)
+		t.Fatalf("print selected options failed: %v", err)
 	}
 
 	if got := out.String(); got != "auto\nalsa [selected]\njack\n" {
@@ -34,9 +34,9 @@ func TestPrintUsableBackendsMarksSelectedBackend(t *testing.T) {
 	}
 }
 
-func TestPrintUsableBackendsReturnsListingError(t *testing.T) {
+func TestPrintSelectedOptionsReturnsListingError(t *testing.T) {
 	want := errors.New("boom")
-	err := printUsableBackends(&bytes.Buffer{}, "", func() ([]string, error) {
+	err := printSelectedOptions(&bytes.Buffer{}, "", func() ([]string, error) {
 		return nil, want
 	})
 	if !errors.Is(err, want) {

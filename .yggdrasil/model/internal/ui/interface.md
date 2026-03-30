@@ -20,7 +20,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Search results and queue entries should be able to carry reusable artwork metadata forward so playback snapshots can reuse source-derived local paths, embedded-art hints, and external IDs.
 - The root model owns mode switching, help toggling, and visually square viewport resizing.
 - `NewApp` seeds the Bubble Tea program with a best-effort initial terminal size so the first frame can render even when the terminal does not deliver an immediate startup resize event.
-- `NewApp` should accept typed startup options from the application layer, including the initial mode and terminal cell width ratio, while still keeping env-based fallbacks for legacy/default operation.
+- `NewApp` should accept typed startup options from the application layer, including the initial mode and terminal cell width ratio, while still allowing an env override and a termimg-derived fallback for legacy/default operation.
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
 - The root model also publishes terminal window titles derived from mode, help state, and current playback snapshot through Bubble Tea's `View.WindowTitle` field.
 - The root model also enforces the minimum supported terminal size and suppresses normal mode interaction until the viewport is large enough.

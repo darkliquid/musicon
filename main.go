@@ -12,22 +12,39 @@ import (
 	"github.com/darkliquid/musicon/internal/mpris"
 	"github.com/darkliquid/musicon/internal/sources/local"
 	"github.com/darkliquid/musicon/internal/ui"
+	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
 func main() {
 	listBackends := flag.Bool("list-backends", false, "list usable audio backends in config-compatible form and exit")
+	listImageRenderers := flag.Bool("list-image-renderers", false, "list usable image renderers and exit")
 	flag.Parse()
+
+	listingOnly := *listBackends || *listImageRenderers
+	if listingOnly {
+		_ = os.Stderr.Close()
+	}
 
 	loaded, err := config.LoadDefault()
 	if err != nil {
+		if listingOnly {
+			os.Exit(1)
+		}
 		fmt.Fprintf(os.Stderr, "musicon: load config: %v\n", err)
 		os.Exit(1)
 	}
 
 	if *listBackends {
-		_ = os.Stderr.Close()
-		if err := printUsableBackends(os.Stdout, audio.CanonicalBackendName(loaded.Config.Audio.Backend), audio.ListUsableBackends); err != nil {
+		if err := printSelectedOptions(os.Stdout, audio.CanonicalBackendName(loaded.Config.Audio.Backend), audio.ListUsableBackends); err != nil {
+			os.Exit(1)
+		}
+		return
+	}
+	if *listImageRenderers {
+		if err := printSelectedOptions(os.Stdout, components.CanonicalImageRenderer(loaded.Config.UI.AlbumArt.Backend), func() ([]string, error) {
+			return components.ListUsableImageRenderers(), nil
+		}); err != nil {
 			os.Exit(1)
 		}
 		return
@@ -124,16 +141,16 @@ func modeFromConfig(raw string) ui.Mode {
 	return ui.ModeQueue
 }
 
-func printUsableBackends(out io.Writer, selected string, list func() ([]string, error)) error {
-	backends, err := list()
+func printSelectedOptions(out io.Writer, selected string, list func() ([]string, error)) error {
+	options, err := list()
 	if err != nil {
 		return err
 	}
-	for _, backend := range backends {
-		if backend == selected {
-			backend += " [selected]"
+	for _, option := range options {
+		if option == selected {
+			option += " [selected]"
 		}
-		if _, err := fmt.Fprintln(out, backend); err != nil {
+		if _, err := fmt.Fprintln(out, option); err != nil {
 			return err
 		}
 	}

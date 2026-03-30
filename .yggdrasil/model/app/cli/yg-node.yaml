@@ -33,6 +33,10 @@ relations:
     type: calls
     consumes: [NewDiskCache, NewCachedProvider, NewChain]
     failure: "Treat optional artwork-provider startup issues as degradable runtime wiring while preserving the terminal player"
+  - target: pkg/components
+    type: calls
+    consumes: [CanonicalImageRenderer, ListUsableImageRenderers]
+    failure: "Keep CLI image-renderer listing aligned with the same canonical labels and capability detection used by the reusable terminal-image component"
   - target: pkg/coverart/providers/local
     type: calls
     consumes: [NewLocalFilesProvider, EmbeddedProvider]

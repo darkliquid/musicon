@@ -69,8 +69,8 @@ func TestTerminalSizeFromEnvRejectsInvalidValues(t *testing.T) {
 func TestTerminalCellWidthRatioDefault(t *testing.T) {
 	t.Setenv("MUSICON_CELL_WIDTH_RATIO", "")
 
-	if got := terminalCellWidthRatio(); got != 0.5 {
-		t.Fatalf("expected default cell width ratio 0.5, got %v", got)
+	if got := terminalCellWidthRatio(); got <= 0 {
+		t.Fatalf("expected positive default cell width ratio, got %v", got)
 	}
 }
 

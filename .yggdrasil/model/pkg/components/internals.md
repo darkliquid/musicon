@@ -25,6 +25,10 @@ The same widget now uses a fill-oriented scaling mode by default so album art ex
 
 The widget now also supports explicit construction-time render settings for protocol and scale mode. This keeps terminal-image behavior reusable while letting the application move those knobs into TOML-backed startup config instead of requiring every caller to rely on env variables.
 
+The same image code now exposes canonical renderer naming and terminal-aware renderer listing based on `go-termimg` protocol detection so CLI inspection and widget behavior stay aligned.
+
+It now also exposes terminal-derived cell geometry based on `go-termimg` font metrics so square-layout callers can use the same terminal feature query path that renderer selection already depends on.
+
 ## Decisions
 
 - Chose `pkg/components` for reusable widgets because the user explicitly requested that generic UI components live outside `internal/ui`.
@@ -33,6 +37,8 @@ The widget now also supports explicit construction-time render settings for prot
 - Chose a guaranteed-visible halfblock default with an env override over always trusting `go-termimg` auto-detection because local artwork can already resolve correctly while terminal protocol auto-selection still fails to display images for some users.
 - Chose a fill-oriented default scale mode with an env override over a conservative fit-only default because the user explicitly preferred artwork that uses the available square more aggressively.
 - Chose explicit image render settings on the reusable component over teaching `internal/ui` to translate config directly into termimg calls because reusable renderer policy still belongs in `pkg/components`.
+- Chose to keep renderer canonicalization and capability listing alongside the reusable image component over reimplementing that logic in `main.go` because the widget and CLI must agree on the same renderer vocabulary and availability rules.
+- Chose to expose terminal-derived cell geometry from the same package as renderer detection because both concerns depend on the same `go-termimg` feature query and should not drift apart.
 - Chose to reserve cursor width inside the reusable input field instead of letting the focused cursor overflow because a one-column spill from a shared widget can visibly break square-constrained parent layouts.
 - Chose an explicit cell width ratio input for square viewport math instead of assuming terminal cells are square because the user observed the visual frame distortion caused by tall terminal glyphs.
 - Chose a generic leading marker field on list items instead of hard-coding queue icons into the widget because callers may need lightweight row state cues without turning the shared list into a Musicon-specific queue component.
