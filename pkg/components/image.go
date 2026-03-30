@@ -26,7 +26,9 @@ type terminalImageCapabilities struct {
 
 var (
 	detectTerminalImageCapabilities = defaultDetectTerminalImageCapabilities
-	detectChafaTermInfo             = defaultDetectChafaTermInfo
+	detectChafaTermInfo             = func(protocol string) (*chafa.TermInfo, func()) {
+		return defaultDetectChafaTermInfo(protocol)
+	}
 )
 
 // ImageSource describes encoded image data that can be rendered in a terminal.
@@ -201,10 +203,11 @@ func renderWithChafaSettings(source ImageSource, width, height int, settings Ter
 
 	scaleMode := effectiveImageScaleMode(settings.ScaleMode)
 	prepared := prepareImageForScaleMode(decoded, width, height, scaleMode)
-	termInfo, release := detectChafaTermInfo()
-	defer release()
 
 	renderer := effectiveImageProtocol(settings.Protocol)
+	termInfo, release := detectChafaTermInfo(renderer)
+	defer release()
+
 	rendered, err := renderPreparedImage(prepared, width, height, renderer, scaleMode, termInfo)
 	if err != nil {
 		return "", err
@@ -347,7 +350,7 @@ func configuredImageScaleModeWithOverride(raw string) string {
 }
 
 func defaultDetectTerminalImageCapabilities() terminalImageCapabilities {
-	termInfo, release := detectChafaTermInfo()
+	termInfo, release := detectChafaTermInfo("auto")
 	defer release()
 	if termInfo == nil {
 		return terminalImageCapabilities{}
@@ -359,13 +362,52 @@ func defaultDetectTerminalImageCapabilities() terminalImageCapabilities {
 	}
 }
 
-func defaultDetectChafaTermInfo() (*chafa.TermInfo, func()) {
+func defaultDetectChafaTermInfo(protocol string) (*chafa.TermInfo, func()) {
 	db := chafa.TermDbGetDefault()
 	if db == nil {
 		return nil, func() {}
 	}
 
-	termInfo := chafa.TermDbDetect(db, os.Environ())
+	// Determine the effective protocol to see if we really need detection.
+	if protocol == "" {
+		protocol = strings.ToLower(strings.TrimSpace(os.Getenv("MUSICON_IMAGE_PROTOCOL")))
+	}
+
+	// If we've specified a protocol that isn't 'auto', we skip detection entirely to avoid crashes
+	// in Chafa's TermDbDetect, which can be unstable in some environments.
+	// We treat empty as halfblocks (default) which doesn't need detection.
+	if protocol != "" && protocol != "auto" {
+		fallback := chafa.TermDbGetFallbackInfo(db)
+		if fallback == nil {
+			return nil, func() {}
+		}
+		return fallback, func() {
+			chafa.TermInfoUnref(fallback)
+		}
+	}
+
+	// For 'auto', we still try to detect, but pass a minimal environment to be safe.
+	// If the user hasn't specified anything, we default to halfblocks and skip detection.
+	if protocol == "" {
+		fallback := chafa.TermDbGetFallbackInfo(db)
+		if fallback == nil {
+			return nil, func() {}
+		}
+		return fallback, func() {
+			chafa.TermInfoUnref(fallback)
+		}
+	}
+
+	// For 'auto', we still try to detect, but pass a minimal environment to be safe.
+	var env []string
+	if term := os.Getenv("TERM"); term != "" {
+		env = append(env, "TERM="+term)
+	}
+	if colorterm := os.Getenv("COLORTERM"); colorterm != "" {
+		env = append(env, "COLORTERM="+colorterm)
+	}
+
+	termInfo := chafa.TermDbDetect(db, env)
 	if termInfo == nil {
 		fallback := chafa.TermDbGetFallbackInfo(db)
 		if fallback == nil {
@@ -388,17 +430,21 @@ func defaultDetectChafaTermInfo() (*chafa.TermInfo, func()) {
 }
 
 func chafaPixelModeForRenderer(termInfo *chafa.TermInfo, renderer string) chafa.PixelMode {
+	// If a specific renderer was forced, we respect it even if TermInfo doesn't explicitly support it,
+	// as we may have skipped detection to avoid a crash.
+	forced := strings.ToLower(strings.TrimSpace(os.Getenv("MUSICON_IMAGE_PROTOCOL")))
+
 	switch renderer {
 	case "kitty":
-		if termInfo != nil && chafa.TermInfoIsPixelModeSupported(termInfo, chafa.CHAFA_PIXEL_MODE_KITTY) {
+		if forced == "kitty" || (termInfo != nil && chafa.TermInfoIsPixelModeSupported(termInfo, chafa.CHAFA_PIXEL_MODE_KITTY)) {
 			return chafa.CHAFA_PIXEL_MODE_KITTY
 		}
 	case "sixel":
-		if termInfo != nil && chafa.TermInfoIsPixelModeSupported(termInfo, chafa.CHAFA_PIXEL_MODE_SIXELS) {
+		if forced == "sixel" || (termInfo != nil && chafa.TermInfoIsPixelModeSupported(termInfo, chafa.CHAFA_PIXEL_MODE_SIXELS)) {
 			return chafa.CHAFA_PIXEL_MODE_SIXELS
 		}
 	case "iterm2":
-		if termInfo != nil && chafa.TermInfoIsPixelModeSupported(termInfo, chafa.CHAFA_PIXEL_MODE_ITERM2) {
+		if forced == "iterm2" || (termInfo != nil && chafa.TermInfoIsPixelModeSupported(termInfo, chafa.CHAFA_PIXEL_MODE_ITERM2)) {
 			return chafa.CHAFA_PIXEL_MODE_ITERM2
 		}
 	case "auto":
