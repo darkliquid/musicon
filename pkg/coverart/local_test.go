@@ -76,6 +76,30 @@ func TestLocalFilesProviderScansSiblingCovers(t *testing.T) {
 	}
 }
 
+func TestLocalFilesProviderMatchesSiblingCoversCaseInsensitively(t *testing.T) {
+	dir := t.TempDir()
+	audioPath := filepath.Join(dir, "song.flac")
+	coverPath := filepath.Join(dir, "Cover.JPG")
+	if err := os.WriteFile(audioPath, []byte("audio"), 0o644); err != nil {
+		t.Fatalf("write audio: %v", err)
+	}
+	if err := os.WriteFile(coverPath, tinyPNG, 0o644); err != nil {
+		t.Fatalf("write cover: %v", err)
+	}
+
+	provider := NewLocalFilesProvider()
+	result, err := provider.Lookup(context.Background(), Metadata{
+		Title: "Song",
+		Local: &LocalMetadata{AudioPath: audioPath},
+	})
+	if err != nil {
+		t.Fatalf("lookup failed: %v", err)
+	}
+	if got := result.Image.Description; got != "Cover.JPG" {
+		t.Fatalf("expected case-insensitive sibling cover match, got %q", got)
+	}
+}
+
 func TestLocalFilesProviderReturnsNotFoundWithoutLocalContext(t *testing.T) {
 	provider := NewLocalFilesProvider()
 	_, err := provider.Lookup(context.Background(), Metadata{Title: "Song"})

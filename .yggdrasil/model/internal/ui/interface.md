@@ -30,6 +30,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
 - Playback mode owns pane switching, transport key routing, scrubber controls, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
 - Playback mode should treat the active artwork/lyrics/eq/visualizer pane as the base layer and place pane labels, transport controls, and optional track metadata as overlays within that same square instead of stacking separate panels below it.
+- When rendered artwork does not occupy the full playback pane, the remaining pane area should use a muted filler pattern so the image bounds remain legible without overwhelming the artwork itself.
 - Playback artwork rendering should route provider-supplied image data through reusable `pkg/components` image rendering instead of embedding terminal-image protocol logic inside the screen model.
 - Playback artwork requests should pass normalized cover-art metadata into the provider path instead of relying on a narrow track-ID-only contract.
 - Musicon-specific adaptation from reusable cover-art resolvers into the UI artwork contract belongs in `internal/ui`, not in `pkg/coverart`.

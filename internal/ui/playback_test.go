@@ -34,6 +34,9 @@ func TestPlaybackScreenArtworkPaneUsesImageComponent(t *testing.T) {
 	if !strings.Contains(got, "rendered artwork") {
 		t.Fatalf("expected rendered artwork in view, got %q", got)
 	}
+	if !strings.Contains(got, "·") {
+		t.Fatalf("expected filler pattern around artwork, got %q", got)
+	}
 }
 
 func TestPlaybackScreenArtworkPaneShowsRenderFailure(t *testing.T) {

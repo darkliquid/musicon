@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	termimg "github.com/blacktop/go-termimg"
 )
 
 func TestTerminalImageCachesRepeatedRender(t *testing.T) {
@@ -79,5 +81,61 @@ func TestTerminalImageClearsWhenSourceRemoved(t *testing.T) {
 	image.SetSource(nil)
 	if got := image.View(); got != "" {
 		t.Fatalf("expected cleared output, got %q", got)
+	}
+}
+
+func TestConfiguredImageProtocolDefaultsToHalfblocks(t *testing.T) {
+	t.Setenv("MUSICON_IMAGE_PROTOCOL", "")
+
+	if got := configuredImageProtocol(); got != termimg.Halfblocks {
+		t.Fatalf("expected halfblocks default, got %v", got)
+	}
+}
+
+func TestConfiguredImageProtocolFromEnv(t *testing.T) {
+	tests := map[string]termimg.Protocol{
+		"auto":      termimg.Auto,
+		"kitty":     termimg.Kitty,
+		"sixel":     termimg.Sixel,
+		"iterm2":    termimg.ITerm2,
+		"unicode":   termimg.Halfblocks,
+		"something": termimg.Halfblocks,
+	}
+
+	for raw, want := range tests {
+		t.Run(raw, func(t *testing.T) {
+			t.Setenv("MUSICON_IMAGE_PROTOCOL", raw)
+			if got := configuredImageProtocol(); got != want {
+				t.Fatalf("expected %v for %q, got %v", want, raw, got)
+			}
+		})
+	}
+}
+
+func TestConfiguredImageScaleModeDefaultsToFill(t *testing.T) {
+	t.Setenv("MUSICON_IMAGE_SCALE", "")
+
+	if got := configuredImageScaleMode(); got != termimg.ScaleFill {
+		t.Fatalf("expected fill default, got %v", got)
+	}
+}
+
+func TestConfiguredImageScaleModeFromEnv(t *testing.T) {
+	tests := map[string]termimg.ScaleMode{
+		"fill":     termimg.ScaleFill,
+		"stretch":  termimg.ScaleStretch,
+		"fit":      termimg.ScaleFit,
+		"auto":     termimg.ScaleAuto,
+		"none":     termimg.ScaleNone,
+		"surprise": termimg.ScaleFill,
+	}
+
+	for raw, want := range tests {
+		t.Run(raw, func(t *testing.T) {
+			t.Setenv("MUSICON_IMAGE_SCALE", raw)
+			if got := configuredImageScaleMode(); got != want {
+				t.Fatalf("expected %v for %q, got %v", want, raw, got)
+			}
+		})
 	}
 }

@@ -99,20 +99,50 @@ func (p LocalFilesProvider) candidates(local *LocalMetadata) []string {
 	}
 
 	dir := filepath.Dir(local.AudioPath)
-	for _, base := range withDefaults(p.BaseNames, defaultLocalCoverBaseNames) {
-		base = strings.TrimSpace(base)
-		if base == "" {
+	for _, path := range siblingCoverCandidates(dir, withDefaults(p.BaseNames, defaultLocalCoverBaseNames), withDefaults(p.Extensions, defaultLocalCoverExtensions)) {
+		add(path)
+	}
+
+	return candidates
+}
+
+func siblingCoverCandidates(dir string, baseNames, extensions []string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	allowedBases := make(map[string]struct{}, len(baseNames))
+	for _, base := range baseNames {
+		base = strings.ToLower(strings.TrimSpace(base))
+		if base != "" {
+			allowedBases[base] = struct{}{}
+		}
+	}
+
+	allowedExts := make(map[string]struct{}, len(extensions))
+	for _, ext := range extensions {
+		ext = normalizeExt(ext)
+		if ext != "" {
+			allowedExts[ext] = struct{}{}
+		}
+	}
+
+	candidates := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
 			continue
 		}
-		for _, ext := range withDefaults(p.Extensions, defaultLocalCoverExtensions) {
-			ext = normalizeExt(ext)
-			if ext == "" {
-				continue
-			}
-			add(filepath.Join(dir, base+ext))
-			add(filepath.Join(dir, strings.ToUpper(base)+ext))
-			add(filepath.Join(dir, strings.Title(base)+ext))
+		name := strings.TrimSpace(entry.Name())
+		ext := strings.ToLower(filepath.Ext(name))
+		base := strings.ToLower(strings.TrimSuffix(name, filepath.Ext(name)))
+		if _, ok := allowedBases[base]; !ok {
+			continue
 		}
+		if _, ok := allowedExts[ext]; !ok {
+			continue
+		}
+		candidates = append(candidates, filepath.Join(dir, name))
 	}
 
 	return candidates

@@ -8,6 +8,8 @@ import (
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
+	"os"
+	"strings"
 
 	termimg "github.com/blacktop/go-termimg"
 )
@@ -157,8 +159,60 @@ func renderWithTermimg(source ImageSource, width, height int) (string, error) {
 		return "", err
 	}
 
-	widget := termimg.NewImageWidgetFromImage(decoded)
-	widget.SetProtocol(termimg.Auto)
-	widget.SetSizeWithCorrection(width, height)
-	return widget.Render()
+	protocol := configuredImageProtocol()
+	scaleMode := configuredImageScaleMode()
+	rendered, err := termimg.New(decoded).
+		Protocol(protocol).
+		Scale(scaleMode).
+		Size(width, height).
+		Render()
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(rendered) != "" {
+		return rendered, nil
+	}
+	if protocol == termimg.Halfblocks {
+		return rendered, nil
+	}
+
+	return termimg.New(decoded).
+		Protocol(termimg.Halfblocks).
+		Scale(scaleMode).
+		Size(width, height).
+		Render()
+}
+
+func configuredImageProtocol() termimg.Protocol {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MUSICON_IMAGE_PROTOCOL"))) {
+	case "", "halfblocks", "halfblock", "unicode":
+		return termimg.Halfblocks
+	case "auto":
+		return termimg.Auto
+	case "kitty":
+		return termimg.Kitty
+	case "sixel":
+		return termimg.Sixel
+	case "iterm2", "iterm":
+		return termimg.ITerm2
+	default:
+		return termimg.Halfblocks
+	}
+}
+
+func configuredImageScaleMode() termimg.ScaleMode {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("MUSICON_IMAGE_SCALE"))) {
+	case "", "fill":
+		return termimg.ScaleFill
+	case "stretch":
+		return termimg.ScaleStretch
+	case "fit":
+		return termimg.ScaleFit
+	case "auto":
+		return termimg.ScaleAuto
+	case "none":
+		return termimg.ScaleNone
+	default:
+		return termimg.ScaleFill
+	}
 }

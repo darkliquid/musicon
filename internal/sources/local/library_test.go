@@ -1,6 +1,7 @@
 package local
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -11,6 +12,18 @@ import (
 	"github.com/gopxl/beep"
 	"github.com/gopxl/beep/wav"
 )
+
+var localTinyPNG = []byte{
+	0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+	0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+	0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+	0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+	0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
+	0x54, 0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0x00,
+	0x00, 0x03, 0x01, 0x01, 0x00, 0xc9, 0xfe, 0x92,
+	0xef, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e,
+	0x44, 0xae, 0x42, 0x60, 0x82,
+}
 
 func TestLibrarySearchFindsLocalAudioFiles(t *testing.T) {
 	dir := t.TempDir()
@@ -123,6 +136,38 @@ func TestLibrarySearchFindsNestedFilesByPathFragment(t *testing.T) {
 	}
 	if len(results) != 1 || results[0].ID != audioPath {
 		t.Fatalf("expected nested path result, got %#v", results)
+	}
+}
+
+func TestLibrarySearchArtworkMetadataResolvesSiblingCover(t *testing.T) {
+	dir := t.TempDir()
+	audioPath := filepath.Join(dir, "Track.wav")
+	coverPath := filepath.Join(dir, "Cover.JPG")
+	writeSilentWAV(t, audioPath)
+	if err := os.WriteFile(coverPath, localTinyPNG, 0o644); err != nil {
+		t.Fatalf("write cover failed: %v", err)
+	}
+
+	library := NewLibrary(dir)
+	results, err := library.Search(teaui.SearchRequest{
+		SourceID: sourceID,
+		Query:    "track",
+		Filters:  teaui.DefaultSearchFilters(),
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected one result, got %d", len(results))
+	}
+
+	provider := coverart.NewLocalFilesProvider()
+	image, err := provider.Lookup(context.Background(), results[0].Artwork)
+	if err != nil {
+		t.Fatalf("lookup failed: %v", err)
+	}
+	if image.Image.Description != "Cover.JPG" {
+		t.Fatalf("expected sibling cover to resolve from search metadata, got %#v", image.Image)
 	}
 }
 

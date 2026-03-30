@@ -8,7 +8,7 @@ Its expected shape is:
 - rescan that root on a bounded refresh interval so search results do not become stale during a session
 - derive user-facing search metadata from filenames and best-effort local tags
 - index normalized absolute paths, library-relative paths, and slash-separated path variants alongside title/artist/album metadata so path fragments can be searched directly
-- attach local artwork metadata such as audio path and embedded-art bytes when available
+- attach local artwork metadata such as audio path and embedded-art bytes when available so the downstream local cover-art provider can discover sibling images next to the selected track
 - resolve queued local files to the matching `beep` decoder based on file extension
 
 ## Decisions

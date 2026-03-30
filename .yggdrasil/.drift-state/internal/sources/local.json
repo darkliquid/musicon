@@ -1,13 +1,15 @@
 {
-  "hash": "7e60c7646d4133c46b33149fc18d2c26cc1cb1023acb193b935675ca16ac1ea8",
+  "hash": "cc97018b9c2f9b7c96fb23468b25b2323063f1e61a4b907d07af095bd6be2778",
   "files": {
     ".yggdrasil/model/internal/sources/local/yg-node.yaml": "54aca83194fd016ff0c6e8b45e7ee6c96a909cba2ddac5acae0143b914114891",
+    ".yggdrasil/model/internal/sources/local/interface.md": "77fe0c22d2c7a29465baf86cd2b9cb4a6b2af3a639a5319e0bd372ae90725712",
+    ".yggdrasil/model/internal/sources/local/internals.md": "eacef62ebe9919d2cfda4796228ecd78b900e402740c7371c3fea9b6679ebe9e",
     ".yggdrasil/model/internal/sources/local/responsibility.md": "fa13d0a9dd635762f5b9406d9ec2d17e135b7b9b6e64a9885cbdc5a93f665410",
     ".yggdrasil/model/internal/yg-node.yaml": "c15c09ee704d84db6ab9d46f43837aeba2d3fcc8cef65ec7918fd970bac90223",
     ".yggdrasil/model/internal/responsibility.md": "90fa17d80db7c3265833b84cf53518ceac4f367db6fef86dd3ea8b4adf3ddee7",
     ".yggdrasil/model/internal/sources/yg-node.yaml": "155bfbd70696ad25fd020e00b44fe4283011c1ba4881ba99d50ce1e95f1fb388",
     ".yggdrasil/model/internal/sources/responsibility.md": "1561d38ffff084e69330c4eb16ba008003895f96fba0cfa682ae9fb9aaba9411",
-    ".yggdrasil/model/internal/ui/responsibility.md": "0040e27b00cbe1446875e59262c0451cd7c084fdb8dcafacda02cc35762522fa",
+    ".yggdrasil/model/internal/ui/responsibility.md": "fb311ab57a4553d9dd13ac0b0a204908c343140677af3de650b6a6853e155077",
     ".yggdrasil/model/internal/audio/responsibility.md": "575f1917d9fca0c7d2aa7e20e2c6392df9a9c5f0021584ccc33da981b3447ee4",
     ".yggdrasil/model/internal/audio/interface.md": "887ea132f46a0460b8e8f726226f1b6a084aa0478752a157261c750cbaec6874",
     ".yggdrasil/model/pkg/coverart/core/responsibility.md": "7b054c333ca3e291be359b9bc00e3a09ad79f6461714fbe6ad0311685944d33d",
@@ -19,23 +21,21 @@
     ".yggdrasil/flows/playback-control/description.md": "a774146f3b8e97761e3b53e66ff893281fc78fc0d8760a7784aebc32846a13f6",
     ".yggdrasil/flows/queue-management/yg-flow.yaml": "7d3130388b4b32c355870c25626d453ee07f8cbef2b5f4175c12b34d5e627caa",
     ".yggdrasil/flows/queue-management/description.md": "25b2fb63fe1abb229a897d62c4da66a8a5783d404196839a55f5f3f983a6525d",
-    ".yggdrasil/model/internal/sources/local/interface.md": "ce3b44936968db2fe6c37b8c1ee33896565980b956ed31683338aae5db77410f",
-    ".yggdrasil/model/internal/sources/local/internals.md": "b47aeb4800f2f8d79b603596b98b2d92d53ebaf777243b9017321e2d78b193a3",
-    ".yggdrasil/model/internal/ui/interface.md": "4faf3fb9a29808fb774099b0a3db8c01747ad76f263d10ec5a0b8c550b93e7b5",
     "internal/sources/local/library.go": "27c81bc4c2225bb0f8a80e02ad79d8dd58ab66224d79e6c3752bb62d181846bc",
-    "internal/sources/local/library_test.go": "34454aaacf55a2a6cd29d64da34b5c1bd8b548b54c542b4f1874aebe6548d180"
+    "internal/sources/local/library_test.go": "4863eaeb8c84d90bf12a32698a88e9de65167a7e5d3ec967df20556b6c0427c2",
+    ".yggdrasil/model/internal/ui/interface.md": "2395a6d1f4beb64183158e4805eba0449fd5e0ec6344e94b1a6cd1b63eabca03"
   },
   "mtimes": {
     ".yggdrasil/model/internal/sources/local/yg-node.yaml": 1774848185791.962,
-    ".yggdrasil/model/internal/sources/local/interface.md": 1774850451572.4807,
-    ".yggdrasil/model/internal/sources/local/internals.md": 1774850458926.5635,
+    ".yggdrasil/model/internal/sources/local/interface.md": 1774854965320.4622,
+    ".yggdrasil/model/internal/sources/local/internals.md": 1774854972405.5413,
     ".yggdrasil/model/internal/sources/local/responsibility.md": 1774848185791.962,
     ".yggdrasil/model/internal/yg-node.yaml": 1774839903015.8567,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
     ".yggdrasil/model/internal/sources/yg-node.yaml": 1774848185784.962,
     ".yggdrasil/model/internal/sources/responsibility.md": 1774848185791.962,
-    ".yggdrasil/model/internal/ui/responsibility.md": 1774845840022.5544,
-    ".yggdrasil/model/internal/ui/interface.md": 1774849683525.8303,
+    ".yggdrasil/model/internal/ui/responsibility.md": 1774853820657.9028,
+    ".yggdrasil/model/internal/ui/interface.md": 1774857591006.329,
     ".yggdrasil/model/internal/audio/responsibility.md": 1774842115486.2412,
     ".yggdrasil/model/internal/audio/interface.md": 1774847720404.7207,
     ".yggdrasil/model/pkg/coverart/core/responsibility.md": 1774846540110.4302,
@@ -48,6 +48,6 @@
     ".yggdrasil/flows/queue-management/yg-flow.yaml": 1774848185793.962,
     ".yggdrasil/flows/queue-management/description.md": 1774848185793.962,
     "internal/sources/local/library.go": 1774850398307.8806,
-    "internal/sources/local/library_test.go": 1774850415008.697
+    "internal/sources/local/library_test.go": 1774854918986.9546
   }
 }

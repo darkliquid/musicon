@@ -273,7 +273,15 @@ func (p *playbackScreen) centerView(width, height int) string {
 			} else {
 				p.artwork.SetSource(source)
 				if artwork := strings.TrimSpace(p.artwork.View()); artwork != "" {
-					return lipgloss.NewStyle().Width(width).Height(height).Align(lipgloss.Center, lipgloss.Center).Render(artwork)
+					return lipgloss.Place(
+						width,
+						height,
+						lipgloss.Center,
+						lipgloss.Center,
+						artwork,
+						lipgloss.WithWhitespaceChars("·"),
+						lipgloss.WithWhitespaceForeground(lipgloss.Color("238")),
+					)
 				}
 				if renderErr := p.artwork.Error(); renderErr != nil {
 					p.artStatus = fmt.Sprintf("Artwork render failed: %v", renderErr)
