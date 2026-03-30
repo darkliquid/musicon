@@ -1,5 +1,5 @@
 {
-  "hash": "5302e73232ce38062a3c77cb915e94b511901a9128d49f74766118626a5db336",
+  "hash": "b442bf6b8c42b677ed7406dc01d6aa6501f621929185b26a3c692d4e98a998e0",
   "files": {
     ".yggdrasil/model/pkg/coverart/providers/remote/yg-node.yaml": "cb12a64fd719508a226caa59a285d72b9919aead7922fe8c53f7bd8a6508e83e",
     ".yggdrasil/model/pkg/coverart/providers/remote/interface.md": "e170fc69e9a5d607e3e6af73f9f045db6f2e209e73d0ab390ad79fba8bc7abf0",
@@ -16,7 +16,6 @@
     ".yggdrasil/model/pkg/coverart/providers/internals.md": "6dcbd4755cc4c89f8d1060a6f7d86c20a2cb022b9820ebf5eaf629402c65fb78",
     ".yggdrasil/model/pkg/coverart/providers/responsibility.md": "e5cbb1a40c3705f65d8245d48fb15d2aed4f102f36d9adf4eb47681e4cb09e39",
     ".yggdrasil/model/pkg/coverart/core/responsibility.md": "7b054c333ca3e291be359b9bc00e3a09ad79f6461714fbe6ad0311685944d33d",
-    ".yggdrasil/model/pkg/coverart/core/interface.md": "4af0a98cc611a8fd31c37c8b32014473d61aa4c9987d4710baef65b133a8388d",
     ".yggdrasil/flows/playback-control/yg-flow.yaml": "16c81c4ce354e25a98f76766ea07371a9851471aa7d61f141d63aaddce6ba6d3",
     ".yggdrasil/flows/playback-control/description.md": "c287ae23e016913dfafcdb2624610e2475f981679b942caf52ec288a756dc5eb",
     "pkg/coverart/musicbrainz.go": "b8b35c834ca150ae8167b4a7e1a151dfe9365780988a2c1952604fd37a704d9b",
@@ -26,7 +25,8 @@
     "pkg/coverart/apple.go": "e78c18ac78ed3d15b062c4b5a34f2c1ac64663ba52ecb71cffcbe11676e79b48",
     "pkg/coverart/apple_test.go": "9b36bdca2470baeadf34b3180135488a634543530f32112637b5e512a3625709",
     "pkg/coverart/lastfm.go": "55df4898c69a3fb32eda9f742bc51559ceeba01bbded6eb5b2106a21be5c4756",
-    "pkg/coverart/lastfm_test.go": "8def7ca769d78554fe6f1023defb5575f437d994d9f2db5cddca51b77dd5643d"
+    "pkg/coverart/lastfm_test.go": "8def7ca769d78554fe6f1023defb5575f437d994d9f2db5cddca51b77dd5643d",
+    ".yggdrasil/model/pkg/coverart/core/interface.md": "373f4b5c9ddf322dff62cc66b4436f393c0ea84a5d58dc6fb57bb2409c236e9d"
   },
   "mtimes": {
     ".yggdrasil/model/pkg/coverart/providers/remote/yg-node.yaml": 1774846840960.8171,
@@ -44,7 +44,7 @@
     ".yggdrasil/model/pkg/coverart/providers/internals.md": 1774846840962.8171,
     ".yggdrasil/model/pkg/coverart/providers/responsibility.md": 1774846840961.8171,
     ".yggdrasil/model/pkg/coverart/core/responsibility.md": 1774846540110.4302,
-    ".yggdrasil/model/pkg/coverart/core/interface.md": 1774846628292.4229,
+    ".yggdrasil/model/pkg/coverart/core/interface.md": 1774847720374.7205,
     ".yggdrasil/flows/playback-control/yg-flow.yaml": 1774846840962.8171,
     ".yggdrasil/flows/playback-control/description.md": 1774846840962.8171,
     "pkg/coverart/musicbrainz.go": 1774846618353.1187,

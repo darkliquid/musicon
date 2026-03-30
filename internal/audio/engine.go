@@ -117,6 +117,7 @@ func (e *Engine) AddToQueue(result teaui.SearchResult) error {
 		Source:   result.Source,
 		Kind:     result.Kind,
 		Duration: result.Duration,
+		Artwork:  result.Artwork,
 	}
 	if entry.ID == "" {
 		entry.ID = fmt.Sprintf("queue-%d", len(e.queue)+1)
@@ -400,18 +401,7 @@ func (e *Engine) startCurrentLocked(paused bool) error {
 	magospeaker.Play(sequence)
 
 	info := resolved.Info
-	if info.ID == "" {
-		info.ID = entry.ID
-	}
-	if info.Title == "" {
-		info.Title = entry.Title
-	}
-	if info.Source == "" {
-		info.Source = entry.Source
-	}
-	if info.Duration <= 0 {
-		info.Duration = resolved.Format.SampleRate.D(resolved.Stream.Len())
-	}
+	info = prepareTrackInfo(entry, resolved)
 
 	e.current = &activeTrack{
 		entry:      entry,
@@ -422,6 +412,24 @@ func (e *Engine) startCurrentLocked(paused bool) error {
 		volumeFx:   volumeFx,
 	}
 	return nil
+}
+
+func prepareTrackInfo(entry teaui.QueueEntry, resolved ResolvedTrack) teaui.TrackInfo {
+	info := resolved.Info
+	if info.ID == "" {
+		info.ID = entry.ID
+	}
+	if info.Title == "" {
+		info.Title = entry.Title
+	}
+	if info.Source == "" {
+		info.Source = entry.Source
+	}
+	if info.Duration <= 0 && resolved.Stream != nil && resolved.Format.SampleRate > 0 {
+		info.Duration = resolved.Format.SampleRate.D(resolved.Stream.Len())
+	}
+	info.Artwork = info.Artwork.Merge(entry.Artwork)
+	return info
 }
 
 func (e *Engine) ensureSpeakerLocked() error {

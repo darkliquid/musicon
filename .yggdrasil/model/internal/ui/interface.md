@@ -16,6 +16,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 
 - Contracts stay narrow and UI-oriented rather than mirroring backend internals.
 - Queue and playback screens must run against nil or partially configured services by showing explicit placeholders and empty states.
+- Search results and queue entries should be able to carry reusable artwork metadata forward so playback snapshots can reuse source-derived local paths, embedded-art hints, and external IDs.
 - The root model owns mode switching, help toggling, and square-viewport resizing.
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
 - The root model also emits terminal-title control sequences derived from mode, help state, and current playback snapshot.

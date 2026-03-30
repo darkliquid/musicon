@@ -12,6 +12,7 @@ This node exposes:
 
 - Metadata must be reusable and renderer-agnostic.
 - IDs must support both album-level and track-level external identifiers so callers can resolve album artwork even when only per-track metadata is available.
+- Metadata must support safe merging so queue/runtime/display layers can preserve local paths, embedded-art hints, and external IDs without each layer reimplementing merge logic.
 - The chain preserves provider priority and miss-vs-failure semantics.
 - Cache wrappers may be composed around providers without changing caller contracts.
 

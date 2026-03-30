@@ -90,3 +90,39 @@ func TestChainResolveRequiresUsefulMetadata(t *testing.T) {
 		t.Fatalf("expected not found for empty metadata, got %v", err)
 	}
 }
+
+func TestMetadataMergeFillsArtworkGaps(t *testing.T) {
+	embedded := &Image{Data: []byte("img"), MIMEType: "image/jpeg"}
+	base := Metadata{
+		Artist: "Artist",
+		IDs: IDs{
+			SpotifyTrackID: "track-id",
+		},
+		Local: &LocalMetadata{
+			AudioPath: "/music/song.mp3",
+		},
+	}
+	fallback := Metadata{
+		Title: "Song",
+		Album: "Album",
+		IDs: IDs{
+			MusicBrainzReleaseID: "mb-release",
+			SpotifyAlbumID:       "album-id",
+		},
+		Local: &LocalMetadata{
+			CoverFilePath: "/music/cover.jpg",
+			Embedded:      embedded,
+		},
+	}
+
+	got := base.Merge(fallback)
+	if got.Title != "Song" || got.Album != "Album" || got.Artist != "Artist" {
+		t.Fatalf("unexpected merged labels: %#v", got)
+	}
+	if got.IDs.SpotifyTrackID != "track-id" || got.IDs.SpotifyAlbumID != "album-id" || got.IDs.MusicBrainzReleaseID != "mb-release" {
+		t.Fatalf("unexpected merged ids: %#v", got.IDs)
+	}
+	if got.Local == nil || got.Local.AudioPath != "/music/song.mp3" || got.Local.CoverFilePath != "/music/cover.jpg" || got.Local.Embedded != embedded {
+		t.Fatalf("unexpected merged local metadata: %#v", got.Local)
+	}
+}

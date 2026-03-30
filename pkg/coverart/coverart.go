@@ -42,6 +42,62 @@ type Metadata struct {
 	Local  *LocalMetadata
 }
 
+// Merge returns metadata that prefers the receiver's populated fields and fills
+// gaps from fallback.
+func (m Metadata) Merge(fallback Metadata) Metadata {
+	m = m.Normalize()
+	fallback = fallback.Normalize()
+
+	if m.Title == "" {
+		m.Title = fallback.Title
+	}
+	if m.Album == "" {
+		m.Album = fallback.Album
+	}
+	if m.Artist == "" {
+		m.Artist = fallback.Artist
+	}
+
+	if m.IDs.MusicBrainzReleaseID == "" {
+		m.IDs.MusicBrainzReleaseID = fallback.IDs.MusicBrainzReleaseID
+	}
+	if m.IDs.MusicBrainzReleaseGroupID == "" {
+		m.IDs.MusicBrainzReleaseGroupID = fallback.IDs.MusicBrainzReleaseGroupID
+	}
+	if m.IDs.MusicBrainzRecordingID == "" {
+		m.IDs.MusicBrainzRecordingID = fallback.IDs.MusicBrainzRecordingID
+	}
+	if m.IDs.SpotifyAlbumID == "" {
+		m.IDs.SpotifyAlbumID = fallback.IDs.SpotifyAlbumID
+	}
+	if m.IDs.SpotifyTrackID == "" {
+		m.IDs.SpotifyTrackID = fallback.IDs.SpotifyTrackID
+	}
+	if m.IDs.AppleMusicAlbumID == "" {
+		m.IDs.AppleMusicAlbumID = fallback.IDs.AppleMusicAlbumID
+	}
+	if m.IDs.AppleMusicSongID == "" {
+		m.IDs.AppleMusicSongID = fallback.IDs.AppleMusicSongID
+	}
+
+	switch {
+	case m.Local == nil:
+		m.Local = fallback.Local
+	case fallback.Local != nil:
+		if m.Local.AudioPath == "" {
+			m.Local.AudioPath = fallback.Local.AudioPath
+		}
+		if m.Local.CoverFilePath == "" {
+			m.Local.CoverFilePath = fallback.Local.CoverFilePath
+		}
+		if m.Local.Embedded == nil {
+			m.Local.Embedded = fallback.Local.Embedded
+		}
+	}
+
+	return m.Normalize()
+}
+
 // Normalize trims metadata and fills zero nested structs with nil.
 func (m Metadata) Normalize() Metadata {
 	m.Title = strings.TrimSpace(m.Title)

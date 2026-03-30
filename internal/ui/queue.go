@@ -362,6 +362,7 @@ func (q *queueScreen) addSelectedResult() string {
 			Source:   result.Source,
 			Kind:     result.Kind,
 			Duration: result.Duration,
+			Artwork:  result.Artwork,
 		})
 		q.queue.SetItems(queueListItems(q.queueData))
 	}

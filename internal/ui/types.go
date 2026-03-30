@@ -122,6 +122,7 @@ type SearchResult struct {
 	Kind      MediaKind
 	Duration  time.Duration
 	QueueHint string
+	Artwork   coverart.Metadata
 }
 
 type QueueEntry struct {
@@ -131,6 +132,7 @@ type QueueEntry struct {
 	Source   string
 	Kind     MediaKind
 	Duration time.Duration
+	Artwork  coverart.Metadata
 }
 
 type TrackInfo struct {
@@ -144,17 +146,11 @@ type TrackInfo struct {
 }
 
 func (t TrackInfo) CoverArtMetadata() coverart.Metadata {
-	metadata := t.Artwork.Normalize()
-	if metadata.Title == "" {
-		metadata.Title = t.Title
-	}
-	if metadata.Album == "" {
-		metadata.Album = t.Album
-	}
-	if metadata.Artist == "" {
-		metadata.Artist = t.Artist
-	}
-	return metadata.Normalize()
+	return t.Artwork.Merge(coverart.Metadata{
+		Title:  t.Title,
+		Album:  t.Album,
+		Artist: t.Artist,
+	})
 }
 
 type PlaybackSnapshot struct {
