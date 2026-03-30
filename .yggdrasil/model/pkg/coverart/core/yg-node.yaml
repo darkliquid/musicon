@@ -1,0 +1,8 @@
+name: CoverArtCore
+type: library
+description: "Reusable cover-art metadata, result, chain, and cache contracts"
+mapping:
+  paths:
+    - pkg/coverart/coverart.go
+    - pkg/coverart/cache.go
+    - pkg/coverart/cache_test.go

@@ -1,0 +1,14 @@
+name: CoverArtLocalProviders
+type: library
+description: "Concrete local-file and embedded-art cover-art providers"
+relations:
+  - target: pkg/coverart/core
+    type: uses
+    consumes: [Metadata, Provider, Result, ErrNotFound]
+    failure: "Propagate local lookup misses and parse failures through the shared cover-art core contracts"
+mapping:
+  paths:
+    - pkg/coverart/local.go
+    - pkg/coverart/local_test.go
+    - pkg/coverart/embedded.go
+    - pkg/coverart/embedded_test.go

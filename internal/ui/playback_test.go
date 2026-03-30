@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/darkliquid/musicon/pkg/components"
+	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
 type stubArtworkProvider struct {
@@ -13,8 +14,8 @@ type stubArtworkProvider struct {
 	err    error
 }
 
-func (s stubArtworkProvider) Artwork(trackID string) (*components.ImageSource, error) {
-	_ = trackID
+func (s stubArtworkProvider) Artwork(metadata coverart.Metadata) (*components.ImageSource, error) {
+	_ = metadata
 	return s.source, s.err
 }
 

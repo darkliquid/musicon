@@ -21,3 +21,15 @@ relations:
     type: calls
     consumes: [NewBridge, Start, Close]
     failure: "Log or surface MPRIS bridge startup failures without breaking terminal playback"
+  - target: pkg/coverart/core
+    type: calls
+    consumes: [NewDiskCache, NewCachedProvider, NewChain]
+    failure: "Treat optional artwork-provider startup issues as degradable runtime wiring while preserving the terminal player"
+  - target: pkg/coverart/providers/local
+    type: calls
+    consumes: [NewLocalFilesProvider, EmbeddedProvider]
+    failure: "Treat optional artwork-provider startup issues as degradable runtime wiring while preserving the terminal player"
+  - target: pkg/coverart/providers/remote
+    type: calls
+    consumes: [NewMusicBrainzProvider, SpotifyProvider, AppleMusicProvider, LastFMProvider]
+    failure: "Treat optional artwork-provider startup issues as degradable runtime wiring while preserving the terminal player"

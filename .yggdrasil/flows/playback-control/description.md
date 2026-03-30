@@ -18,6 +18,9 @@ Make core playback actions and status easy to understand at a glance while prior
 - `internal/ui` renders playback state, accepts key input, and delegates transport requests through UI-facing contracts.
 - `internal/audio` resolves queue entries into playable streams and manages actual audio output.
 - `internal/mpris` mirrors playback state to desktop media controls and forwards remote transport requests back into Musicon.
+- `pkg/coverart/core` provides reusable lookup metadata plus provider-chain and cache contracts.
+- `pkg/coverart/providers/local` implements the local-file and embedded-art artwork sources.
+- `pkg/coverart/providers/remote` implements the remote metadata-service artwork sources.
 
 # Paths
 
@@ -26,7 +29,7 @@ Make core playback actions and status easy to understand at a glance while prior
 1. The user enters playback mode.
 2. The UI shows the current track inside the square playback layout.
 3. The user uses keyboard controls to play, pause, skip, seek, or adjust volume.
-4. When artwork data is available, the playback pane renders it through the reusable terminal-image component; otherwise it shows an explicit fallback state.
+4. When artwork metadata is available, the artwork path routes it through the reusable priority-ordered cover-art resolver with local files first, then embedded art, MusicBrainz, Spotify, Apple Music, and Last.fm before the playback pane renders the resulting image through the terminal-image component.
 5. The audio runtime applies the transport request to the active output stream and returns updated playback state to the UI.
 6. The MPRIS bridge reflects the updated playback state to the desktop session when available.
 7. The user optionally toggles metadata, help, or an alternate center pane such as lyrics or visualization.
@@ -43,5 +46,7 @@ Make core playback actions and status easy to understand at a glance while prior
 - The primary layout stays inside the square application frame.
 - Non-artwork panes exist as UI surfaces with backend hooks, even when no real data is supplied yet.
 - Artwork rendering should remain reusable and terminal-protocol-aware without leaking renderer details into playback-screen orchestration.
+- Artwork lookup policy should remain reusable and metadata-driven rather than hardcoded into the playback screen.
+- Local and user-editable metadata sources must outrank closed remote services so user preferences remain authoritative.
 - Playback transport depends on a concrete runtime capable of turning queue items into live output.
 - Desktop media controls must not become an alternate source of truth; they reflect and control the same playback runtime used by the terminal UI.

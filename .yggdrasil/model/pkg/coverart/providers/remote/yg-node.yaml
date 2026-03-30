@@ -1,0 +1,18 @@
+name: CoverArtRemoteProviders
+type: library
+description: "Concrete remote-service cover-art providers"
+relations:
+  - target: pkg/coverart/core
+    type: uses
+    consumes: [Metadata, Provider, Result, ErrNotFound]
+    failure: "Propagate remote lookup misses, auth failures, and HTTP errors through the shared cover-art core contracts"
+mapping:
+  paths:
+    - pkg/coverart/musicbrainz.go
+    - pkg/coverart/musicbrainz_test.go
+    - pkg/coverart/spotify.go
+    - pkg/coverart/spotify_test.go
+    - pkg/coverart/apple.go
+    - pkg/coverart/apple_test.go
+    - pkg/coverart/lastfm.go
+    - pkg/coverart/lastfm_test.go

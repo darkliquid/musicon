@@ -18,3 +18,7 @@ relations:
     type: uses
     consumes: [View, Update, SetSize, SetFocused]
     failure: "Fallback to component empty states or no-op rendering rather than embedding component internals here"
+  - target: pkg/coverart/core
+    type: uses
+    consumes: [Metadata, Normalize]
+    failure: "Treat missing or sparse cover-art metadata as a normal fallback condition instead of pushing provider-chain logic into the playback screen"

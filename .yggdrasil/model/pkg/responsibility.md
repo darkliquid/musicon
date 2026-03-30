@@ -2,4 +2,4 @@
 
 This parent node groups reusable packages intended to remain generic enough for cross-package consumption.
 
-For the active work area, it provides structural context for the shared UI components library in `pkg/components`.
+For the active work area, it provides structural context for the shared UI components library in `pkg/components` and the reusable cover-art resolution package in `pkg/coverart`.

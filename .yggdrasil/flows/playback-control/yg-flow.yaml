@@ -5,3 +5,6 @@ nodes:
   - internal/ui
   - internal/audio
   - internal/mpris
+  - pkg/coverart/core
+  - pkg/coverart/providers/local
+  - pkg/coverart/providers/remote

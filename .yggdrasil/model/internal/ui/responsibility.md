@@ -8,7 +8,7 @@ It is responsible for:
 - queue and playback screen composition
 - square viewport layout rules
 - keymaps, focus, and mode transitions
-- frontend-facing interfaces for queue data, source search, playback snapshots, artwork data, lyrics, and visualization placeholders
+- frontend-facing interfaces for queue data, source search, playback snapshots, normalized artwork lookup metadata, lyrics, and visualization placeholders
 
 # Boundaries
 

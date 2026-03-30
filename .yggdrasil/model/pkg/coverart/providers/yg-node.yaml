@@ -1,0 +1,3 @@
+name: CoverArtProviders
+type: library
+description: "Parent node for concrete local and remote cover-art providers"

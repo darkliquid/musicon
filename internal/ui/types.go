@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/darkliquid/musicon/pkg/components"
+	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
 type Mode int
@@ -139,6 +140,21 @@ type TrackInfo struct {
 	Album    string
 	Source   string
 	Duration time.Duration
+	Artwork  coverart.Metadata
+}
+
+func (t TrackInfo) CoverArtMetadata() coverart.Metadata {
+	metadata := t.Artwork.Normalize()
+	if metadata.Title == "" {
+		metadata.Title = t.Title
+	}
+	if metadata.Album == "" {
+		metadata.Album = t.Album
+	}
+	if metadata.Artist == "" {
+		metadata.Artist = t.Artist
+	}
+	return metadata.Normalize()
 }
 
 type PlaybackSnapshot struct {
@@ -181,7 +197,7 @@ type LyricsProvider interface {
 }
 
 type ArtworkProvider interface {
-	Artwork(trackID string) (*components.ImageSource, error)
+	Artwork(metadata coverart.Metadata) (*components.ImageSource, error)
 }
 
 type VisualizationProvider interface {

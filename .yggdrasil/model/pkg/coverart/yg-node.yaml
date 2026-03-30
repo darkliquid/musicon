@@ -1,0 +1,3 @@
+name: CoverArtResolution
+type: library
+description: "Parent node for reusable cover-art resolution contracts and provider implementations"

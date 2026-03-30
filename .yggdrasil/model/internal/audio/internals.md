@@ -10,6 +10,7 @@ The expected shape is:
 - an injected resolver turns a queue entry into a playable `beep.StreamSeekCloser`
 - the runtime manages speaker initialization, active streamer lifecycle, pause/resume, seek, volume, and queue progression
 - thin queue/playback adapter wrappers expose the UI contracts over one shared engine state object
+- resolved track info can carry richer cover-art metadata forward to the UI artwork path without forcing the runtime itself to fetch or render artwork
 
 This node should own concurrency, lifecycle, and cleanup concerns so `internal/ui` stays presentation-focused.
 

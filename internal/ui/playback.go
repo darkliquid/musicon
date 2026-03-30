@@ -230,8 +230,10 @@ func (p *playbackScreen) infoView(width, height int) string {
 
 func (p *playbackScreen) centerView(width, height int) string {
 	trackID := ""
+	var trackInfo *TrackInfo
 	if p.snapshot.Track != nil {
-		trackID = p.snapshot.Track.ID
+		trackInfo = p.snapshot.Track
+		trackID = trackInfo.ID
 	}
 
 	switch p.pane {
@@ -254,8 +256,8 @@ func (p *playbackScreen) centerView(width, height int) string {
 	default:
 		p.artStatus = ""
 		p.artwork.SetSize(width, height)
-		if p.services.Artwork != nil && trackID != "" {
-			source, err := p.services.Artwork.Artwork(trackID)
+		if p.services.Artwork != nil && trackInfo != nil {
+			source, err := p.services.Artwork.Artwork(trackInfo.CoverArtMetadata())
 			if err != nil {
 				p.artStatus = err.Error()
 				p.artwork.SetSource(nil)

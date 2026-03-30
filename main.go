@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/darkliquid/musicon/internal/audio"
 	"github.com/darkliquid/musicon/internal/mpris"
 	"github.com/darkliquid/musicon/internal/ui"
+	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
 func main() {
@@ -24,9 +26,59 @@ func main() {
 	app := ui.NewApp(ui.Services{
 		Queue:    engine.QueueService(),
 		Playback: playback,
+		Artwork:  buildArtworkProvider(),
 	})
 	if err := ui.Run(app); err != nil {
 		fmt.Fprintf(os.Stderr, "musicon: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func buildArtworkProvider() ui.ArtworkProvider {
+	const userAgent = "musicon/0.1 (+https://github.com/darkliquid/musicon)"
+
+	var cache coverart.Cache
+	if dir, err := os.UserCacheDir(); err == nil && dir != "" {
+		cache = coverart.NewDiskCache(filepath.Join(dir, "musicon", "coverart"))
+	}
+
+	mb := coverart.NewMusicBrainzProvider(userAgent)
+	spotify := &coverart.SpotifyProvider{
+		ClientID:     os.Getenv("SPOTIFY_CLIENT_ID"),
+		ClientSecret: os.Getenv("SPOTIFY_CLIENT_SECRET"),
+		Market:       getenv("SPOTIFY_MARKET", "us"),
+	}
+	apple := &coverart.AppleMusicProvider{
+		DeveloperToken: os.Getenv("APPLE_MUSIC_DEVELOPER_TOKEN"),
+		Storefront:     getenv("APPLE_MUSIC_STOREFRONT", "us"),
+	}
+	lastfm := &coverart.LastFMProvider{
+		APIKey: os.Getenv("LASTFM_API_KEY"),
+	}
+
+	var providers []coverart.Provider
+	providers = append(providers,
+		coverart.NewLocalFilesProvider(),
+		coverart.EmbeddedProvider{},
+		withCache(mb, cache),
+		withCache(spotify, cache),
+		withCache(apple, cache),
+		withCache(lastfm, cache),
+	)
+
+	return ui.NewCoverArtProvider(coverart.NewChain(providers...))
+}
+
+func withCache(provider coverart.Provider, cache coverart.Cache) coverart.Provider {
+	if cache == nil {
+		return provider
+	}
+	return coverart.NewCachedProvider(provider, cache)
+}
+
+func getenv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }
