@@ -19,6 +19,8 @@ import (
 func main() {
 	listBackends := flag.Bool("list-backends", false, "list usable audio backends in config-compatible form and exit")
 	listImageRenderers := flag.Bool("list-image-renderers", false, "list usable image renderers and exit")
+	audioBackend := flag.String("audio-backend", "", "force a specific audio backend (e.g. alsa, pulse, jack)")
+	imageBackend := flag.String("image-backend", "", "force a specific image renderer (e.g. kitty, sixel, iterm2, halfblocks)")
 	flag.Parse()
 
 	listingOnly := *listBackends || *listImageRenderers
@@ -34,6 +36,16 @@ func main() {
 		}
 		debuglog("musicon: load config: %v\n", err)
 		os.Exit(1)
+	}
+
+	if *audioBackend != "" {
+		loaded.Config.Audio.Backend = audio.CanonicalBackendName(*audioBackend)
+	}
+	if *imageBackend != "" {
+		backend := components.CanonicalImageRenderer(*imageBackend)
+		loaded.Config.UI.AlbumArt.Backend = backend
+		loaded.Config.UI.AlbumArt.Protocol = backend
+		os.Setenv("MUSICON_IMAGE_PROTOCOL", backend)
 	}
 
 	if *listBackends {
