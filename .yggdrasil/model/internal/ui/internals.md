@@ -15,7 +15,7 @@ The root model assumes a default terminal cell width ratio of `0.5`, meaning a t
 
 It now also evaluates explicit minimum viewport requirements before rendering the main shell. If the terminal is smaller than the supported `20×20` minimum, the root model renders a dedicated resize warning and blocks normal application interactions until the terminal is large enough again.
 
-Queue mode arranges source chips, filter chips, search input, result browsing, and queue inspection inside the square frame with discovery content above the queue.
+Queue mode arranges source chips, filter chips, search input, and a single merged browser list inside the square frame. Queued items stay pinned at the top of that browser with a marker, while current search results are appended below them without the marker until the user adds them to the queue. Typing and deletion keys keep the query live while arrow keys continue to move the browser selection, so `enter` can immediately toggle the selected row between enqueued and not enqueued without any explicit focus switch.
 
 Playback mode arranges an album-art-first center pane, a transport/progress strip, optional metadata, and switchable artwork/lyrics/eq/visualizer panes inside the same frame.
 
@@ -36,3 +36,4 @@ The node delegates reusable widgets such as lists, inputs, panels, progress bars
 - Chose to pass full cover-art metadata into artwork providers instead of a bare track ID so the future reusable provider chain can use local paths, embedded art, and multiple external IDs without making the playback screen aware of lookup policy.
 - Chose to seed Bubble Tea with a best-effort initial terminal size instead of waiting only on `RequestWindowSize`, because some PTYs never answer the size query and would otherwise leave the UI stuck in the zero-dimension loading state.
 - Chose a configurable default cell width ratio of `0.5` instead of treating terminal cells as square because visual squareness in real terminals depends on glyph geometry, not only on row and column counts.
+- Chose a single merged queue browser over separate results and queue panes because the user wanted queued items to remain persistent and visually prioritized while search hits continue to appear after them in the same navigation flow.

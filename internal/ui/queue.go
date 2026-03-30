@@ -13,32 +13,41 @@ type queueFocus int
 
 const (
 	focusSearch queueFocus = iota
-	focusResults
-	focusQueue
+	focusBrowser
 )
 
 func (f queueFocus) String() string {
 	switch f {
-	case focusResults:
-		return "results focus"
-	case focusQueue:
-		return "queue focus"
+	case focusBrowser:
+		return "browser focus"
 	default:
 		return "search focus"
 	}
+}
+
+type queueBrowserRowKind int
+
+const (
+	queueRowQueued queueBrowserRowKind = iota
+	queueRowSearchResult
+)
+
+type queueBrowserRow struct {
+	kind   queueBrowserRowKind
+	queue  QueueEntry
+	result SearchResult
 }
 
 type queueScreen struct {
 	services     Services
 	width        int
 	height       int
-	focus        queueFocus
 	sources      []SourceDescriptor
 	sourceIndex  int
 	filters      SearchFilters
 	searchInput  components.Input
-	results      components.List
-	queue        components.List
+	browser      components.List
+	browserData  []queueBrowserRow
 	resultData   []SearchResult
 	queueData    []QueueEntry
 	status       string
@@ -50,20 +59,15 @@ func newQueueScreen(services Services) *queueScreen {
 	searchInput := components.NewInput("type to search the active source")
 	searchInput.SetFocused(true)
 
-	results := components.NewList()
-	results.SetEmptyState("No results yet", "Type a query to ask the active source for matching music.")
-	results.SetFocused(false)
-
-	queue := components.NewList()
-	queue.SetEmptyState("Queue is empty", "Add search results to build the active listening queue.")
+	browser := components.NewList()
+	browser.SetEmptyState("Queue is empty", "Queued items stay at the top. Type to append matching search results below them.")
+	browser.SetFocused(false)
 
 	screen := &queueScreen{
 		services:    services,
-		focus:       focusSearch,
 		filters:     DefaultSearchFilters(),
 		searchInput: searchInput,
-		results:     results,
-		queue:       queue,
+		browser:     browser,
 		sources:     configuredSources(services),
 		status:      "Queue mode ready. Type to search and use tab to switch modes.",
 	}
@@ -87,33 +91,30 @@ func (q *queueScreen) SetSize(width, height int) {
 	q.width = max(1, width)
 	q.height = max(1, height)
 	q.searchInput.SetSize(max(8, q.width-8))
-	q.resizeLists()
+	q.resizeBrowser()
 }
 
-func (q *queueScreen) resizeLists() {
-	topHeight := max(8, (q.height*3)/5)
-	if topHeight >= q.height {
-		topHeight = max(4, q.height-4)
-	}
-	bottomHeight := max(4, q.height-topHeight-1)
-
-	resultsHeight := max(3, topHeight-7)
-	q.results.SetSize(max(6, q.width-4), resultsHeight)
-	q.queue.SetSize(max(6, q.width-4), max(2, bottomHeight-2))
+func (q *queueScreen) resizeBrowser() {
+	listHeight := max(3, q.height-7)
+	q.browser.SetSize(max(6, q.width-4), listHeight)
 }
 
 func (q *queueScreen) Update(msg tea.Msg) string {
 	keypress, ok := msg.(tea.KeyPressMsg)
 	if ok {
+		if shouldEditSearch(keypress) && q.searchInput.Update(msg) {
+			q.refreshResults()
+			if strings.TrimSpace(q.searchInput.Value()) == "" {
+				return "Search cleared."
+			}
+			return fmt.Sprintf("Searching %s for %q.", q.activeSource().Name, q.searchInput.Value())
+		}
+
 		switch keypress.String() {
 		case "ctrl+l":
-			q.focus = (q.focus + 1) % 3
-			q.syncFocus()
-			return fmt.Sprintf("Focused %s.", q.focus.String())
+			return "Search and browser stay active together."
 		case "ctrl+h":
-			q.focus = (q.focus + 2) % 3
-			q.syncFocus()
-			return fmt.Sprintf("Focused %s.", q.focus.String())
+			return "Search and browser stay active together."
 		case "[":
 			q.sourceIndex--
 			if q.sourceIndex < 0 {
@@ -138,90 +139,49 @@ func (q *queueScreen) Update(msg tea.Msg) string {
 			q.refreshResults()
 			return q.filterStatus()
 		case "enter":
-			switch q.focus {
-			case focusSearch:
-				if strings.TrimSpace(q.searchInput.Value()) == "" {
-					return "Enter a search query first."
-				}
-				q.focus = focusResults
-				q.syncFocus()
-				q.refreshResults()
-				return fmt.Sprintf("Showing results for %q.", q.searchInput.Value())
-			case focusResults:
-				return q.addSelectedResult()
-			case focusQueue:
-				return q.removeSelectedQueueItem()
-			}
+			return q.activateSelectedRow()
 		case "ctrl+x":
 			return q.clearQueue()
 		case "x":
-			if q.focus == focusQueue {
-				return q.removeSelectedQueueItem()
-			}
+			return q.removeSelectedQueueItem()
 		}
 	}
 
-	if q.focus == focusSearch && q.searchInput.Update(msg) {
-		q.refreshResults()
-		if strings.TrimSpace(q.searchInput.Value()) == "" {
-			return "Search cleared."
-		}
-		return fmt.Sprintf("Searching %s for %q.", q.activeSource().Name, q.searchInput.Value())
-	}
-
-	switch q.focus {
-	case focusResults:
-		q.results.Update(msg)
-	case focusQueue:
-		q.queue.Update(msg)
+	if ok {
+		q.browser.Update(msg)
 	}
 
 	return ""
+}
+
+func shouldEditSearch(keypress tea.KeyPressMsg) bool {
+	switch keypress.String() {
+	case "backspace", "ctrl+w":
+		return true
+	}
+	return keypress.Key().Text != ""
 }
 
 func (q *queueScreen) View() string {
 	if q.width <= 0 || q.height <= 0 {
 		return ""
 	}
-	q.resizeLists()
+	q.resizeBrowser()
 
-	topHeight := max(8, (q.height*3)/5)
-	if topHeight >= q.height {
-		topHeight = max(4, q.height-4)
-	}
-	bottomHeight := max(4, q.height-topHeight-1)
-	searchBody := joinLines(
+	body := joinLines(
 		renderSourceChips(q.sources, q.sourceIndex),
 		renderFilterChips(q.filters),
 		q.searchInput.View(),
-		q.results.View(),
+		q.browser.View(),
 	)
 
-	queueBody := q.queue.View()
-	if len(q.queueData) > 0 {
-		queueBody = lipgloss.JoinVertical(lipgloss.Left,
-			lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render(fmt.Sprintf("%d item(s) queued", len(q.queueData))),
-			q.queue.View(),
-		)
-	}
-
-	top := components.RenderPanel(components.PanelOptions{
-		Title:    "Discover",
-		Subtitle: q.focus.String(),
+	return components.RenderPanel(components.PanelOptions{
+		Title:    "Queue browser",
+		Subtitle: q.browserSubtitle(),
 		Width:    q.width,
-		Height:   topHeight,
-		Focused:  q.focus != focusQueue,
-	}, searchBody)
-
-	bottom := components.RenderPanel(components.PanelOptions{
-		Title:    "Queue",
-		Subtitle: "enter/x acts on selected row",
-		Width:    q.width,
-		Height:   bottomHeight,
-		Focused:  q.focus == focusQueue,
-	}, queueBody)
-
-	return lipgloss.JoinVertical(lipgloss.Left, top, bottom)
+		Height:   q.height,
+		Focused:  true,
+	}, body)
 }
 
 func (q *queueScreen) HelpView() string {
@@ -232,21 +192,21 @@ func (q *queueScreen) HelpView() string {
 		Height:   q.height,
 		Focused:  true,
 	}, strings.Join([]string{
-		"ctrl+l / ctrl+h  change focus between search, results, and queue",
+		"ctrl+l / ctrl+h  search and browser stay active together",
 		"[ / ]            switch active source",
 		"1 / 2 / 3        toggle Track / Stream / Playlist filters",
-		"type text         update the active search query",
-		"enter             search, add selected result, or remove selected queue item",
-		"x / ctrl+x        remove selected queue item / clear the entire queue",
+		"type text         update the active search query while keeping browser selection live",
+		"up / down         move through queued items and current search results",
+		"enter             toggle the selected item between enqueued and not enqueued",
+		"x / ctrl+x        remove selected queued item / clear the entire queue",
 		"tab               switch to playback mode",
 		"?                 toggle this help view",
 	}, "\n"))
 }
 
 func (q *queueScreen) syncFocus() {
-	q.searchInput.SetFocused(q.focus == focusSearch)
-	q.results.SetFocused(q.focus == focusResults)
-	q.queue.SetFocused(q.focus == focusQueue)
+	q.searchInput.SetFocused(true)
+	q.browser.SetFocused(true)
 }
 
 func (q *queueScreen) activeSource() SourceDescriptor {
@@ -264,28 +224,27 @@ func (q *queueScreen) refreshResults() {
 	sourceID := q.activeSource().ID
 	if query == "" {
 		q.resultData = nil
-		q.results.SetItems(nil)
 		q.lastQuery = ""
 		q.lastSourceID = sourceID
+		q.rebuildBrowser()
 		return
 	}
 	if q.services.Search == nil {
 		q.resultData = nil
-		q.results.SetItems(nil)
-		q.results.SetEmptyState("Search backend unavailable", "Connect a source-search implementation to populate results for this query.")
 		q.lastQuery = query
 		q.lastSourceID = sourceID
+		q.rebuildBrowser()
 		return
 	}
 
 	results, err := q.services.Search.Search(SearchRequest{SourceID: sourceID, Query: query, Filters: q.filters})
 	if err != nil {
 		q.resultData = nil
-		q.results.SetItems(nil)
-		q.results.SetEmptyState("Search failed", err.Error())
+		q.browser.SetEmptyState("Search failed", err.Error())
 		q.status = err.Error()
 		q.lastQuery = query
 		q.lastSourceID = sourceID
+		q.rebuildBrowser()
 		return
 	}
 
@@ -296,42 +255,9 @@ func (q *queueScreen) refreshResults() {
 		}
 	}
 	q.resultData = filtered
-	q.results.SetItems(searchListItems(filtered))
-	q.results.SetEmptyState("No matching music", "The current backend returned no results for this query and filter combination.")
 	q.lastQuery = query
 	q.lastSourceID = sourceID
-}
-
-func searchListItems(results []SearchResult) []components.ListItem {
-	items := make([]components.ListItem, 0, len(results))
-	for _, result := range results {
-		meta := result.Kind.String()
-		if result.Duration > 0 {
-			meta += " · " + formatDuration(result.Duration)
-		}
-		items = append(items, components.ListItem{
-			Title:    result.Title,
-			Subtitle: firstNonEmpty(result.Subtitle, result.Source),
-			Meta:     meta,
-		})
-	}
-	return items
-}
-
-func queueListItems(entries []QueueEntry) []components.ListItem {
-	items := make([]components.ListItem, 0, len(entries))
-	for index, entry := range entries {
-		meta := fmt.Sprintf("%d", index+1)
-		if entry.Duration > 0 {
-			meta += " · " + formatDuration(entry.Duration)
-		}
-		items = append(items, components.ListItem{
-			Title:    entry.Title,
-			Subtitle: firstNonEmpty(entry.Subtitle, entry.Source),
-			Meta:     meta,
-		})
-	}
-	return items
+	q.rebuildBrowser()
 }
 
 func firstNonEmpty(values ...string) string {
@@ -343,12 +269,27 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func (q *queueScreen) addSelectedResult() string {
-	index := q.results.SelectedIndex()
-	if index < 0 || index >= len(q.resultData) {
-		return "Select a result to add it to the queue."
+func (q *queueScreen) activateSelectedRow() string {
+	index := q.browser.SelectedIndex()
+	if index < 0 || index >= len(q.browserData) {
+		return "Select a row to act on it."
 	}
-	result := q.resultData[index]
+
+	row := q.browserData[index]
+	switch row.kind {
+	case queueRowQueued:
+		return q.removeQueueEntry(row.queue)
+	case queueRowSearchResult:
+		if entry, ok := q.findQueuedEntryByID(row.result.ID); ok {
+			return q.removeQueueEntry(entry)
+		}
+		return q.addSearchResult(row.result)
+	default:
+		return "Select a row to act on it."
+	}
+}
+
+func (q *queueScreen) addSearchResult(result SearchResult) string {
 	if q.services.Queue != nil {
 		if err := q.services.Queue.Add(result); err != nil {
 			return err.Error()
@@ -364,25 +305,46 @@ func (q *queueScreen) addSelectedResult() string {
 			Duration: result.Duration,
 			Artwork:  result.Artwork,
 		})
-		q.queue.SetItems(queueListItems(q.queueData))
+		q.rebuildBrowser()
 	}
 	return fmt.Sprintf("Added %q to the queue.", result.Title)
 }
 
 func (q *queueScreen) removeSelectedQueueItem() string {
-	index := q.queue.SelectedIndex()
-	if index < 0 || index >= len(q.queueData) {
+	index := q.browser.SelectedIndex()
+	if index < 0 || index >= len(q.browserData) {
 		return "Select a queued item to remove it."
 	}
-	entry := q.queueData[index]
+	row := q.browserData[index]
+	switch row.kind {
+	case queueRowQueued:
+		return q.removeQueueEntry(row.queue)
+	case queueRowSearchResult:
+		entry, ok := q.findQueuedEntryByID(row.result.ID)
+		if !ok {
+			return "Selected item is not currently queued."
+		}
+		return q.removeQueueEntry(entry)
+	default:
+		return "Select a queued item to remove it."
+	}
+}
+
+func (q *queueScreen) removeQueueEntry(entry QueueEntry) string {
 	if q.services.Queue != nil {
 		if err := q.services.Queue.Remove(entry.ID); err != nil {
 			return err.Error()
 		}
 		q.syncQueue()
 	} else {
-		q.queueData = append(q.queueData[:index], q.queueData[index+1:]...)
-		q.queue.SetItems(queueListItems(q.queueData))
+		for index, queued := range q.queueData {
+			if queued.ID != entry.ID {
+				continue
+			}
+			q.queueData = append(q.queueData[:index], q.queueData[index+1:]...)
+			break
+		}
+		q.rebuildBrowser()
 	}
 	return fmt.Sprintf("Removed %q from the queue.", entry.Title)
 }
@@ -398,7 +360,7 @@ func (q *queueScreen) clearQueue() string {
 		q.syncQueue()
 	} else {
 		q.queueData = nil
-		q.queue.SetItems(nil)
+		q.rebuildBrowser()
 	}
 	return "Cleared the queue."
 }
@@ -407,7 +369,63 @@ func (q *queueScreen) syncQueue() {
 	if q.services.Queue != nil {
 		q.queueData = q.services.Queue.Snapshot()
 	}
-	q.queue.SetItems(queueListItems(q.queueData))
+	q.rebuildBrowser()
+}
+
+func (q *queueScreen) rebuildBrowser() {
+	rows := make([]queueBrowserRow, 0, len(q.queueData)+len(q.resultData))
+	items := make([]components.ListItem, 0, len(q.queueData)+len(q.resultData))
+
+	for index, entry := range q.queueData {
+		rows = append(rows, queueBrowserRow{kind: queueRowQueued, queue: entry})
+		meta := fmt.Sprintf("%d", index+1)
+		if entry.Duration > 0 {
+			meta += " · " + formatDuration(entry.Duration)
+		}
+		items = append(items, components.ListItem{
+			Leading:  "●",
+			Title:    entry.Title,
+			Subtitle: firstNonEmpty(entry.Subtitle, entry.Source),
+			Meta:     meta,
+		})
+	}
+
+	for _, result := range q.resultData {
+		rows = append(rows, queueBrowserRow{kind: queueRowSearchResult, result: result})
+		meta := result.Kind.String()
+		if result.Duration > 0 {
+			meta += " · " + formatDuration(result.Duration)
+		}
+		items = append(items, components.ListItem{
+			Title:    result.Title,
+			Subtitle: firstNonEmpty(result.Subtitle, result.Source),
+			Meta:     meta,
+		})
+	}
+
+	q.browserData = rows
+	q.browser.SetItems(items)
+	switch {
+	case len(q.queueData) == 0 && strings.TrimSpace(q.searchInput.Value()) == "":
+		q.browser.SetEmptyState("Queue is empty", "Type to search. Queued items will stay pinned above search results.")
+	case len(q.queueData) > 0 && len(q.resultData) == 0:
+		q.browser.SetEmptyState("Queued items only", "Type to append matching search results below the queued items.")
+	default:
+		q.browser.SetEmptyState("No matching music", "Queued items stay visible, but the current search returned no additional results.")
+	}
+}
+
+func (q *queueScreen) browserSubtitle() string {
+	return fmt.Sprintf("%d queued · %d results · type to search, arrows to browse, enter to toggle", len(q.queueData), len(q.resultData))
+}
+
+func (q *queueScreen) findQueuedEntryByID(id string) (QueueEntry, bool) {
+	for _, entry := range q.queueData {
+		if entry.ID == id {
+			return entry, true
+		}
+	}
+	return QueueEntry{}, false
 }
 
 func (q *queueScreen) filterStatus() string {

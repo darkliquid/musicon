@@ -9,6 +9,7 @@ import (
 
 // ListItem is a generic single-row list entry.
 type ListItem struct {
+	Leading  string
 	Title    string
 	Subtitle string
 	Meta     string
@@ -136,6 +137,9 @@ func (l List) View() string {
 	for idx := start; idx < end; idx++ {
 		item := l.items[idx]
 		label := item.Title
+		if item.Leading != "" {
+			label = item.Leading + " " + label
+		}
 		if item.Subtitle != "" {
 			label += " — " + item.Subtitle
 		}

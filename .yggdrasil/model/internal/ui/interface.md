@@ -23,7 +23,8 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
 - The root model also publishes terminal window titles derived from mode, help state, and current playback snapshot through Bubble Tea's `View.WindowTitle` field.
 - The root model also enforces the minimum supported terminal size and suppresses normal mode interaction until the viewport is large enough.
-- Queue mode owns source cycling, query input, filter toggles, result selection, and queue list interactions.
+- Queue mode owns source cycling, query input, filter toggles, and a single merged browser list where queued items remain pinned before the current search results.
+- Queue mode must keep query editing and browser navigation live at the same time: typing and deletion refresh the active search while movement keys continue to change the selected row, and `enter` toggles the selected item between enqueued and not enqueued.
 - Playback mode owns pane switching, transport key routing, scrubber controls, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
 - Playback artwork rendering should route provider-supplied image data through reusable `pkg/components` image rendering instead of embedding terminal-image protocol logic inside the screen model.
 - Playback artwork requests should pass normalized cover-art metadata into the provider path instead of relying on a narrow track-ID-only contract.
