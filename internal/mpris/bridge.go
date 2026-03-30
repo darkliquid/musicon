@@ -102,7 +102,7 @@ func (b *Bridge) Start() error {
 	b.quit = make(chan struct{})
 	b.wg.Add(1)
 	go b.refreshLoop()
-	b.refreshProperties()
+	go b.refreshProperties()
 	return nil
 }
 

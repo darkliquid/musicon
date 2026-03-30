@@ -31,8 +31,8 @@ github.com/clipperhouse/stringish v0.1.1/go.mod h1:v/WhFtE1q0ovMta2+m+UbpZ+2/HEX
 github.com/clipperhouse/uax29/v2 v2.5.0 h1:x7T0T4eTHDONxFJsL94uKNKPHrclyFI0lm7+w94cO8U=
 github.com/clipperhouse/uax29/v2 v2.5.0/go.mod h1:Wn1g7MK6OoeDT0vL+Q0SQLDz/KpfsVRgg6W7ihQeh4g=
 github.com/d4l3k/messagediff v1.2.2-0.20190829033028-7e0a312ae40b/go.mod h1:Oozbb1TVXFac9FtSIxHBMnBCq2qeH/2KkEQxENCrlLo=
-github.com/darkliquid/mago v0.1.0 h1:xuBodIHXlF9xDFH7r9KwDhwADkWx3jVjmpo7sPyWRyY=
-github.com/darkliquid/mago v0.1.0/go.mod h1:Rjxoa61pHYLtQGlQA3rQSPLTWT0+/dbwJ6Sbz5Zk0Yw=
+github.com/darkliquid/mago v0.2.0 h1:wj2oXs7zY7/HBKSEnUqYCG7MXqgT4xbelRpFxQd8bho=
+github.com/darkliquid/mago v0.2.0/go.mod h1:Rjxoa61pHYLtQGlQA3rQSPLTWT0+/dbwJ6Sbz5Zk0Yw=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8 h1:OtSeLS5y0Uy01jaKK4mA/WVIYtpzVm63vLVAPzJXigg=

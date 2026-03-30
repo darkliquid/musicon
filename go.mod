@@ -6,7 +6,7 @@ require (
 	charm.land/bubbletea/v2 v2.0.2
 	github.com/BurntSushi/toml v1.5.0
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/darkliquid/mago v0.1.0
+	github.com/darkliquid/mago v0.2.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/gopxl/beep v1.4.1
