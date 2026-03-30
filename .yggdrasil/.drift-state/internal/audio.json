@@ -1,5 +1,5 @@
 {
-  "hash": "fd63143da584a2f72415ac23fc44f3b3ba662097eed436f0f15117a56d1c4321",
+  "hash": "900a38242c6e40b09560323c9d5afed48c6a5674b654e0facf6a65bbe4d0cab6",
   "files": {
     ".yggdrasil/model/internal/audio/yg-node.yaml": "9e8af2b2796a93f8a24cf08c904c97ea1e87e8e2392ebb6dcf8298ec7e2280e9",
     ".yggdrasil/model/internal/audio/interface.md": "76006d9d4fc6c5c3d896778edda0ba339996719e378d6a38bd3e41e27c7b9505",
@@ -13,7 +13,7 @@
     "internal/audio/engine.go": "e6e2edf02631060dd2c04ad8dbcf7c0f902d42a2647d98dc670909a919a5bc81",
     "internal/audio/engine_test.go": "abf5f9efd67c97e06fb912682f740d0a2533acd98ddd84a9587cfc54c8a96ea2",
     "internal/audio/speaker.go": "a7100f3a1f2f28ef17bffa5a32f4f721dcf295c48836ccb2ffcd3dfeb69e093d",
-    ".yggdrasil/model/internal/ui/interface.md": "1182e18d48c39a45493abf9aa60a35e6c8bd1efb33657056720fa0e80705ed62"
+    ".yggdrasil/model/internal/ui/interface.md": "6923c1e4875038ac4bc203500efb2b91e9ec5dde903b450775ae121cf87b1dda"
   },
   "mtimes": {
     ".yggdrasil/model/internal/audio/yg-node.yaml": 1774842788587.9082,
@@ -23,7 +23,7 @@
     ".yggdrasil/model/internal/yg-node.yaml": 1774839903015.8567,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
     ".yggdrasil/model/internal/ui/responsibility.md": 1774853820657.9028,
-    ".yggdrasil/model/internal/ui/interface.md": 1774861893426.1228,
+    ".yggdrasil/model/internal/ui/interface.md": 1774863965278.5989,
     ".yggdrasil/flows/playback-control/yg-flow.yaml": 1774848349003.8003,
     ".yggdrasil/flows/playback-control/description.md": 1774848349004.8003,
     "internal/audio/engine.go": 1774859256408.992,

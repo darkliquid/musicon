@@ -4,16 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"testing"
-
-	termimg "github.com/blacktop/go-termimg"
 )
 
-func withStubTerminalFeatures(t *testing.T, features *termimg.TerminalFeatures) {
+func withStubTerminalImageCapabilities(t *testing.T, capabilities terminalImageCapabilities) {
 	t.Helper()
-	original := queryTerminalFeatures
-	queryTerminalFeatures = func() *termimg.TerminalFeatures { return features }
+	original := detectTerminalImageCapabilities
+	detectTerminalImageCapabilities = func() terminalImageCapabilities { return capabilities }
 	t.Cleanup(func() {
-		queryTerminalFeatures = original
+		detectTerminalImageCapabilities = original
 	})
 }
 
@@ -96,26 +94,34 @@ func TestTerminalImageClearsWhenSourceRemoved(t *testing.T) {
 func TestConfiguredImageProtocolDefaultsToHalfblocks(t *testing.T) {
 	t.Setenv("MUSICON_IMAGE_PROTOCOL", "")
 
-	if got := configuredImageProtocol(); got != termimg.Halfblocks {
-		t.Fatalf("expected halfblocks default, got %v", got)
+	if got := configuredImageProtocol(); got != "halfblocks" {
+		t.Fatalf("expected halfblocks default, got %q", got)
+	}
+}
+
+func TestEffectiveImageRendererPrefersEnvOverExplicitSetting(t *testing.T) {
+	t.Setenv("MUSICON_IMAGE_PROTOCOL", "kitty")
+
+	if got := EffectiveImageRenderer("halfblocks"); got != "kitty" {
+		t.Fatalf("expected env renderer override to win, got %q", got)
 	}
 }
 
 func TestConfiguredImageProtocolFromEnv(t *testing.T) {
-	tests := map[string]termimg.Protocol{
-		"auto":      termimg.Auto,
-		"kitty":     termimg.Kitty,
-		"sixel":     termimg.Sixel,
-		"iterm2":    termimg.ITerm2,
-		"unicode":   termimg.Halfblocks,
-		"something": termimg.Halfblocks,
+	tests := map[string]string{
+		"auto":      "auto",
+		"kitty":     "kitty",
+		"sixel":     "sixel",
+		"iterm2":    "iterm2",
+		"unicode":   "halfblocks",
+		"something": "halfblocks",
 	}
 
 	for raw, want := range tests {
 		t.Run(raw, func(t *testing.T) {
 			t.Setenv("MUSICON_IMAGE_PROTOCOL", raw)
 			if got := configuredImageProtocol(); got != want {
-				t.Fatalf("expected %v for %q, got %v", want, raw, got)
+				t.Fatalf("expected %q for %q, got %q", want, raw, got)
 			}
 		})
 	}
@@ -124,34 +130,42 @@ func TestConfiguredImageProtocolFromEnv(t *testing.T) {
 func TestConfiguredImageScaleModeDefaultsToFill(t *testing.T) {
 	t.Setenv("MUSICON_IMAGE_SCALE", "")
 
-	if got := configuredImageScaleMode(); got != termimg.ScaleFill {
-		t.Fatalf("expected fill default, got %v", got)
+	if got := configuredImageScaleMode(); got != "fill" {
+		t.Fatalf("expected fill default, got %q", got)
 	}
 }
 
 func TestConfiguredImageScaleModeFromEnv(t *testing.T) {
-	tests := map[string]termimg.ScaleMode{
-		"fill":     termimg.ScaleFill,
-		"stretch":  termimg.ScaleStretch,
-		"fit":      termimg.ScaleFit,
-		"auto":     termimg.ScaleAuto,
-		"none":     termimg.ScaleNone,
-		"surprise": termimg.ScaleFill,
+	tests := map[string]string{
+		"fill":     "fill",
+		"stretch":  "stretch",
+		"fit":      "fit",
+		"auto":     "auto",
+		"none":     "none",
+		"surprise": "fill",
 	}
 
 	for raw, want := range tests {
 		t.Run(raw, func(t *testing.T) {
 			t.Setenv("MUSICON_IMAGE_SCALE", raw)
 			if got := configuredImageScaleMode(); got != want {
-				t.Fatalf("expected %v for %q, got %v", want, raw, got)
+				t.Fatalf("expected %q for %q, got %q", want, raw, got)
 			}
 		})
 	}
 }
 
 func TestConfiguredImageProtocolWithOverride(t *testing.T) {
-	if got := configuredImageProtocolWithOverride("kitty"); got != termimg.Kitty {
-		t.Fatalf("expected kitty override, got %v", got)
+	if got := configuredImageProtocolWithOverride("kitty"); got != "kitty" {
+		t.Fatalf("expected kitty override, got %q", got)
+	}
+}
+
+func TestEffectiveImageProtocolPrefersEnvOverExplicitSetting(t *testing.T) {
+	t.Setenv("MUSICON_IMAGE_PROTOCOL", "kitty")
+
+	if got := effectiveImageProtocol("sixel"); got != "kitty" {
+		t.Fatalf("expected env protocol override to win, got %q", got)
 	}
 }
 
@@ -160,6 +174,7 @@ func TestCanonicalImageRendererNormalizesAliases(t *testing.T) {
 		"":          "halfblocks",
 		"unicode":   "halfblocks",
 		"halfblock": "halfblocks",
+		"symbols":   "halfblocks",
 		"iterm":     "iterm2",
 		"iterm2":    "iterm2",
 		"kitty":     "kitty",
@@ -174,7 +189,7 @@ func TestCanonicalImageRendererNormalizesAliases(t *testing.T) {
 }
 
 func TestListUsableImageRenderersIncludesAutoAndHalfblocks(t *testing.T) {
-	withStubTerminalFeatures(t, &termimg.TerminalFeatures{})
+	withStubTerminalImageCapabilities(t, terminalImageCapabilities{})
 
 	renderers := ListUsableImageRenderers()
 	if len(renderers) == 0 || renderers[0] != "auto" {
@@ -193,10 +208,10 @@ func TestListUsableImageRenderersIncludesAutoAndHalfblocks(t *testing.T) {
 }
 
 func TestListUsableImageRenderersUsesDetectedFeatures(t *testing.T) {
-	withStubTerminalFeatures(t, &termimg.TerminalFeatures{
-		KittyGraphics:  true,
-		ITerm2Graphics: true,
-		SixelGraphics:  true,
+	withStubTerminalImageCapabilities(t, terminalImageCapabilities{
+		Kitty:  true,
+		ITerm2: true,
+		Sixel:  true,
 	})
 
 	renderers := ListUsableImageRenderers()
@@ -211,27 +226,22 @@ func TestListUsableImageRenderersUsesDetectedFeatures(t *testing.T) {
 	}
 }
 
-func TestTerminalCellWidthRatioUsesDetectedFontMetrics(t *testing.T) {
-	withStubTerminalFeatures(t, &termimg.TerminalFeatures{
-		FontWidth:  8,
-		FontHeight: 16,
-	})
-
-	if got := TerminalCellWidthRatio(); got != 0.5 {
-		t.Fatalf("expected derived ratio 0.5, got %v", got)
-	}
-}
-
-func TestTerminalCellWidthRatioFallsBackWhenFeaturesMissing(t *testing.T) {
-	withStubTerminalFeatures(t, &termimg.TerminalFeatures{})
-
+func TestTerminalCellWidthRatioReturnsFallback(t *testing.T) {
 	if got := TerminalCellWidthRatio(); got != 0.5 {
 		t.Fatalf("expected fallback ratio 0.5, got %v", got)
 	}
 }
 
 func TestConfiguredImageScaleModeWithOverride(t *testing.T) {
-	if got := configuredImageScaleModeWithOverride("stretch"); got != termimg.ScaleStretch {
-		t.Fatalf("expected stretch override, got %v", got)
+	if got := configuredImageScaleModeWithOverride("stretch"); got != "stretch" {
+		t.Fatalf("expected stretch override, got %q", got)
+	}
+}
+
+func TestEffectiveImageScaleModePrefersEnvOverExplicitSetting(t *testing.T) {
+	t.Setenv("MUSICON_IMAGE_SCALE", "stretch")
+
+	if got := effectiveImageScaleMode("fit"); got != "stretch" {
+		t.Fatalf("expected env scale override to win, got %q", got)
 	}
 }

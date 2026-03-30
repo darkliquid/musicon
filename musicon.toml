@@ -7,7 +7,7 @@ start_mode = "queue"
 
 [ui.album_art]
 fill_mode = "fill"
-backend = "halfblocks"
+backend = "auto"
 
 [sources.local]
 dirs = ["~/Music"]

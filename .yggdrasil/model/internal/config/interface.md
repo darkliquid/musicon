@@ -15,7 +15,7 @@ This node exposes a small startup-facing configuration surface:
 - Default config loading should layer the global XDG config first and then overlay the user XDG config on top when both are present.
 - The config surface should centralize tunables that were previously scattered across env-based startup behavior, especially audio backend selection, UI startup defaults, album-art rendering mode, and local source directories.
 - Album-art renderer configuration should accept a user-facing `backend` key while still tolerating the older `protocol` spelling as a compatibility alias.
-- When `ui.cell_width_ratio` is omitted or non-positive, the loader should derive a startup default from `go-termimg` terminal font metrics instead of pinning a universal hardcoded ratio.
+- When `ui.cell_width_ratio` is omitted or non-positive, the loader should fall back to the shared fixed ratio used by `pkg/components` instead of attempting terminal font-metric auto-detection.
 - UI configuration should remain app-owned: `internal/config` may normalize values, but `internal/ui` should still receive typed options instead of parsing TOML itself.
 
 # Failure modes

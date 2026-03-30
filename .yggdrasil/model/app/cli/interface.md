@@ -4,7 +4,7 @@ This node does not expose a reusable library API, but it does define the executa
 
 - load and normalize startup configuration through `internal/config`
 - list usable audio backends through a CLI flag and mark the currently effective configured choice
-- list usable image renderers through a CLI flag and mark the currently effective configured choice
+- list usable image renderers through a CLI flag and mark the currently effective choice after applying config plus env override precedence
 - construct the audio runtime with `audio.NewEngine(...)`
 - construct the active source/search implementation(s)
 - construct and start the MPRIS bridge with `mpris.NewBridge(...)` and `Start()`

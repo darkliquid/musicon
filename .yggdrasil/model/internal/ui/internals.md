@@ -11,7 +11,7 @@ The root model computes a visually square viewport from terminal size with `comp
 
 Startup now seeds Bubble Tea with an initial terminal size derived from the live stdout TTY when available, then falls back to `COLUMNS`/`LINES`, then `80x24`. `Init` still explicitly requests the live window size so interactive terminals can correct the seeded dimensions immediately. This avoids a blank startup state in PTYs or terminal emulators that never answer Bubble Tea's size probe.
 
-The root model now prefers a cell width ratio derived from `go-termimg` terminal font metrics and still allows `MUSICON_CELL_WIDTH_RATIO` to override that value explicitly. This keeps the rendered frame visually square based on the active terminal rather than merely assuming a generic glyph shape.
+The root model now prefers an explicit configured cell width ratio, still allows `MUSICON_CELL_WIDTH_RATIO` to override that value explicitly, and otherwise falls back to the shared default ratio from `pkg/components`. This keeps square-layout policy stable after the renderer migration while preserving explicit user control.
 
 It now also evaluates explicit minimum viewport requirements before rendering the main shell. If the terminal is smaller than the supported `20×20` minimum, the root model renders a dedicated resize warning and blocks normal application interactions until the terminal is large enough again.
 
@@ -32,10 +32,10 @@ The node delegates reusable widgets such as lists, inputs, panels, progress bars
 - Kept backend construction outside `internal/ui` even after adding a real audio runtime so the UI remains decoupled from concrete playback wiring.
 - Chose terminal-title control in the root UI shell over a separate runtime service because the title is presentation state derived from what the UI is already rendering.
 - Chose a root-owned help toggle with screen-specific help views so shared chrome stays consistent while each mode can document its own controls.
-- Chose to keep `go-termimg` usage out of `internal/ui` by pushing terminal-image rendering into `pkg/components`, so playback mode remains focused on choosing panes and handling fallback messaging instead of protocol details.
+- Chose to keep terminal-image library usage out of `internal/ui` by pushing rendering into `pkg/components`, so playback mode remains focused on choosing panes and handling fallback messaging instead of protocol details.
 - Chose to pass full cover-art metadata into artwork providers instead of a bare track ID so the future reusable provider chain can use local paths, embedded art, and multiple external IDs without making the playback screen aware of lookup policy.
 - Chose to seed Bubble Tea with a best-effort initial terminal size instead of waiting only on `RequestWindowSize`, because some PTYs never answer the size query and would otherwise leave the UI stuck in the zero-dimension loading state.
-- Chose a termimg-derived default cell width ratio over baking in `0.5` everywhere because visual squareness in real terminals depends on the active terminal's reported font geometry, not only on row and column counts.
+- Chose a shared fixed default cell width ratio over renderer-library auto-detection during the Chafa migration because the user explicitly asked for config-or-fallback behavior once `go-termimg` was removed.
 - Chose a single merged queue browser over separate results and queue panes because the user wanted queued items to remain persistent and visually prioritized while search hits continue to appear after them in the same navigation flow.
 - Chose explicit queue-reorder shortcuts plus an inline now-playing marker over a separate queue-edit mode because the user wanted the merged browser to stay direct and comfortable without more focus choreography.
 - Chose a square-only root presentation over persistent outer tabs and footer chrome because the user wanted all relevant UI to stay inside one clean centered square at all times.

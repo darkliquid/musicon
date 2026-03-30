@@ -42,7 +42,7 @@ func main() {
 		return
 	}
 	if *listImageRenderers {
-		if err := printSelectedOptions(os.Stdout, components.CanonicalImageRenderer(loaded.Config.UI.AlbumArt.Backend), func() ([]string, error) {
+		if err := printSelectedOptions(os.Stdout, components.EffectiveImageRenderer(loaded.Config.UI.AlbumArt.Backend), func() ([]string, error) {
 			return components.ListUsableImageRenderers(), nil
 		}); err != nil {
 			os.Exit(1)

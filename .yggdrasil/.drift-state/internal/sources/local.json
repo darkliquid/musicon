@@ -1,5 +1,5 @@
 {
-  "hash": "e5b9dfdd0038cf4e1069645db385233ba76296eb2a64db8ef2f3d34597154657",
+  "hash": "052094513a8515983deeb870bd58657af2caa390a73abb182ffc055b510927aa",
   "files": {
     ".yggdrasil/model/internal/sources/local/yg-node.yaml": "54aca83194fd016ff0c6e8b45e7ee6c96a909cba2ddac5acae0143b914114891",
     ".yggdrasil/model/internal/sources/local/interface.md": "0a847ba10d9f390fa40649f23933486bb3bc5a8c1718f0def9296c0d64972cdd",
@@ -23,7 +23,7 @@
     ".yggdrasil/flows/queue-management/description.md": "25b2fb63fe1abb229a897d62c4da66a8a5783d404196839a55f5f3f983a6525d",
     "internal/sources/local/library.go": "db534b72195ca4bbe488ba3824a29e8e5e97b9edb68af127d058aa1c9e45c7de",
     "internal/sources/local/library_test.go": "0d63e2ada2447520e054c81b0083f0087c192e927f76f5aa242b02a90c04a688",
-    ".yggdrasil/model/internal/ui/interface.md": "1182e18d48c39a45493abf9aa60a35e6c8bd1efb33657056720fa0e80705ed62"
+    ".yggdrasil/model/internal/ui/interface.md": "6923c1e4875038ac4bc203500efb2b91e9ec5dde903b450775ae121cf87b1dda"
   },
   "mtimes": {
     ".yggdrasil/model/internal/sources/local/yg-node.yaml": 1774848185791.962,
@@ -35,7 +35,7 @@
     ".yggdrasil/model/internal/sources/yg-node.yaml": 1774848185784.962,
     ".yggdrasil/model/internal/sources/responsibility.md": 1774848185791.962,
     ".yggdrasil/model/internal/ui/responsibility.md": 1774853820657.9028,
-    ".yggdrasil/model/internal/ui/interface.md": 1774861893426.1228,
+    ".yggdrasil/model/internal/ui/interface.md": 1774863965278.5989,
     ".yggdrasil/model/internal/audio/responsibility.md": 1774859625581.1982,
     ".yggdrasil/model/internal/audio/interface.md": 1774860691193.48,
     ".yggdrasil/model/pkg/coverart/core/responsibility.md": 1774846540110.4302,
