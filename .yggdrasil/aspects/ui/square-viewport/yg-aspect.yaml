@@ -1,0 +1,3 @@
+name: SquareViewportLayout
+description: "The interactive UI must render inside a centered 1:1 viewport constrained by the terminal's smaller dimension"
+stability: implementation

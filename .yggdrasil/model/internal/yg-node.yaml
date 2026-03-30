@@ -1,0 +1,3 @@
+name: InternalModules
+type: module
+description: "Repository-internal implementation areas that are not part of the public package surface"

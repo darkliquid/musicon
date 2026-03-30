@@ -1,0 +1,6 @@
+name: PlaybackControl
+description: "The user monitors and controls the currently playing item from a playback-focused screen"
+nodes:
+  - app/cli
+  - internal/ui
+  - internal/audio

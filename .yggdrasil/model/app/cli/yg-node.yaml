@@ -1,0 +1,23 @@
+name: CLIEntrypoint
+type: infrastructure
+description: "Thin terminal entrypoint that initializes and runs the Bubble Tea UI application"
+aspects:
+  - aspect: ui/mode-toggle
+    anchors:
+      - main
+mapping:
+  paths:
+    - main.go
+relations:
+  - target: internal/ui
+    type: calls
+    consumes: [NewApp, Run]
+    failure: "Return startup or runtime errors to the terminal user instead of hiding them"
+  - target: internal/audio
+    type: calls
+    consumes: [NewEngine, QueueService, PlaybackService, Close]
+    failure: "Surface audio runtime startup and shutdown failures instead of hiding them behind the terminal UI"
+  - target: internal/audio
+    type: calls
+    consumes: [NewEngine, QueueService, PlaybackService, Close]
+    failure: "Surface audio runtime startup and teardown failures instead of hiding them behind the terminal UI"

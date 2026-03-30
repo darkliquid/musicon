@@ -1,0 +1,43 @@
+{
+  "hash": "199ebc160249903e309fc652d596a62749d1d3277b1d22618e760ee7ae2b954a",
+  "files": {
+    ".yggdrasil/model/app/cli/responsibility.md": "711132b00a8ea25cc78bbca82d0370b61eb9a9c516a715cbdc5be39d29dc2ce2",
+    ".yggdrasil/model/app/yg-node.yaml": "3ff1b09541a43f32a625db53aa813b01fc441539c2fef4ba37030d6eec3353ba",
+    ".yggdrasil/model/app/responsibility.md": "370acf592e591f7931933ac92849d7d565d233f955e1c7c2e2f6608071aff13c",
+    ".yggdrasil/aspects/ui/mode-toggle/yg-aspect.yaml": "e8a77816aaecfc859ce13d0c3b2ed952b3626e95e4e29a38192849f29a3ee748",
+    ".yggdrasil/aspects/ui/mode-toggle/requirements.md": "f8ed7c5f8e73a7bee0b76b00f3889e51700cc7cde9bfb59065d48b88a9ef35aa",
+    ".yggdrasil/model/internal/ui/responsibility.md": "97e777fcc721ae0d59642c109b383015e74ceeb95fd024a265f538060f34f38b",
+    ".yggdrasil/model/internal/responsibility.md": "254a5255e689132936cab283cad091ff92301e3458d9bc227bc3e694763df756",
+    ".yggdrasil/flows/queue-management/yg-flow.yaml": "db332be2afd55b3d15a3b6fb8d8ec5c78f8c0e1cfaf878370aef693f6d9ccf62",
+    ".yggdrasil/flows/queue-management/description.md": "ea0a518ed4d2c78ff0bea8ab043c925d040e9dee6b4a91fd9e98b63bb7a6e102",
+    ".yggdrasil/model/app/cli/yg-node.yaml": "3bc2ff563c7cf60d8a82dbe7289bf8e70ec10f7d7396f553a8912b946af113fa",
+    ".yggdrasil/model/app/cli/interface.md": "0fd5dcfdfb7c3daefdc342b5ba096e191f13c4c6d675d859c81ea54a6d5b17e9",
+    ".yggdrasil/model/app/cli/internals.md": "490973b7edff990c5f98dffe1ee16ab687d13b4cb0817e9201a64d2fe2c2fca3",
+    ".yggdrasil/model/internal/ui/interface.md": "45a76607bf25261a4c822822563b9773f12340b8722c95ce0b97779359876072",
+    ".yggdrasil/model/internal/audio/responsibility.md": "575f1917d9fca0c7d2aa7e20e2c6392df9a9c5f0021584ccc33da981b3447ee4",
+    ".yggdrasil/model/internal/audio/interface.md": "9e1dcce72a1f785e67b24ed15531e733c0a36a29e5a583d4f19381d7ea7c52ad",
+    ".yggdrasil/flows/playback-control/yg-flow.yaml": "1f64721523ff0ff3eb7d53fa9f0e1c0c5a5ed2e4e700480367773f118fc1e870",
+    ".yggdrasil/flows/playback-control/description.md": "dfc48f9d8a379d04c1b7906731b517722a9e2a04f4802c34f7947f4b853d45d0",
+    "main.go": "030a00224ebc8e8af34d9f076a3dec26ff4754c9539059a96823d8a41f458201"
+  },
+  "mtimes": {
+    ".yggdrasil/model/app/cli/yg-node.yaml": 1774842784018.8992,
+    ".yggdrasil/model/app/cli/interface.md": 1774842785707.9026,
+    ".yggdrasil/model/app/cli/internals.md": 1774842786438.904,
+    ".yggdrasil/model/app/cli/responsibility.md": 1774839526591.9216,
+    ".yggdrasil/model/app/yg-node.yaml": 1774839898455.773,
+    ".yggdrasil/model/app/responsibility.md": 1774839901724.833,
+    ".yggdrasil/aspects/ui/mode-toggle/yg-aspect.yaml": 1774839519036.7817,
+    ".yggdrasil/aspects/ui/mode-toggle/requirements.md": 1774839520278.8047,
+    ".yggdrasil/model/internal/ui/responsibility.md": 1774839546440.2893,
+    ".yggdrasil/model/internal/ui/interface.md": 1774842787290.9058,
+    ".yggdrasil/model/internal/responsibility.md": 1774839904256.8794,
+    ".yggdrasil/model/internal/audio/responsibility.md": 1774842115486.2412,
+    ".yggdrasil/model/internal/audio/interface.md": 1774842789120.9094,
+    ".yggdrasil/flows/playback-control/yg-flow.yaml": 1774842171850.0347,
+    ".yggdrasil/flows/playback-control/description.md": 1774842175784.958,
+    ".yggdrasil/flows/queue-management/yg-flow.yaml": 1774839521039.8188,
+    ".yggdrasil/flows/queue-management/description.md": 1774839522154.8396,
+    "main.go": 1774842600773.893
+  }
+}

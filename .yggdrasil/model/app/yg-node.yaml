@@ -1,0 +1,3 @@
+name: AppShell
+type: infrastructure
+description: "Top-level application executable area for Musicon"

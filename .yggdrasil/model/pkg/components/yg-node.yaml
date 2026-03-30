@@ -1,0 +1,10 @@
+name: SharedUIComponents
+type: library
+description: "Reusable Bubble Tea-oriented UI widgets and layout helpers that are not tightly coupled to Musicon internals"
+aspects:
+  - aspect: ui/square-viewport
+    anchors:
+      - SquareViewport
+mapping:
+  paths:
+    - pkg/components/

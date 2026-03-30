@@ -1,0 +1,3 @@
+name: DedicatedModeToggle
+description: "Queue management and playback are dedicated fullscreen modes switched by a toggle key"
+stability: protocol

@@ -1,0 +1,5 @@
+name: QueueManagement
+description: "The user searches sources, reviews candidates, and curates the active playback queue"
+nodes:
+  - app/cli
+  - internal/ui

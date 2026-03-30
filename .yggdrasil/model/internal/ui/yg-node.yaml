@@ -1,0 +1,20 @@
+name: TerminalUI
+type: module
+description: "Bubble Tea application shell, screen models, and UI-facing contracts for queue and playback modes"
+aspects:
+  - aspect: ui/square-viewport
+    anchors:
+      - SquareViewport
+      - ClampSquare
+  - aspect: ui/mode-toggle
+    anchors:
+      - ModeQueue
+      - ModePlayback
+mapping:
+  paths:
+    - internal/ui/
+relations:
+  - target: pkg/components
+    type: uses
+    consumes: [View, Update, SetSize, SetFocused]
+    failure: "Fallback to component empty states or no-op rendering rather than embedding component internals here"

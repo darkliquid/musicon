@@ -1,0 +1,10 @@
+[tools]
+"cargo:weave-cli" = "latest"
+"cargo:weave-driver" = "latest"
+go = "latest"
+"go:github.com/grindlemire/go-tui/cmd/tui" = "latest"
+golangci-lint = "latest"
+"npm:@chrisdudek/yg" = "latest"
+
+[env]
+CGO_ENABLED=0

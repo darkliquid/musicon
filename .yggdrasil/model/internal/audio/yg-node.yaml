@@ -1,0 +1,11 @@
+name: AudioRuntime
+type: service
+description: "Playback runtime that uses mago and beep to output audio and expose transport state to the UI"
+relations:
+  - target: internal/ui
+    type: implements
+    consumes: [QueueService, PlaybackService]
+    failure: "Return runtime errors through the injected service contracts so the UI can surface them cleanly"
+mapping:
+  paths:
+    - internal/audio/
