@@ -15,7 +15,7 @@ Queue mode arranges source chips, filter chips, search input, result browsing, a
 
 Playback mode arranges an album-art-first center pane, a transport/progress strip, optional metadata, and switchable artwork/lyrics/eq/visualizer panes inside the same frame.
 
-Nil or partially configured services are treated as valid UI states: the screens stay navigable and show empty-state messaging rather than inventing missing backend behavior. When playback services are present, repeat and stream toggles route through the injected runtime instead of living only in local screen state, and the root shell uses the latest playback snapshot to keep the terminal title in sync with visible state.
+Nil or partially configured services are treated as valid UI states: the screens stay navigable and show empty-state messaging rather than inventing missing backend behavior. When playback services are present, repeat and stream toggles route through the injected runtime instead of living only in local screen state, and the root shell uses the latest playback snapshot to keep the terminal title in sync with visible state. Artwork providers now supply encoded image data while playback mode delegates protocol detection, rendering, and caching to a reusable `pkg/components.TerminalImage` widget.
 
 The node delegates reusable widgets such as lists, inputs, panels, progress bars, and empty-state renderers to `pkg/components`.
 
@@ -28,3 +28,4 @@ The node delegates reusable widgets such as lists, inputs, panels, progress bars
 - Kept backend construction outside `internal/ui` even after adding a real audio runtime so the UI remains decoupled from concrete playback wiring.
 - Chose terminal-title control in the root UI shell over a separate runtime service because the title is presentation state derived from what the UI is already rendering.
 - Chose a root-owned help toggle with screen-specific help views so shared chrome stays consistent while each mode can document its own controls.
+- Chose to keep `go-termimg` usage out of `internal/ui` by pushing terminal-image rendering into `pkg/components`, so playback mode remains focused on choosing panes and handling fallback messaging instead of protocol details.

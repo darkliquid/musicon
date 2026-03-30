@@ -19,6 +19,7 @@ type playbackScreen struct {
 	snapshot  PlaybackSnapshot
 	status    string
 	artStatus string
+	artwork   *components.TerminalImage
 }
 
 func newPlaybackScreen(services Services) *playbackScreen {
@@ -27,6 +28,7 @@ func newPlaybackScreen(services Services) *playbackScreen {
 		pane:     PaneArtwork,
 		snapshot: PlaybackSnapshot{Volume: 60},
 		status:   "Playback mode ready. Connect a playback backend to drive live state.",
+		artwork:  components.NewTerminalImage(),
 	}
 	screen.refreshSnapshot()
 	return screen
@@ -250,12 +252,32 @@ func (p *playbackScreen) centerView(width, height int) string {
 		}
 		return components.RenderEmptyState(width, height, p.pane.String()+" placeholder", "Attach a visualization provider to render live analysis inside this pane.")
 	default:
+		p.artStatus = ""
+		p.artwork.SetSize(width, height)
 		if p.services.Artwork != nil && trackID != "" {
-			if artwork, err := p.services.Artwork.Artwork(trackID, width, height); err == nil && strings.TrimSpace(artwork) != "" {
-				return lipgloss.NewStyle().Width(width).Height(height).Align(lipgloss.Center, lipgloss.Center).Render(artwork)
+			source, err := p.services.Artwork.Artwork(trackID)
+			if err != nil {
+				p.artStatus = err.Error()
+				p.artwork.SetSource(nil)
+			} else {
+				p.artwork.SetSource(source)
+				if artwork := strings.TrimSpace(p.artwork.View()); artwork != "" {
+					return lipgloss.NewStyle().Width(width).Height(height).Align(lipgloss.Center, lipgloss.Center).Render(artwork)
+				}
+				if renderErr := p.artwork.Error(); renderErr != nil {
+					p.artStatus = fmt.Sprintf("Artwork render failed: %v", renderErr)
+				} else if source != nil && strings.TrimSpace(source.Description) != "" {
+					p.artStatus = source.Description
+				}
 			}
+		} else {
+			p.artwork.SetSource(nil)
 		}
-		return components.RenderEmptyState(width, height, "Album art", "Artwork will appear here when an artwork provider is connected. Until then this pane defines the layout and focus of playback mode.")
+		body := "Artwork will appear here when an artwork provider is connected. Until then this pane defines the layout and focus of playback mode."
+		if strings.TrimSpace(p.artStatus) != "" {
+			body = p.artStatus
+		}
+		return components.RenderEmptyState(width, height, "Album art", body)
 	}
 }
 

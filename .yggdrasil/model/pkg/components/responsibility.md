@@ -8,6 +8,7 @@ Examples include:
 - lists
 - progress bars
 - empty-state renderers
+- terminal image rendering widgets
 - focusable layout helpers
 
 # Boundaries

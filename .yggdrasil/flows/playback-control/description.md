@@ -26,9 +26,10 @@ Make core playback actions and status easy to understand at a glance while prior
 1. The user enters playback mode.
 2. The UI shows the current track inside the square playback layout.
 3. The user uses keyboard controls to play, pause, skip, seek, or adjust volume.
-4. The audio runtime applies the transport request to the active output stream and returns updated playback state to the UI.
-5. The MPRIS bridge reflects the updated playback state to the desktop session when available.
-6. The user optionally toggles metadata, help, or an alternate center pane such as lyrics or visualization.
+4. When artwork data is available, the playback pane renders it through the reusable terminal-image component; otherwise it shows an explicit fallback state.
+5. The audio runtime applies the transport request to the active output stream and returns updated playback state to the UI.
+6. The MPRIS bridge reflects the updated playback state to the desktop session when available.
+7. The user optionally toggles metadata, help, or an alternate center pane such as lyrics or visualization.
 
 ## Alternate path: information-first viewing
 
@@ -41,5 +42,6 @@ Make core playback actions and status easy to understand at a glance while prior
 - Playback remains a dedicated top-level mode.
 - The primary layout stays inside the square application frame.
 - Non-artwork panes exist as UI surfaces with backend hooks, even when no real data is supplied yet.
+- Artwork rendering should remain reusable and terminal-protocol-aware without leaking renderer details into playback-screen orchestration.
 - Playback transport depends on a concrete runtime capable of turning queue items into live output.
 - Desktop media controls must not become an alternate source of truth; they reflect and control the same playback runtime used by the terminal UI.

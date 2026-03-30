@@ -1,6 +1,10 @@
 package ui
 
-import "time"
+import (
+	"time"
+
+	"github.com/darkliquid/musicon/pkg/components"
+)
 
 type Mode int
 
@@ -177,7 +181,7 @@ type LyricsProvider interface {
 }
 
 type ArtworkProvider interface {
-	Artwork(trackID string, width, height int) (string, error)
+	Artwork(trackID string) (*components.ImageSource, error)
 }
 
 type VisualizationProvider interface {
