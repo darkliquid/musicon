@@ -52,3 +52,16 @@ func TestPlaybackScreenArtworkPaneShowsRenderFailure(t *testing.T) {
 		t.Fatalf("expected render failure message, got %q", got)
 	}
 }
+
+func TestPlaybackScreenViewUsesOverlaysInsteadOfStackedPanels(t *testing.T) {
+	screen := newPlaybackScreen(Services{})
+	screen.SetSize(48, 24)
+
+	got := screen.View()
+	if !strings.Contains(got, "Playback") || !strings.Contains(got, "state:") {
+		t.Fatalf("expected playback controls overlay, got %q", got)
+	}
+	if strings.Contains(got, "Playback controls") {
+		t.Fatalf("expected stacked controls panel title to be removed, got %q", got)
+	}
+}

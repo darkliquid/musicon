@@ -9,22 +9,6 @@ import (
 	"github.com/darkliquid/musicon/pkg/components"
 )
 
-type queueFocus int
-
-const (
-	focusSearch queueFocus = iota
-	focusBrowser
-)
-
-func (f queueFocus) String() string {
-	switch f {
-	case focusBrowser:
-		return "browser focus"
-	default:
-		return "search focus"
-	}
-}
-
 type queueBrowserRowKind int
 
 const (
@@ -90,13 +74,13 @@ func configuredSources(services Services) []SourceDescriptor {
 func (q *queueScreen) SetSize(width, height int) {
 	q.width = max(1, width)
 	q.height = max(1, height)
-	q.searchInput.SetSize(max(8, q.width-8))
+	q.searchInput.SetSize(max(8, q.width))
 	q.resizeBrowser()
 }
 
 func (q *queueScreen) resizeBrowser() {
-	listHeight := max(3, q.height-7)
-	q.browser.SetSize(max(6, q.width-4), listHeight)
+	listHeight := max(3, q.height-5)
+	q.browser.SetSize(max(6, q.width), listHeight)
 }
 
 func (q *queueScreen) Update(msg tea.Msg) string {
@@ -175,24 +159,19 @@ func (q *queueScreen) View() string {
 		q.browser.View(),
 	)
 
-	return components.RenderPanel(components.PanelOptions{
-		Title:    "Queue browser",
-		Subtitle: q.browserSubtitle(),
-		Width:    q.width,
-		Height:   q.height,
-		Focused:  true,
-	}, body)
+	return lipgloss.NewStyle().Width(q.width).Height(q.height).Render(body)
 }
 
 func (q *queueScreen) HelpView() string {
+	width := min(q.width, 64)
+	height := min(q.height, 13)
 	return components.RenderPanel(components.PanelOptions{
 		Title:    "Queue help",
-		Subtitle: "dedicated queue-management mode",
-		Width:    q.width,
-		Height:   q.height,
+		Subtitle: "search and browse stay live together",
+		Width:    width,
+		Height:   height,
 		Focused:  true,
 	}, strings.Join([]string{
-		"ctrl+l / ctrl+h  search and browser stay active together",
 		"[ / ]            switch active source",
 		"1 / 2 / 3        toggle Track / Stream / Playlist filters",
 		"type text         update the active search query while keeping browser selection live",

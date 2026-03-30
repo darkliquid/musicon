@@ -127,52 +127,24 @@ func (p *playbackScreen) View() string {
 	}
 
 	p.refreshSnapshot()
-	infoHeight := 0
+	body := lipgloss.NewStyle().Width(p.width).Height(p.height).Render(p.centerView(p.width, p.height))
+	top := p.paneOverlay()
+	body = bottomOverlay(body, p.controlsOverlay(), p.width, p.height)
 	if p.showInfo {
-		infoHeight = 7
+		top = lipgloss.JoinVertical(lipgloss.Center, top, "", p.infoOverlay())
 	}
-	controlsHeight := 7
-	centerHeight := p.height - controlsHeight - infoHeight - 1
-	if centerHeight < 6 {
-		centerHeight = 6
-	}
-
-	center := components.RenderPanel(components.PanelOptions{
-		Title:    fmt.Sprintf("Center pane · %s", p.pane.String()),
-		Subtitle: paneHint(p.pane),
-		Width:    p.width,
-		Height:   centerHeight,
-		Focused:  true,
-	}, p.centerView(p.width-4, centerHeight-3))
-
-	controls := components.RenderPanel(components.PanelOptions{
-		Title:    "Playback controls",
-		Subtitle: "space pause · [ ] skip · ← → seek · -/+ volume",
-		Width:    p.width,
-		Height:   controlsHeight,
-		Focused:  false,
-	}, p.controlsView(p.width-4))
-
-	sections := []string{center, controls}
-	if p.showInfo {
-		sections = append(sections, components.RenderPanel(components.PanelOptions{
-			Title:    "Track info",
-			Subtitle: "toggle with i",
-			Width:    p.width,
-			Height:   infoHeight,
-			Focused:  false,
-		}, p.infoView(p.width-4, infoHeight-3)))
-	}
-
-	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+	body = topOverlay(body, top, p.width, p.height)
+	return body
 }
 
 func (p *playbackScreen) HelpView() string {
+	width := min(p.width, 68)
+	height := min(p.height, 13)
 	return components.RenderPanel(components.PanelOptions{
 		Title:    "Playback help",
-		Subtitle: "dedicated playback mode",
-		Width:    p.width,
-		Height:   p.height,
+		Subtitle: "controls and info overlay the active pane",
+		Width:    width,
+		Height:   height,
 		Focused:  true,
 	}, strings.Join([]string{
 		"space             toggle play / pause state",
@@ -185,6 +157,43 @@ func (p *playbackScreen) HelpView() string {
 		"tab               switch back to queue mode",
 		"?                 toggle this help view",
 	}, "\n"))
+}
+
+func (p *playbackScreen) paneOverlay() string {
+	content := lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		pill(p.pane.String(), true),
+		"  ",
+		lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Render(paneHint(p.pane)),
+	)
+	return lipgloss.NewStyle().
+		Background(lipgloss.Color("236")).
+		Foreground(lipgloss.Color("252")).
+		Padding(0, 1).
+		Width(min(p.width, max(24, lipgloss.Width(content)+2))).
+		Render(content)
+}
+
+func (p *playbackScreen) infoOverlay() string {
+	width := min(p.width, 44)
+	return components.RenderPanel(components.PanelOptions{
+		Title:    "Track info",
+		Subtitle: "toggle with i",
+		Width:    width,
+		Height:   8,
+		Focused:  false,
+	}, p.infoView(width-4, 5))
+}
+
+func (p *playbackScreen) controlsOverlay() string {
+	width := min(p.width, max(36, p.width-4))
+	return components.RenderPanel(components.PanelOptions{
+		Title:    "Playback",
+		Subtitle: "space pause · [ ] next/prev · ← → seek",
+		Width:    width,
+		Height:   6,
+		Focused:  false,
+	}, p.controlsView(width-4))
 }
 
 func (p *playbackScreen) controlsView(width int) string {

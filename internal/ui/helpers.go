@@ -77,3 +77,28 @@ func joinLines(lines ...string) string {
 	}
 	return strings.Join(filtered, "\n")
 }
+
+func overlayRows(base, overlay string, width, height int) string {
+	baseLines := strings.Split(lipgloss.NewStyle().Width(width).Height(height).Render(base), "\n")
+	overlayLines := strings.Split(lipgloss.NewStyle().Width(width).Height(height).Render(overlay), "\n")
+	limit := min(len(baseLines), len(overlayLines))
+	for index := 0; index < limit; index++ {
+		if strings.TrimSpace(overlayLines[index]) == "" {
+			continue
+		}
+		baseLines[index] = overlayLines[index]
+	}
+	return strings.Join(baseLines, "\n")
+}
+
+func centeredOverlay(body, overlay string, width, height int) string {
+	return overlayRows(body, lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, overlay), width, height)
+}
+
+func topOverlay(body, overlay string, width, height int) string {
+	return overlayRows(body, lipgloss.Place(width, height, lipgloss.Center, lipgloss.Top, overlay), width, height)
+}
+
+func bottomOverlay(body, overlay string, width, height int) string {
+	return overlayRows(body, lipgloss.Place(width, height, lipgloss.Center, lipgloss.Bottom, overlay), width, height)
+}

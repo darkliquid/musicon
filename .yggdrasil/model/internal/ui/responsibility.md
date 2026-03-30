@@ -7,6 +7,7 @@ It is responsible for:
 - the root application model
 - queue and playback screen composition
 - square viewport layout rules
+- in-square help and playback overlay composition
 - keymaps, focus, and mode transitions
 - frontend-facing interfaces for queue data, source search, playback snapshots, normalized artwork lookup metadata, lyrics, and visualization placeholders
 

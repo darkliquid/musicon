@@ -23,9 +23,13 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
 - The root model also publishes terminal window titles derived from mode, help state, and current playback snapshot through Bubble Tea's `View.WindowTitle` field.
 - The root model also enforces the minimum supported terminal size and suppresses normal mode interaction until the viewport is large enough.
+- The root model must render only the centered square itself during normal operation; persistent outer chrome such as tab bars, footer bars, or mode banners should not live outside the square.
+- Help stays in the active mode instead of replacing it with a separate screen: the root model overlays the current mode's help card inside the square viewport.
 - Queue mode owns source cycling, query input, filter toggles, and a single merged browser list where queued items remain pinned before the current search results.
 - Queue mode must keep query editing and browser navigation live at the same time: typing and deletion refresh the active search while movement keys continue to change the selected row, and `enter` toggles the selected item between enqueued and not enqueued.
+- Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
 - Playback mode owns pane switching, transport key routing, scrubber controls, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
+- Playback mode should treat the active artwork/lyrics/eq/visualizer pane as the base layer and place pane labels, transport controls, and optional track metadata as overlays within that same square instead of stacking separate panels below it.
 - Playback artwork rendering should route provider-supplied image data through reusable `pkg/components` image rendering instead of embedding terminal-image protocol logic inside the screen model.
 - Playback artwork requests should pass normalized cover-art metadata into the provider path instead of relying on a narrow track-ID-only contract.
 - Musicon-specific adaptation from reusable cover-art resolvers into the UI artwork contract belongs in `internal/ui`, not in `pkg/coverart`.

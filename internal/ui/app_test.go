@@ -152,3 +152,36 @@ func TestSanitizeTitleRemovesControlCharacters(t *testing.T) {
 		t.Fatalf("expected %q, got %q", want, got)
 	}
 }
+
+func TestRootViewOmitsOuterChrome(t *testing.T) {
+	model := &rootModel{
+		width:          80,
+		height:         40,
+		cellWidthRatio: 1,
+		mode:           ModeQueue,
+		queue:          newQueueScreen(Services{}),
+		playback:       newPlaybackScreen(Services{}),
+	}
+
+	view := model.View().Content
+	if strings.Contains(view, "tab Queue") || strings.Contains(view, "ctrl+c exits") {
+		t.Fatalf("expected outer chrome to be removed, got %q", view)
+	}
+}
+
+func TestRootViewOverlaysHelpInsideSquare(t *testing.T) {
+	model := &rootModel{
+		width:          80,
+		height:         40,
+		cellWidthRatio: 1,
+		mode:           ModeQueue,
+		showHelp:       true,
+		queue:          newQueueScreen(Services{}),
+		playback:       newPlaybackScreen(Services{}),
+	}
+
+	view := model.View().Content
+	if !strings.Contains(view, "Queue help") {
+		t.Fatalf("expected queue help overlay, got %q", view)
+	}
+}

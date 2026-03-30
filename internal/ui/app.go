@@ -185,33 +185,17 @@ func (m *rootModel) View() tea.View {
 		return m.makeView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, message), title)
 	}
 
-	frameWidth, frameHeight := m.viewport.Inner(1)
-	frameWidth = max(1, frameWidth)
-	frameHeight = max(1, frameHeight)
+	bodyWidth := max(1, m.viewport.Width)
+	bodyHeight := max(1, m.viewport.Height)
+	m.queue.SetSize(bodyWidth, bodyHeight)
+	m.playback.SetSize(bodyWidth, bodyHeight)
 
-	headerHeight := 3
-	footerHeight := 2
-	bodyHeight := frameHeight - headerHeight - footerHeight
-	if bodyHeight < 1 {
-		bodyHeight = 1
+	body := lipgloss.NewStyle().Width(bodyWidth).Height(bodyHeight).Render(m.activeBody())
+	if m.showHelp {
+		body = centeredOverlay(body, m.activeHelpOverlay(), bodyWidth, bodyHeight)
 	}
-	m.queue.SetSize(frameWidth, bodyHeight)
-	m.playback.SetSize(frameWidth, bodyHeight)
 
-	body := m.activeBody()
-	frame := lipgloss.NewStyle().
-		Border(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Width(frameWidth).
-		Height(frameHeight).
-		Render(lipgloss.JoinVertical(
-			lipgloss.Left,
-			lipgloss.NewStyle().Width(frameWidth).Height(headerHeight).Render(m.renderHeader(frameWidth)),
-			lipgloss.NewStyle().Width(frameWidth).Height(bodyHeight).Render(body),
-			lipgloss.NewStyle().Width(frameWidth).Height(footerHeight).Render(m.renderFooter(frameWidth)),
-		))
-
-	return m.makeView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, frame), m.terminalTitle())
+	return m.makeView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, body), m.terminalTitle())
 }
 
 func (m *rootModel) makeView(content, title string) tea.View {
@@ -222,12 +206,6 @@ func (m *rootModel) makeView(content, title string) tea.View {
 }
 
 func (m *rootModel) activeBody() string {
-	if m.showHelp {
-		if m.mode == ModeQueue {
-			return m.queue.HelpView()
-		}
-		return m.playback.HelpView()
-	}
 	if m.mode == ModeQueue {
 		return m.queue.View()
 	}
@@ -235,12 +213,15 @@ func (m *rootModel) activeBody() string {
 }
 
 func (m *rootModel) resizeScreens() {
-	frameWidth, frameHeight := m.viewport.Inner(1)
-	headerHeight := 3
-	footerHeight := 2
-	bodyHeight := max(1, frameHeight-headerHeight-footerHeight)
-	m.queue.SetSize(max(1, frameWidth), bodyHeight)
-	m.playback.SetSize(max(1, frameWidth), bodyHeight)
+	m.queue.SetSize(max(1, m.viewport.Width), max(1, m.viewport.Height))
+	m.playback.SetSize(max(1, m.viewport.Width), max(1, m.viewport.Height))
+}
+
+func (m *rootModel) activeHelpOverlay() string {
+	if m.mode == ModeQueue {
+		return m.queue.HelpView()
+	}
+	return m.playback.HelpView()
 }
 
 func (m *rootModel) toggleMode() {
