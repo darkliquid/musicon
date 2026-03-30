@@ -1,9 +1,7 @@
 {
-  "hash": "9a05a6946c1699e8cb6a78dd7e0a96e65ff21f50cbe8f75de8a237ec15340de7",
+  "hash": "07ea4f3a7f3c6a3de13b24484655ab5e6e5fb983c4754bab908b07b04177dfd2",
   "files": {
     ".yggdrasil/model/internal/sources/local/yg-node.yaml": "54aca83194fd016ff0c6e8b45e7ee6c96a909cba2ddac5acae0143b914114891",
-    ".yggdrasil/model/internal/sources/local/interface.md": "82944b798382eac80b5e2e6dc63e1faa6358da5a9682337e094865400f3e6236",
-    ".yggdrasil/model/internal/sources/local/internals.md": "39b0aaecf5a8b5de826b15bba8d9bf81ef8d091559d64887813a82f8e9d796df",
     ".yggdrasil/model/internal/sources/local/responsibility.md": "fa13d0a9dd635762f5b9406d9ec2d17e135b7b9b6e64a9885cbdc5a93f665410",
     ".yggdrasil/model/internal/yg-node.yaml": "c15c09ee704d84db6ab9d46f43837aeba2d3fcc8cef65ec7918fd970bac90223",
     ".yggdrasil/model/internal/responsibility.md": "90fa17d80db7c3265833b84cf53518ceac4f367db6fef86dd3ea8b4adf3ddee7",
@@ -22,13 +20,15 @@
     ".yggdrasil/flows/playback-control/description.md": "a774146f3b8e97761e3b53e66ff893281fc78fc0d8760a7784aebc32846a13f6",
     ".yggdrasil/flows/queue-management/yg-flow.yaml": "7d3130388b4b32c355870c25626d453ee07f8cbef2b5f4175c12b34d5e627caa",
     ".yggdrasil/flows/queue-management/description.md": "25b2fb63fe1abb229a897d62c4da66a8a5783d404196839a55f5f3f983a6525d",
-    "internal/sources/local/library.go": "a02074d5f379f7912219cd1ef9bcb4466521409721178573c34f56e644caf5c9",
-    "internal/sources/local/library_test.go": "abe57349d3b49dc70b7442b51a9d8e8ebdcea17e69a798a47de709608bcb0fa6"
+    ".yggdrasil/model/internal/sources/local/interface.md": "3ec9b683cd487a286a08a9a53759f4f1cc938bbded0084c438348beceaee1f78",
+    ".yggdrasil/model/internal/sources/local/internals.md": "75334cca410dd0c9f268b8c05cb4fc616f94030c57a24e5ab396f0864ceacf29",
+    "internal/sources/local/library.go": "21c6076bc20397ae79fabd440c3bed7351e68ce942bfa13e273227da2b256117",
+    "internal/sources/local/library_test.go": "df289c15525384578de953856a987492687bb637bee7ee328e10f8d0f1ad083e"
   },
   "mtimes": {
     ".yggdrasil/model/internal/sources/local/yg-node.yaml": 1774848185791.962,
-    ".yggdrasil/model/internal/sources/local/interface.md": 1774848185791.962,
-    ".yggdrasil/model/internal/sources/local/internals.md": 1774848185792.962,
+    ".yggdrasil/model/internal/sources/local/interface.md": 1774848761980.4514,
+    ".yggdrasil/model/internal/sources/local/internals.md": 1774848761981.4514,
     ".yggdrasil/model/internal/sources/local/responsibility.md": 1774848185791.962,
     ".yggdrasil/model/internal/yg-node.yaml": 1774839903015.8567,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
@@ -47,7 +47,7 @@
     ".yggdrasil/flows/playback-control/description.md": 1774848349004.8003,
     ".yggdrasil/flows/queue-management/yg-flow.yaml": 1774848185793.962,
     ".yggdrasil/flows/queue-management/description.md": 1774848185793.962,
-    "internal/sources/local/library.go": 1774848315394.4216,
-    "internal/sources/local/library_test.go": 1774848286013.0908
+    "internal/sources/local/library.go": 1774848744118.966,
+    "internal/sources/local/library_test.go": 1774848752741.1196
   }
 }

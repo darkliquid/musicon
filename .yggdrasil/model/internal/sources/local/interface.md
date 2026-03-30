@@ -12,6 +12,7 @@ The resulting type implements:
 # Contracts
 
 - Local discovery must stay internal to the source layer rather than leaking filesystem traversal into the UI or audio runtime.
+- Local discovery should refresh over time so newly added or removed files can appear without restarting Musicon.
 - Search results must preserve local file paths and best-effort embedded-art metadata for downstream cover-art resolution.
 - Resolver output must decode supported local files into playable `beep` streams and provide track info rich enough for the playback UI.
 

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/darkliquid/musicon/internal/audio"
 	teaui "github.com/darkliquid/musicon/internal/ui"
@@ -20,6 +21,7 @@ import (
 )
 
 const sourceID = "local-files"
+const defaultRefreshInterval = 2 * time.Second
 
 var supportedExtensions = map[string]struct{}{
 	".mp3":  {},
@@ -33,11 +35,14 @@ var supportedExtensions = map[string]struct{}{
 type Library struct {
 	root string
 
-	mu      sync.RWMutex
-	scanned bool
-	scanErr error
-	index   []indexedTrack
-	byID    map[string]indexedTrack
+	RefreshInterval time.Duration
+
+	mu       sync.RWMutex
+	scanned  bool
+	scanErr  error
+	lastScan time.Time
+	index    []indexedTrack
+	byID     map[string]indexedTrack
 }
 
 type indexedTrack struct {
@@ -53,7 +58,10 @@ func NewLibrary(root string) *Library {
 	if root == "" {
 		root = "."
 	}
-	return &Library{root: root}
+	return &Library{
+		root:            root,
+		RefreshInterval: defaultRefreshInterval,
+	}
 }
 
 func (l *Library) Sources() []teaui.SourceDescriptor {
@@ -129,7 +137,7 @@ func (l *Library) Resolve(entry teaui.QueueEntry) (audio.ResolvedTrack, error) {
 
 func (l *Library) scan() ([]indexedTrack, error) {
 	l.mu.RLock()
-	if l.scanned {
+	if !l.needsRefreshLocked() {
 		defer l.mu.RUnlock()
 		return append([]indexedTrack(nil), l.index...), l.scanErr
 	}
@@ -137,7 +145,7 @@ func (l *Library) scan() ([]indexedTrack, error) {
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if l.scanned {
+	if !l.needsRefreshLocked() {
 		return append([]indexedTrack(nil), l.index...), l.scanErr
 	}
 
@@ -171,9 +179,21 @@ func (l *Library) scan() ([]indexedTrack, error) {
 
 	l.scanned = true
 	l.scanErr = err
+	l.lastScan = time.Now()
 	l.index = index
 	l.byID = byID
 	return append([]indexedTrack(nil), l.index...), err
+}
+
+func (l *Library) needsRefreshLocked() bool {
+	if !l.scanned {
+		return true
+	}
+	interval := l.RefreshInterval
+	if interval <= 0 {
+		return true
+	}
+	return time.Since(l.lastScan) >= interval
 }
 
 func indexTrack(path string) (indexedTrack, error) {

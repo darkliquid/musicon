@@ -67,6 +67,42 @@ func TestLibraryResolveDecodesWAVFiles(t *testing.T) {
 	}
 }
 
+func TestLibraryRefreshesSearchResultsWhenFilesChange(t *testing.T) {
+	dir := t.TempDir()
+	firstPath := filepath.Join(dir, "First.wav")
+	writeSilentWAV(t, firstPath)
+
+	library := NewLibrary(dir)
+	library.RefreshInterval = 0
+
+	results, err := library.Search(teaui.SearchRequest{
+		SourceID: sourceID,
+		Query:    "first",
+		Filters:  teaui.DefaultSearchFilters(),
+	})
+	if err != nil {
+		t.Fatalf("initial search failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected initial result, got %d", len(results))
+	}
+
+	secondPath := filepath.Join(dir, "Second.wav")
+	writeSilentWAV(t, secondPath)
+
+	results, err = library.Search(teaui.SearchRequest{
+		SourceID: sourceID,
+		Query:    "second",
+		Filters:  teaui.DefaultSearchFilters(),
+	})
+	if err != nil {
+		t.Fatalf("refreshed search failed: %v", err)
+	}
+	if len(results) != 1 || results[0].ID != secondPath {
+		t.Fatalf("expected refreshed result for second file, got %#v", results)
+	}
+}
+
 func TestIDsFromRawTagsExtractsKnownExternalIDs(t *testing.T) {
 	ids := idsFromRawTags(map[string]interface{}{
 		"MUSICBRAINZ_ALBUMID":          "mb-release",
