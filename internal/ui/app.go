@@ -114,9 +114,7 @@ func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *rootModel) View() tea.View {
 	if m.width <= 0 || m.height <= 0 {
-		view := tea.NewView("loading terminal dimensions...")
-		view.AltScreen = true
-		return view
+		return m.makeView("loading terminal dimensions...", "Musicon - Starting")
 	}
 
 	check := m.layoutCheck()
@@ -134,9 +132,8 @@ func (m *rootModel) View() tea.View {
 			Background(lipgloss.Color("52")).
 			Padding(1, 2).
 			Render(message)
-		view := tea.NewView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, message))
-		view.AltScreen = true
-		return view
+		title := fmt.Sprintf("Musicon - Resize Required (%dx%d)", check.Viewport.TerminalWidth, check.Viewport.TerminalHeight)
+		return m.makeView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, message), title)
 	}
 
 	frameWidth, frameHeight := m.viewport.Inner(1)
@@ -165,7 +162,11 @@ func (m *rootModel) View() tea.View {
 			lipgloss.NewStyle().Width(frameWidth).Height(footerHeight).Render(m.renderFooter(frameWidth)),
 		))
 
-	view := tea.NewView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, frame))
+	return m.makeView(lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, frame), m.terminalTitle())
+}
+
+func (m *rootModel) makeView(content, title string) tea.View {
+	view := tea.NewView(titleSequence(title) + content)
 	view.AltScreen = true
 	return view
 }
@@ -272,4 +273,52 @@ func tickCmd() tea.Cmd {
 	return tea.Tick(250*time.Millisecond, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
+}
+
+func (m *rootModel) terminalTitle() string {
+	segments := []string{"Musicon", m.mode.String()}
+	if m.showHelp {
+		segments = append(segments, "Help")
+	}
+
+	snapshot := m.playbackSnapshot()
+	if snapshot.Track == nil {
+		segments = append(segments, "Idle")
+		return strings.Join(segments, " - ")
+	}
+
+	track := snapshot.Track.Title
+	if artist := strings.TrimSpace(snapshot.Track.Artist); artist != "" {
+		track = artist + " - " + track
+	}
+	state := "Playing"
+	if snapshot.Paused {
+		state = "Paused"
+	}
+
+	segments = append(segments, sanitizeTitle(track), state)
+	return strings.Join(segments, " - ")
+}
+
+func (m *rootModel) playbackSnapshot() PlaybackSnapshot {
+	if m.playback == nil {
+		return PlaybackSnapshot{}
+	}
+	m.playback.refreshSnapshot()
+	return m.playback.snapshot
+}
+
+func titleSequence(title string) string {
+	return "\x1b]2;" + sanitizeTitle(title) + "\x07"
+}
+
+func sanitizeTitle(title string) string {
+	replacer := strings.NewReplacer(
+		"\x1b", "",
+		"\x07", "",
+		"\n", " ",
+		"\r", " ",
+		"\t", " ",
+	)
+	return strings.TrimSpace(replacer.Replace(title))
 }

@@ -18,6 +18,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Queue and playback screens must run against nil or partially configured services by showing explicit placeholders and empty states.
 - The root model owns mode switching, help toggling, and square-viewport resizing.
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
+- The root model also emits terminal-title control sequences derived from mode, help state, and current playback snapshot.
 - The root model also enforces the minimum supported terminal size and suppresses normal mode interaction until the viewport is large enough.
 - Queue mode owns source cycling, query input, filter toggles, result selection, and queue list interactions.
 - Playback mode owns pane switching, transport key routing, scrubber controls, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.

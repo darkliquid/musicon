@@ -7,7 +7,7 @@
 - `playbackScreen`, the Musicon-specific playback screen
 - shared UI-facing contracts and small rendering helpers
 
-The root model computes a square viewport from terminal size with `components.ClampSquare`, renders a bordered application frame, keeps queue/playback as dedicated top-level modes, and emits periodic Bubble Tea ticks so playback state can refresh while audio is active.
+The root model computes a square viewport from terminal size with `components.ClampSquare`, renders a bordered application frame, keeps queue/playback as dedicated top-level modes, emits periodic Bubble Tea ticks so playback state can refresh while audio is active, and prefixes rendered output with terminal OSC title sequences.
 
 It now also evaluates explicit minimum viewport requirements before rendering the main shell. If the terminal is smaller than the supported `20×20` minimum, the root model renders a dedicated resize warning and blocks normal application interactions until the terminal is large enough again.
 
@@ -15,7 +15,7 @@ Queue mode arranges source chips, filter chips, search input, result browsing, a
 
 Playback mode arranges an album-art-first center pane, a transport/progress strip, optional metadata, and switchable artwork/lyrics/eq/visualizer panes inside the same frame.
 
-Nil or partially configured services are treated as valid UI states: the screens stay navigable and show empty-state messaging rather than inventing missing backend behavior. When playback services are present, repeat and stream toggles route through the injected runtime instead of living only in local screen state.
+Nil or partially configured services are treated as valid UI states: the screens stay navigable and show empty-state messaging rather than inventing missing backend behavior. When playback services are present, repeat and stream toggles route through the injected runtime instead of living only in local screen state, and the root shell uses the latest playback snapshot to keep the terminal title in sync with visible state.
 
 The node delegates reusable widgets such as lists, inputs, panels, progress bars, and empty-state renderers to `pkg/components`.
 
@@ -26,4 +26,5 @@ The node delegates reusable widgets such as lists, inputs, panels, progress bars
 - Chose an explicit `20×20` minimum terminal policy over allowing arbitrarily small degraded layouts so queue and playback screens fail clearly instead of becoming cramped and misleading.
 - Chose interface-only backend integration over stub source or playback implementations because the user explicitly asked for UI-only work at this stage.
 - Kept backend construction outside `internal/ui` even after adding a real audio runtime so the UI remains decoupled from concrete playback wiring.
+- Chose terminal-title control in the root UI shell over a separate runtime service because the title is presentation state derived from what the UI is already rendering.
 - Chose a root-owned help toggle with screen-specific help views so shared chrome stays consistent while each mode can document its own controls.
