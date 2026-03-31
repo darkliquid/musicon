@@ -44,6 +44,7 @@ type Engine struct {
 	mu sync.Mutex
 
 	resolver Resolver
+	visual   *visualizationState
 
 	queue        []teaui.QueueEntry
 	currentIndex int
@@ -92,6 +93,7 @@ func NewEngine(options Options) *Engine {
 
 	return &Engine{
 		resolver:      options.Resolver,
+		visual:        newVisualizationState(rate),
 		currentIndex:  -1,
 		volume:        70,
 		speakerRate:   rate,
@@ -113,6 +115,11 @@ func (e *Engine) QueueService() teaui.QueueService {
 // PlaybackService returns a UI-facing playback adapter backed by the engine.
 func (e *Engine) PlaybackService() teaui.PlaybackService {
 	return playbackService{engine: e}
+}
+
+// VisualizationService returns a UI-facing visualization adapter backed by the engine.
+func (e *Engine) VisualizationService() teaui.VisualizationProvider {
+	return visualizationService{engine: e}
 }
 
 // QueueSnapshot returns a copy of the current queue state.
@@ -606,8 +613,11 @@ func (e *Engine) activateTrackLocked(entry teaui.QueueEntry, info teaui.TrackInf
 	controller := &beep.Ctrl{Streamer: streamer, Paused: paused}
 	volumeLevel, silent := percentToLevel(e.volume)
 	volumeFx := &effects.Volume{Streamer: controller, Base: 2, Volume: volumeLevel, Silent: silent}
+	if e.visual != nil {
+		e.visual.Reset(e.speakerRate)
+	}
 	index := e.currentIndex
-	sequence := beep.Seq(volumeFx, beep.Callback(func() { go e.onTrackFinished(index) }))
+	sequence := beep.Seq(newAnalysisTap(volumeFx, e.visual), beep.Callback(func() { go e.onTrackFinished(index) }))
 	e.speaker.Play(sequence)
 
 	e.current = &activeTrack{
@@ -661,6 +671,9 @@ func (e *Engine) stopCurrentLocked(closeSpeaker bool) {
 		_ = e.current.stream.Close()
 	}
 	e.current = nil
+	if e.visual != nil {
+		e.visual.Clear()
+	}
 	if closeSpeaker && e.speakerReady {
 		e.speaker.Close()
 		e.speakerReady = false
@@ -741,7 +754,9 @@ func (s queueService) Move(id string, delta int) error { return s.engine.MoveQue
 func (s queueService) Remove(id string) error { return s.engine.RemoveFromQueue(id) }
 
 // RemoveGroup deletes a grouped collection through the UI adapter.
-func (s queueService) RemoveGroup(groupID string) error { return s.engine.RemoveGroupFromQueue(groupID) }
+func (s queueService) RemoveGroup(groupID string) error {
+	return s.engine.RemoveGroupFromQueue(groupID)
+}
 
 // Clear removes all queued entries through the UI adapter.
 func (s queueService) Clear() error { return s.engine.ClearQueue() }

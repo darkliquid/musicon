@@ -11,7 +11,7 @@ This node does not expose a reusable library API, but it does define the executa
 - construct and start the MPRIS bridge with `mpris.NewBridge(...)` and `Start()`
 - construct the reusable cover-art provider chain and adapt it into the UI artwork service
 - construct the reusable lyrics provider chain and adapt it into the UI lyrics service
-- inject queue and playback service adapters plus typed UI keybinding options into `ui.NewApp(...)`
+- inject queue, playback, and visualization service adapters plus typed UI keybinding options into `ui.NewApp(...)`
 - start the Bubble Tea program through `ui.Run(app)`
 - close the MPRIS bridge and audio runtime during shutdown
 - surface any startup or runtime error on stderr before exiting non-zero

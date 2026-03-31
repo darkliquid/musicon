@@ -110,11 +110,12 @@ func main() {
 	}
 
 	app := ui.NewApp(ui.Services{
-		Search:   search,
-		Queue:    engine.QueueService(),
-		Playback: playback,
-		Lyrics:   buildLyricsProvider(),
-		Artwork:  buildArtworkProvider(),
+		Search:        search,
+		Queue:         engine.QueueService(),
+		Playback:      playback,
+		Lyrics:        buildLyricsProvider(),
+		Artwork:       buildArtworkProvider(),
+		Visualization: engine.VisualizationService(),
 	}, ui.Options{
 		StartMode:      modeFromConfig(loaded.Config.UI.StartMode),
 		Theme:          loaded.Config.UI.Theme,

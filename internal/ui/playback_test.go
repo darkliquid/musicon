@@ -109,12 +109,18 @@ type visualizationTestProvider struct {
 	mu      sync.Mutex
 	calls   int
 	content string
+	steps   []string
 }
 
 func (p *visualizationTestProvider) Placeholder(PlaybackPane, int, int) (string, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.calls++
+	if len(p.steps) > 0 {
+		content := p.steps[0]
+		p.steps = p.steps[1:]
+		return content, nil
+	}
 	return p.content, nil
 }
 
@@ -452,19 +458,49 @@ func TestPlaybackLyricsScrollResetsForNewTrack(t *testing.T) {
 	}
 }
 
-func TestPlaybackVisualizationLookupIsCachedAcrossViews(t *testing.T) {
-	provider := &visualizationTestProvider{content: "bars"}
+func TestPlaybackVisualizationRefreshesAcrossViews(t *testing.T) {
+	provider := &visualizationTestProvider{steps: []string{"bars 1", "bars 2"}}
 	screen := newPlaybackScreen(Services{Visualization: provider}, AlbumArtOptions{})
 	screen.pane = PaneVisualizer
 	screen.SetSize(40, 20)
 
 	_ = screen.View()
+	first := screen.visualContent
 	_ = screen.View()
+	second := screen.visualContent
 
 	provider.mu.Lock()
 	calls := provider.calls
 	provider.mu.Unlock()
-	if calls != 1 {
-		t.Fatalf("expected visualization provider to be called once, got %d", calls)
+	if calls != 2 {
+		t.Fatalf("expected visualization provider to be called for each view, got %d", calls)
+	}
+	if first != "bars 1" {
+		t.Fatalf("expected first visualization frame in first view, got %q", first)
+	}
+	if second != "bars 2" {
+		t.Fatalf("expected updated visualization frame in second view, got %q", second)
+	}
+}
+
+func TestPlaybackVisualizerWithoutProviderDoesNotShowPlaceholderText(t *testing.T) {
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
+	screen.pane = PaneVisualizer
+	screen.SetSize(40, 20)
+
+	view := screen.View()
+	if strings.Contains(view, "placeholder") || strings.Contains(view, "Attach a visualization provider") {
+		t.Fatalf("expected neutral visualizer background, got %q", view)
+	}
+}
+
+func TestPlaybackArtworkWithoutProviderDoesNotShowPlaceholderText(t *testing.T) {
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
+	screen.pane = PaneArtwork
+	screen.SetSize(40, 20)
+
+	view := screen.View()
+	if strings.Contains(view, "Artwork will appear here") {
+		t.Fatalf("expected neutral artwork background, got %q", view)
 	}
 }

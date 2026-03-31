@@ -10,7 +10,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - `SearchService` for source discovery and result retrieval, with caller-supplied context so UI search can cancel superseded provider work
 - `QueueService` for queue snapshots and mutation
 - `PlaybackService` for transport, volume, and playback snapshots
-- `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with lyrics providers receiving reusable metadata requests and returning reusable lyrics documents, and artwork providers receiving reusable cover-art metadata, optionally reporting provider-attempt progress, and supplying image data to reusable rendering components
+- `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with lyrics providers receiving reusable metadata requests and returning reusable lyrics documents, artwork providers receiving reusable cover-art metadata, optionally reporting provider-attempt progress, and visualization providers returning live pane-sized EQ/visualizer content that is safe to request during ordinary redraws
 - `Options` for startup mode, theme selection, cell-width ratio, and playback artwork rendering preferences
 
 # Contracts
@@ -45,6 +45,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Playback lyrics panes should render plain lines from reusable lyrics documents for the first pass while preserving synced timing data inside the reusable package contract for later UI upgrades.
 - Playback lyrics panes must keep long lyric content inside the square pane by rendering it through a scrollable viewport rather than letting long documents spill past the visible area.
 - Playback artwork providers should also be able to report recent provider/cache attempts so the playback pane can surface lookup progress without embedding provider-chain logic directly in the screen.
+- Playback visualization providers should be callable on ordinary repaints rather than only once per pane/size, because live EQ surfaces change continuously even when the viewport dimensions stay fixed.
 - Musicon-specific adaptation from reusable cover-art resolvers into the UI artwork contract belongs in `internal/ui`, not in `pkg/coverart`.
 - Musicon-specific adaptation from reusable lyrics resolvers into the UI lyrics contract also belongs in `internal/ui`, not in `pkg/lyrics`.
 

@@ -2,7 +2,9 @@ package audio
 
 import (
 	"errors"
+	"math"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -348,4 +350,83 @@ func TestEngineSeekToSwapsPreparedReplacementStream(t *testing.T) {
 	if got := snapshot.Position; got != 25*time.Second {
 		t.Fatalf("expected replacement position 25s, got %s", got)
 	}
+}
+
+func TestVisualizationServiceRendersEQFromCapturedSamples(t *testing.T) {
+	engine := NewEngine(Options{})
+	defer engine.Close()
+
+	engine.visual.Reset(defaultSampleRate)
+	samples := make([][2]float64, analysisFFTSize)
+	for i := range samples {
+		value := math.Sin((2 * math.Pi * 440 * float64(i)) / float64(defaultSampleRate))
+		samples[i] = [2]float64{value, value}
+	}
+	engine.visual.Ingest(samples)
+
+	content, err := engine.VisualizationService().Placeholder(teaui.PaneEQ, 32, 12)
+	if err != nil {
+		t.Fatalf("render eq failed: %v", err)
+	}
+	if !containsBraille(content) {
+		t.Fatalf("expected eq output to contain braille cells, got %q", content)
+	}
+}
+
+func TestVisualizationServiceReturnsEmptyWhenIdle(t *testing.T) {
+	engine := NewEngine(Options{})
+	defer engine.Close()
+
+	content, err := engine.VisualizationService().Placeholder(teaui.PaneEQ, 32, 12)
+	if err != nil {
+		t.Fatalf("render eq failed: %v", err)
+	}
+	if content != "" {
+		t.Fatalf("expected no visualization content while idle, got %q", content)
+	}
+}
+
+func TestBrailleRuneMapsMaskIntoUnicodeBrailleBlock(t *testing.T) {
+	if got := brailleRune(0x11); got != '⠑' {
+		t.Fatalf("expected braille rune ⠑, got %q", got)
+	}
+}
+
+func TestGradientColorAtInterpolatesStops(t *testing.T) {
+	if got := gradientColorAt([]string{"#000000", "#ffffff"}, 0.5); got != "#808080" {
+		t.Fatalf("expected midpoint gray, got %q", got)
+	}
+}
+
+func TestRenderEQBarsUsesBrailleAndGradientColors(t *testing.T) {
+	content := renderEQBars([]float64{0.5}, 1, 1)
+	if !containsBraille(content) {
+		t.Fatalf("expected braille glyph, got %q", content)
+	}
+	if low, high := gradientColorAt(eqGradientStops, 0), gradientColorAt(eqGradientStops, 1); low == high {
+		t.Fatalf("expected gradient endpoints to differ, got low=%q high=%q", low, high)
+	}
+}
+
+func TestRenderMirrorBarsUsesBrailleAndGradientColors(t *testing.T) {
+	content := renderMirrorBars([]float64{0.5}, 1, 2)
+	if !containsBraille(content) {
+		t.Fatalf("expected mirrored braille glyph, got %q", content)
+	}
+	lines := strings.Split(content, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected two mirrored rows, got %d in %q", len(lines), content)
+	}
+	if center, edge := gradientColorAt(eqGradientStops, 0), gradientColorAt(eqGradientStops, 1); center == edge {
+		t.Fatalf("expected mirrored gradient endpoints to differ, got center=%q edge=%q", center, edge)
+	}
+}
+
+func containsBraille(content string) bool {
+	for _, r := range content {
+		if r >= 0x2801 && r <= 0x28FF {
+			return true
+		}
+	}
+	return false
 }

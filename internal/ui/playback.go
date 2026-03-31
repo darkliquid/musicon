@@ -406,7 +406,10 @@ func (p *playbackScreen) centerView(width, height int) string {
 		if strings.TrimSpace(p.visualContent) != "" {
 			return lipgloss.NewStyle().Width(width).Height(height).Render(p.visualContent)
 		}
-		return components.RenderEmptyState(width, height, p.pane.String()+" placeholder", "Attach a visualization provider to render live analysis inside this pane.")
+		if p.visualErr != nil {
+			return components.RenderEmptyState(width, height, p.pane.String()+" unavailable", p.visualErr.Error())
+		}
+		return neutralPlaybackPane(width, height)
 	default:
 		p.artwork.SetSize(width, height)
 		p.refreshArtwork(trackInfo)
@@ -428,12 +431,23 @@ func (p *playbackScreen) centerView(width, height int) string {
 		} else if p.artworkSource != nil && strings.TrimSpace(p.artworkSource.Description) != "" {
 			p.artStatus = p.artworkSource.Description
 		}
-		body := "Artwork will appear here when an artwork provider is connected. Until then this pane defines the layout and focus of playback mode."
 		if strings.TrimSpace(p.artStatus) != "" {
-			body = p.artStatus
+			return components.RenderEmptyState(width, height, "Album art", p.artStatus)
 		}
-		return components.RenderEmptyState(width, height, "Album art", body)
+		return neutralPlaybackPane(width, height)
 	}
+}
+
+func neutralPlaybackPane(width, height int) string {
+	return lipgloss.Place(
+		width,
+		height,
+		lipgloss.Center,
+		lipgloss.Center,
+		"",
+		lipgloss.WithWhitespaceChars("·"),
+		lipgloss.WithWhitespaceForeground(lipgloss.Color("238")),
+	)
 }
 
 func (p *playbackScreen) refreshArtwork(trackInfo *TrackInfo) {
@@ -810,17 +824,11 @@ func (s *lyricsLookupState) snapshot() (*lyrics.Document, error, bool) {
 
 func (p *playbackScreen) refreshVisualization(width, height int) {
 	if p.services.Visualization == nil {
-		p.visualKey = ""
 		p.visualContent = ""
 		p.visualErr = nil
 		return
 	}
-	key := fmt.Sprintf("%s:%dx%d", p.pane.String(), width, height)
-	if key == p.visualKey {
-		return
-	}
 	content, err := p.services.Visualization.Placeholder(p.pane, width, height)
-	p.visualKey = key
 	p.visualContent = content
 	p.visualErr = err
 }
@@ -882,9 +890,9 @@ func paneHint(pane PlaybackPane) string {
 	case PaneLyrics:
 		return "scroll with up/down/pgup/pgdn when lyrics overflow"
 	case PaneEQ:
-		return "analysis-ready empty state"
+		return "live spectrum bars driven by the audio runtime"
 	case PaneVisualizer:
-		return "visualizer-ready empty state"
+		return "mirrored live spectrum driven by the audio runtime"
 	default:
 		return "album-art-first playback layout"
 	}
