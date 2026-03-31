@@ -14,6 +14,7 @@ coverage.out
 cover.out
 *.coverprofile
 /coverage/
+*.log
 
 # Editor and OS files
 .DS_Store
