@@ -2,6 +2,12 @@
 
 Musicon is a terminal music player for local libraries, internet radio, and YouTube Music.
 
+
+
+https://github.com/user-attachments/assets/a77e6c1c-e165-435a-afcc-14bf803cef58
+
+
+
 It combines:
 
 - a Bubble Tea TUI with dedicated queue and playback modes
