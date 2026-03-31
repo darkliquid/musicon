@@ -10,7 +10,7 @@ func TestCachedProviderUsesCacheAfterFirstLookup(t *testing.T) {
 	cache := NewDiskCache(t.TempDir())
 	provider := &stubProvider{
 		name:   "provider",
-		result: Result{Image: Image{Data: []byte("img"), MIMEType: "image/png"}},
+		result: Result{Image: Image{Data: mustPNG(t, 4, 4), MIMEType: "image/png"}},
 	}
 
 	wrapped := NewCachedProvider(provider, cache)
@@ -46,7 +46,7 @@ func TestCachedProviderDoesNotCacheNotFound(t *testing.T) {
 func TestCachedProviderSurfacesCacheWriteFailures(t *testing.T) {
 	provider := &stubProvider{
 		name:   "provider",
-		result: Result{Image: Image{Data: []byte("img")}},
+		result: Result{Image: Image{Data: mustPNG(t, 4, 4), MIMEType: "image/png"}},
 	}
 	wrapped := NewCachedProvider(provider, failingCache{})
 	_, err := wrapped.Lookup(context.Background(), Metadata{Title: "Song"})
@@ -59,7 +59,7 @@ func TestCachedProviderReusesRemoteCacheAcrossLocalMetadataChanges(t *testing.T)
 	cache := NewDiskCache(t.TempDir())
 	provider := &stubProvider{
 		name:   "provider",
-		result: Result{Image: Image{Data: []byte("img"), MIMEType: "image/png"}},
+		result: Result{Image: Image{Data: mustPNG(t, 4, 4), MIMEType: "image/png"}},
 	}
 
 	wrapped := NewCachedProvider(provider, cache)
@@ -69,7 +69,7 @@ func TestCachedProviderReusesRemoteCacheAcrossLocalMetadataChanges(t *testing.T)
 		Artist: "Artist",
 		Local: &LocalMetadata{
 			AudioPath: "/music/song.mp3",
-			Embedded:  &Image{Data: []byte("embedded"), Description: "embedded"},
+			Embedded:  &Image{Data: mustPNG(t, 4, 4), MIMEType: "image/png", Description: "embedded"},
 		},
 	}
 	second := Metadata{

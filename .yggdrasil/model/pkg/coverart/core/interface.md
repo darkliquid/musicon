@@ -15,6 +15,8 @@ This node exposes:
 - IDs must support both album-level and track-level external identifiers so callers can resolve album artwork even when only per-track metadata is available.
 - Metadata must support safe merging so queue/runtime/display layers can preserve local paths, embedded-art hints, direct remote artwork URLs, and external IDs without each layer reimplementing merge logic.
 - The chain preserves provider priority and miss-vs-failure semantics.
+- Successful provider results must contain artwork bytes that the terminal image layer can actually decode; unsupported formats are treated as provider misses so later providers can still run.
+- SVG artwork is normalized in the core chain by rasterizing it to PNG before the result reaches UI consumers, so direct artwork URLs and remote-provider responses stay usable without teaching the renderer about SVG.
 - Cache wrappers may be composed around providers without changing caller contracts.
 - `MetadataURLProvider` must treat metadata-supplied artwork URLs as an optional fast path, returning `ErrNotFound` when no URL is present so callers can place it before slower fallback providers.
 - Cache identity for remote lookups should be derived from reusable track metadata rather than local-only file hints so later sessions can reuse remote artwork by normalized song/album/artist/ID information alone.
@@ -22,4 +24,5 @@ This node exposes:
 # Failure modes
 
 - Empty metadata resolves as not-found rather than panicking.
+- Provider results with unsupported or undecodable image formats resolve as not-found so the chain can continue to later providers.
 - Hard provider or cache failures surface explicitly.

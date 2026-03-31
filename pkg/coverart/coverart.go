@@ -1,11 +1,22 @@
 package coverart
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	"image/png"
+	_ "image/png"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
+
+	"github.com/srwiley/oksvg"
+	"github.com/srwiley/rasterx"
 )
 
 // ErrNotFound reports that a provider could not locate cover art for the supplied metadata.
@@ -289,13 +300,24 @@ func (c *Chain) ResolveObserved(ctx context.Context, metadata Metadata, report f
 
 func lookupProviderObserved(ctx context.Context, provider Provider, metadata Metadata, report func(AttemptEvent)) (Result, error) {
 	if observed, ok := provider.(AttemptReportingProvider); ok {
-		return observed.LookupObserved(ctx, metadata, report)
+		result, err := observed.LookupObserved(ctx, metadata, report)
+		if err != nil {
+			return Result{}, err
+		}
+		return normalizeResult(result)
 	}
 	reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptTrying, Message: "trying provider"})
 	result, err := provider.Lookup(ctx, metadata)
 	switch {
 	case err == nil:
-		reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptSuccess, Message: "artwork found"})
+		result, err = normalizeResult(result)
+		if err == nil {
+			reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptSuccess, Message: "artwork found"})
+		} else if errors.Is(err, ErrNotFound) {
+			reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptNotFound, Message: "artwork format is unsupported"})
+		} else {
+			reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptError, Message: err.Error()})
+		}
 	case errors.Is(err, ErrNotFound):
 		reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptNotFound, Message: "no artwork found"})
 	default:
@@ -318,6 +340,114 @@ func (p MetadataURLProvider) client() *http.Client {
 		return p.Client
 	}
 	return http.DefaultClient
+}
+
+func normalizeResult(result Result) (Result, error) {
+	image, err := normalizeImage(result.Image)
+	if err != nil {
+		return Result{}, err
+	}
+	result.Image = image
+	return result, nil
+}
+
+func normalizeImage(img Image) (Image, error) {
+	img.MIMEType = normalizeImageMIMEType(img.MIMEType)
+	img.Description = strings.TrimSpace(img.Description)
+	if len(img.Data) == 0 {
+		return Image{}, ErrNotFound
+	}
+
+	if looksLikeSVG(img.Data, img.MIMEType) {
+		pngData, err := rasterizeSVG(img.Data)
+		if err != nil {
+			return Image{}, fmt.Errorf("%w: svg artwork is not rasterizable", ErrNotFound)
+		}
+		img.Data = pngData
+		img.MIMEType = "image/png"
+		return img, nil
+	}
+
+	if _, _, err := image.DecodeConfig(bytes.NewReader(img.Data)); err != nil {
+		return Image{}, fmt.Errorf("%w: unsupported artwork format", ErrNotFound)
+	}
+	return img, nil
+}
+
+func normalizeImageMIMEType(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	mediaType, _, err := mime.ParseMediaType(value)
+	if err != nil {
+		if index := strings.IndexByte(value, ';'); index >= 0 {
+			value = value[:index]
+		}
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+	return strings.ToLower(strings.TrimSpace(mediaType))
+}
+
+func looksLikeSVG(data []byte, mimeType string) bool {
+	if normalizeImageMIMEType(mimeType) == "image/svg+xml" {
+		return true
+	}
+	snippet := strings.ToLower(string(data))
+	return strings.Contains(snippet, "<svg") && strings.Contains(snippet, "</svg>")
+}
+
+func rasterizeSVG(data []byte) ([]byte, error) {
+	icon, err := oksvg.ReadIconStream(bytes.NewReader(data), oksvg.WarnErrorMode)
+	if err != nil {
+		return nil, err
+	}
+
+	width, height, ok := rasterizeDimensions(icon.ViewBox.W, icon.ViewBox.H)
+	if !ok {
+		return nil, errors.New("svg has invalid dimensions")
+	}
+
+	img := image.NewRGBA(image.Rect(0, 0, width, height))
+	scanner := rasterx.NewScannerGV(width, height, img, img.Bounds())
+	raster := rasterx.NewDasher(width, height, scanner)
+	icon.SetTarget(0, 0, float64(width), float64(height))
+	icon.Draw(raster, 1.0)
+
+	var out bytes.Buffer
+	if err := png.Encode(&out, img); err != nil {
+		return nil, err
+	}
+	return out.Bytes(), nil
+}
+
+func rasterizeDimensions(viewWidth, viewHeight float64) (int, int, bool) {
+	const maxDimension = 512
+	if viewWidth <= 0 || viewHeight <= 0 {
+		return 0, 0, false
+	}
+
+	width := int(viewWidth + 0.5)
+	height := int(viewHeight + 0.5)
+	if width <= 0 || height <= 0 {
+		return 0, 0, false
+	}
+
+	largest := width
+	if height > largest {
+		largest = height
+	}
+	if largest > maxDimension {
+		width = (width * maxDimension) / largest
+		height = (height * maxDimension) / largest
+	}
+	if width <= 0 {
+		width = 1
+	}
+	if height <= 0 {
+		height = 1
+	}
+	return width, height, true
 }
 
 // IsNotFound reports whether the error is a provider miss rather than a hard failure.

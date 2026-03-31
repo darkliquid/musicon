@@ -1,8 +1,12 @@
 package coverart
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"image"
+	"image/color"
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,7 +60,7 @@ func TestMetadataNormalize(t *testing.T) {
 
 func TestChainResolveFallsThroughNotFound(t *testing.T) {
 	first := &stubProvider{name: "first", err: ErrNotFound}
-	second := &stubProvider{name: "second", result: Result{Image: Image{Data: []byte("img")}}}
+	second := &stubProvider{name: "second", result: Result{Image: Image{Data: mustPNG(t, 4, 4)}}}
 	chain := NewChain(first, second)
 
 	result, err := chain.Resolve(context.Background(), Metadata{Title: "Song"})
@@ -74,7 +78,7 @@ func TestChainResolveFallsThroughNotFound(t *testing.T) {
 func TestChainResolveStopsOnHardFailure(t *testing.T) {
 	want := errors.New("boom")
 	first := &stubProvider{name: "first", err: want}
-	second := &stubProvider{name: "second", result: Result{Image: Image{Data: []byte("img")}}}
+	second := &stubProvider{name: "second", result: Result{Image: Image{Data: mustPNG(t, 4, 4)}}}
 	chain := NewChain(first, second)
 
 	_, err := chain.Resolve(context.Background(), Metadata{Title: "Song"})
@@ -96,7 +100,7 @@ func TestChainResolveRequiresUsefulMetadata(t *testing.T) {
 
 func TestChainResolveObservedReportsAttempts(t *testing.T) {
 	first := &stubProvider{name: "first", err: ErrNotFound}
-	second := &stubProvider{name: "second", result: Result{Image: Image{Data: []byte("img")}}}
+	second := &stubProvider{name: "second", result: Result{Image: Image{Data: mustPNG(t, 4, 4)}}}
 	chain := NewChain(first, second)
 	var events []AttemptEvent
 
@@ -127,7 +131,7 @@ func TestChainResolveObservedReportsAttempts(t *testing.T) {
 }
 
 func TestMetadataMergeFillsArtworkGaps(t *testing.T) {
-	embedded := &Image{Data: []byte("img"), MIMEType: "image/jpeg"}
+	embedded := &Image{Data: mustPNG(t, 4, 4), MIMEType: "image/png"}
 	base := Metadata{
 		Artist:    "Artist",
 		RemoteURL: "https://img.example.test/base.jpg",
@@ -165,13 +169,14 @@ func TestMetadataMergeFillsArtworkGaps(t *testing.T) {
 }
 
 func TestMetadataURLProviderFetchesRemoteArtwork(t *testing.T) {
+	pngData := mustPNG(t, 6, 6)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/cover.jpg" {
 			http.NotFound(w, r)
 			return
 		}
-		w.Header().Set("Content-Type", "image/jpeg")
-		_, _ = w.Write([]byte("jpeg-data"))
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(pngData)
 	}))
 	defer server.Close()
 
@@ -180,7 +185,69 @@ func TestMetadataURLProviderFetchesRemoteArtwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Lookup returned error: %v", err)
 	}
-	if result.Provider != "metadata-url" || result.Image.MIMEType != "image/jpeg" || string(result.Image.Data) != "jpeg-data" {
+	if result.Provider != "metadata-url" || result.Image.MIMEType != "image/png" || !bytes.Equal(result.Image.Data, pngData) {
 		t.Fatalf("unexpected metadata-url result: %#v", result)
 	}
+}
+
+func TestChainResolveFallsThroughUnsupportedArtwork(t *testing.T) {
+	first := &stubProvider{name: "first", result: Result{Image: Image{
+		Data:     []byte("not-an-image"),
+		MIMEType: "application/octet-stream",
+	}}}
+	second := &stubProvider{name: "second", result: Result{Image: Image{Data: mustPNG(t, 8, 8)}}}
+	chain := NewChain(first, second)
+
+	result, err := chain.Resolve(context.Background(), Metadata{Title: "Song"})
+	if err != nil {
+		t.Fatalf("resolve failed: %v", err)
+	}
+	if result.Provider != "second" {
+		t.Fatalf("expected provider second, got %q", result.Provider)
+	}
+	if first.calls != 1 || second.calls != 1 {
+		t.Fatalf("expected both providers called once, got %d and %d", first.calls, second.calls)
+	}
+}
+
+func TestChainResolveRasterizesSVGArtwork(t *testing.T) {
+	first := &stubProvider{name: "first", result: Result{Image: Image{
+		Data:        []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 16"><rect width="32" height="16" fill="#ff0000"/></svg>`),
+		MIMEType:    "image/svg+xml; charset=utf-8",
+		Description: "svg art",
+	}}}
+	chain := NewChain(first)
+
+	result, err := chain.Resolve(context.Background(), Metadata{Title: "Song"})
+	if err != nil {
+		t.Fatalf("resolve failed: %v", err)
+	}
+	if result.Provider != "first" {
+		t.Fatalf("expected provider first, got %q", result.Provider)
+	}
+	if result.Image.MIMEType != "image/png" {
+		t.Fatalf("expected rasterized png mime type, got %q", result.Image.MIMEType)
+	}
+	decoded, _, err := image.Decode(bytes.NewReader(result.Image.Data))
+	if err != nil {
+		t.Fatalf("expected rasterized png to decode, got %v", err)
+	}
+	if decoded.Bounds().Dx() != 32 || decoded.Bounds().Dy() != 16 {
+		t.Fatalf("unexpected rasterized bounds: %v", decoded.Bounds())
+	}
+}
+
+func mustPNG(t *testing.T, width, height int) []byte {
+	t.Helper()
+	img := image.NewNRGBA(image.Rect(0, 0, width, height))
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			img.Set(x, y, color.NRGBA{R: 0x33, G: 0x66, B: 0x99, A: 0xff})
+		}
+	}
+	var out bytes.Buffer
+	if err := png.Encode(&out, img); err != nil {
+		t.Fatalf("encode png: %v", err)
+	}
+	return out.Bytes()
 }
