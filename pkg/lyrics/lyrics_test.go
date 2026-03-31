@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 )
 
 type stubProvider struct {
@@ -60,5 +61,45 @@ func TestDocumentDisplayLinesPrefersTimedLines(t *testing.T) {
 	lines := document.DisplayLines()
 	if len(lines) != 2 || lines[0] != "line one" {
 		t.Fatalf("unexpected display lines: %#v", lines)
+	}
+}
+
+func TestDocumentHasTimedLines(t *testing.T) {
+	if (Document{}).HasTimedLines() {
+		t.Fatal("expected empty document to report no timed lines")
+	}
+	if !(Document{TimedLines: []TimedLine{{Start: time.Second, Text: "line"}}}).HasTimedLines() {
+		t.Fatal("expected timed document to report timed lines")
+	}
+}
+
+func TestDocumentActiveTimedLineIndex(t *testing.T) {
+	document := Document{
+		TimedLines: []TimedLine{
+			{Start: time.Second, Text: "first"},
+			{Start: 3 * time.Second, Text: "second"},
+			{Start: 5 * time.Second, Text: "third"},
+		},
+	}
+
+	cases := []struct {
+		name     string
+		position time.Duration
+		want     int
+	}{
+		{name: "before first line", position: 500 * time.Millisecond, want: -1},
+		{name: "at first line", position: time.Second, want: 0},
+		{name: "between first and second", position: 2500 * time.Millisecond, want: 0},
+		{name: "at second line", position: 3 * time.Second, want: 1},
+		{name: "after last line", position: 10 * time.Second, want: 2},
+		{name: "negative position clamps to none", position: -time.Second, want: -1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := document.ActiveTimedLineIndex(tc.position); got != tc.want {
+				t.Fatalf("ActiveTimedLineIndex(%s) = %d, want %d", tc.position, got, tc.want)
+			}
+		})
 	}
 }

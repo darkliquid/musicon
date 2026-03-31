@@ -458,6 +458,73 @@ func TestPlaybackLyricsScrollResetsForNewTrack(t *testing.T) {
 	}
 }
 
+func TestPlaybackTimedLyricsAutoFollowActiveLine(t *testing.T) {
+	lines := make([]lyrics.TimedLine, 10)
+	for i := range lines {
+		lines[i] = lyrics.TimedLine{
+			Start: time.Duration(i) * time.Second,
+			Text:  fmt.Sprintf("line %02d", i+1),
+		}
+	}
+
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
+	screen.pane = PaneLyrics
+	screen.SetSize(40, 20)
+	screen.lyricsDoc = &lyrics.Document{TimedLines: lines}
+	screen.lyricsScroll = 0
+	screen.snapshot = PlaybackSnapshot{Position: 8 * time.Second}
+
+	start, end := screen.lyricsWindow(len(screen.lyricsDisplayLines()))
+	viewportHeight := screen.lyricsViewportHeight()
+	active := screen.activeTimedLyricsLine()
+	expectedStart := clamp(active-(viewportHeight/2), 0, max(0, len(lines)-viewportHeight))
+	expectedEnd := min(len(lines), expectedStart+viewportHeight)
+	if start != expectedStart || end != expectedEnd {
+		t.Fatalf("expected synced lyrics window %d-%d, got %d-%d", expectedStart, expectedEnd, start, end)
+	}
+}
+
+func TestPlaybackTimedLyricsRenderHighlightsActiveLine(t *testing.T) {
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
+	screen.pane = PaneLyrics
+	screen.SetSize(40, 12)
+	screen.lyricsDoc = &lyrics.Document{
+		TimedLines: []lyrics.TimedLine{
+			{Start: 0, Text: "line 01"},
+			{Start: time.Second, Text: "line 02"},
+			{Start: 2 * time.Second, Text: "line 03"},
+			{Start: 3 * time.Second, Text: "line 04"},
+			{Start: 4 * time.Second, Text: "line 05"},
+		},
+	}
+	screen.snapshot = PlaybackSnapshot{Position: 3 * time.Second}
+
+	view := screen.renderLyricsView(40, 12)
+	if !strings.Contains(view, "> line 04") {
+		t.Fatalf("expected active timed lyric marker in view, got %q", view)
+	}
+}
+
+func TestPlaybackTimedLyricsIgnoreManualScrollKeys(t *testing.T) {
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
+	screen.pane = PaneLyrics
+	screen.SetSize(40, 12)
+	screen.lyricsDoc = &lyrics.Document{
+		TimedLines: []lyrics.TimedLine{
+			{Start: 0, Text: "line 01"},
+			{Start: time.Second, Text: "line 02"},
+		},
+	}
+
+	status, handled := screen.handleLyricsScrollKey(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if !handled {
+		t.Fatal("expected timed lyrics to consume scroll keys")
+	}
+	if status != "Synced lyrics follow playback automatically." {
+		t.Fatalf("unexpected timed-lyrics scroll status: %q", status)
+	}
+}
+
 func TestPlaybackVisualizationRefreshesAcrossViews(t *testing.T) {
 	provider := &visualizationTestProvider{steps: []string{"bars 1", "bars 2"}}
 	screen := newPlaybackScreen(Services{Visualization: provider}, AlbumArtOptions{})

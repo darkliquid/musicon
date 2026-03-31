@@ -5,6 +5,7 @@ This node is expected to expose:
 - normalized lyrics request and document types
 - provider and chain contracts for reusable lyrics lookup
 - LRC parsing helpers and synced-line representations
+- timed-line activation helpers that let callers map a playback clock position to the current synced lyric line
 - disk-backed caching helpers for successful lyrics results
 - concrete primary providers for local `.lrc` discovery and `lrclib.net`
 
@@ -13,6 +14,7 @@ This node is expected to expose:
 - Requests must be source-agnostic and safe to derive from playback metadata.
 - Request normalization must trim noisy metadata and carry the local audio path when available so local sidecar lookup can reuse existing playback metadata instead of requiring a separate file-discovery seam.
 - The reusable model must preserve synced LRC timestamps even if callers choose to render only plain lines.
+- Timed lyrics documents should also expose a stable way to identify the active synced line for a playback position so karaoke-style UIs can follow the current lyric without re-implementing LRC timing rules.
 - Documents must expose a plain display projection (`DisplayLines`) so basic UIs can render one stable text view without discarding richer synced data.
 - Providers must treat strong title+artist matching as the minimum success bar; weak or ambiguous matches should return not-found instead of likely-wrong lyrics.
 - Local `.lrc` sidecars and `lrclib.net` are the primary providers for the first implementation pass.

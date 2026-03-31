@@ -17,6 +17,8 @@ Remote lookup intentionally prefers correctness over recall. `LRCLibProvider` fi
 
 Caching is provider-scoped and request-derived. `CachedProvider` hashes a JSON payload containing the provider name plus the normalized request, so identical song metadata can be reused across sessions without mixing results between providers or between different versions of the same title by different artists.
 
+Timed LRC documents now also centralize playback-position mapping in the reusable package instead of making each UI binary-search `TimedLines` independently. `Document.ActiveTimedLineIndex` returns the latest synced row whose start time is at or before the playback position, while still reporting "no active line yet" before the first timestamp. This keeps karaoke-style follow-along behavior consistent across any future TUI or alternate renderer that consumes the same lyrics package.
+
 ## Decisions
 
 - Chose a dedicated reusable lyrics package over embedding lookup logic in `internal/ui` because provider chaining, parsing, and cache behavior should be reusable independently of Bubble Tea rendering.

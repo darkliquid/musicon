@@ -699,6 +699,18 @@ func (p *playbackScreen) consumeLyricsLookup() {
 }
 
 func (p *playbackScreen) handleLyricsScrollKey(keypress tea.KeyPressMsg) (string, bool) {
+	if p.lyricsHasTimedSync() {
+		switch {
+		case bubblekey.Matches(keypress, lyricsScrollUpKey),
+			bubblekey.Matches(keypress, lyricsScrollDownKey),
+			bubblekey.Matches(keypress, lyricsPageUpKey),
+			bubblekey.Matches(keypress, lyricsPageDownKey),
+			bubblekey.Matches(keypress, lyricsHomeKey),
+			bubblekey.Matches(keypress, lyricsEndKey):
+			return "Synced lyrics follow playback automatically.", true
+		}
+	}
+
 	lines := p.lyricsDisplayLines()
 	if len(lines) == 0 {
 		return "", false
@@ -737,7 +749,7 @@ func (p *playbackScreen) handleLyricsScrollKey(keypress tea.KeyPressMsg) (string
 }
 
 func (p *playbackScreen) renderLyricsView(width, height int) string {
-	lines := p.lyricsViewportLines()
+	lines := p.renderedLyricsViewportLines()
 	if len(lines) == 0 {
 		return ""
 	}
@@ -767,6 +779,47 @@ func (p *playbackScreen) lyricsDisplayLines() []string {
 	return p.lyricsDoc.DisplayLines()
 }
 
+func (p *playbackScreen) lyricsHasTimedSync() bool {
+	return p.lyricsDoc != nil && p.lyricsDoc.HasTimedLines()
+}
+
+func (p *playbackScreen) activeTimedLyricsLine() int {
+	if !p.lyricsHasTimedSync() {
+		return -1
+	}
+	return p.lyricsDoc.ActiveTimedLineIndex(p.snapshot.Position)
+}
+
+func (p *playbackScreen) renderedLyricsViewportLines() []string {
+	lines := p.lyricsViewportLines()
+	if len(lines) == 0 || !p.lyricsHasTimedSync() {
+		return lines
+	}
+
+	active := p.activeTimedLyricsLine()
+	start, _ := p.lyricsWindow(len(p.lyricsDisplayLines()))
+	rendered := make([]string, 0, len(lines))
+	pastStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	futureStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	activeStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("230")).
+		Background(lipgloss.Color("57"))
+
+	for offset, line := range lines {
+		index := start + offset
+		switch {
+		case active >= 0 && index == active:
+			rendered = append(rendered, activeStyle.Render("> "+line))
+		case active >= 0 && index < active:
+			rendered = append(rendered, pastStyle.Render("  "+line))
+		default:
+			rendered = append(rendered, futureStyle.Render("  "+line))
+		}
+	}
+	return rendered
+}
+
 func (p *playbackScreen) lyricsViewportLines() []string {
 	lines := p.lyricsDisplayLines()
 	if len(lines) == 0 {
@@ -783,6 +836,14 @@ func (p *playbackScreen) lyricsViewportLines() []string {
 func (p *playbackScreen) lyricsWindow(total int) (int, int) {
 	if total <= 0 {
 		return 0, 0
+	}
+	if p.lyricsHasTimedSync() {
+		start := 0
+		if active := p.activeTimedLyricsLine(); active >= 0 {
+			start = clamp(active-(p.lyricsViewportHeight()/2), 0, max(0, total-p.lyricsViewportHeight()))
+		}
+		end := min(total, start+p.lyricsViewportHeight())
+		return start, end
 	}
 	start := clamp(p.lyricsScroll, 0, p.maxLyricsScroll())
 	p.lyricsScroll = start
@@ -888,7 +949,7 @@ func (p *playbackScreen) runPlaybackAction(run func(PlaybackService) error, stat
 func paneHint(pane PlaybackPane) string {
 	switch pane {
 	case PaneLyrics:
-		return "scroll with up/down/pgup/pgdn when lyrics overflow"
+		return "auto-follow synced LRC; scroll plain lyrics with up/down/pgup/pgdn"
 	case PaneEQ:
 		return "live spectrum bars driven by the audio runtime"
 	case PaneVisualizer:

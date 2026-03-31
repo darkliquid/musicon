@@ -43,8 +43,9 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Playback artwork requests should pass normalized cover-art metadata into the provider path instead of relying on a narrow track-ID-only contract.
 - Playback lyrics requests should pass normalized reusable lyrics metadata into the provider path instead of relying on a narrow track-ID-only contract.
 - Playback lyrics lookups must remain on-demand and non-blocking: entering or repainting the Lyrics pane may trigger a background lookup, but the Bubble Tea update loop must stay responsive while the resolver works.
-- Playback lyrics panes should render plain lines from reusable lyrics documents for the first pass while preserving synced timing data inside the reusable package contract for later UI upgrades.
+- Playback lyrics panes should render plain lines from reusable lyrics documents by default, and when synced LRC timing is available they should auto-follow the active lyric line derived from the current playback position so karaoke-style sing-along stays aligned without blocking the UI.
 - Playback lyrics panes must keep long lyric content inside the square pane by rendering it through a scrollable viewport rather than letting long documents spill past the visible area.
+- Manual lyrics scrolling remains relevant for plain or unsynced documents; timed LRC documents should prefer playback-following over manual scroll offsets.
 - Playback artwork providers should also be able to report recent provider/cache attempts so the playback pane can surface lookup progress without embedding provider-chain logic directly in the screen.
 - Playback visualization providers should be callable on ordinary repaints rather than only once per pane/size, because live EQ surfaces change continuously even when the viewport dimensions stay fixed.
 - Musicon-specific adaptation from reusable cover-art resolvers into the UI artwork contract belongs in `internal/ui`, not in `pkg/coverart`.

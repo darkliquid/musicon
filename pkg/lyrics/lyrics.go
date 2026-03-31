@@ -3,6 +3,7 @@ package lyrics
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"time"
 )
@@ -75,6 +76,28 @@ func (d Document) DisplayLines() []string {
 	default:
 		return nil
 	}
+}
+
+// HasTimedLines reports whether the document carries synced LRC timing data.
+func (d Document) HasTimedLines() bool {
+	return len(d.TimedLines) > 0
+}
+
+// ActiveTimedLineIndex returns the timed-line index active at the supplied playback position.
+func (d Document) ActiveTimedLineIndex(position time.Duration) int {
+	if len(d.TimedLines) == 0 {
+		return -1
+	}
+	if position < 0 {
+		position = 0
+	}
+	next := sort.Search(len(d.TimedLines), func(i int) bool {
+		return d.TimedLines[i].Start > position
+	})
+	if next == 0 {
+		return -1
+	}
+	return next - 1
 }
 
 // Empty reports whether the document contains no displayable lyrics.
