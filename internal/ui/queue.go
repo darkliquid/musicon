@@ -361,6 +361,27 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func queueSourceLabel(raw string) string {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	switch normalized {
+	case "", "queue":
+		return ""
+	case "local", "local files":
+		return "local"
+	case "youtube", "youtube music", "youtube-music":
+		return "youtube"
+	default:
+		return strings.ReplaceAll(normalized, " ", "-")
+	}
+}
+
+func queueRowTitle(source, title string) string {
+	if label := queueSourceLabel(source); label != "" {
+		return label + ": " + title
+	}
+	return title
+}
+
 func (q *queueScreen) activateSelectedRow() string {
 	index := q.browser.SelectedIndex()
 	if index < 0 || index >= len(q.browserData) {
@@ -549,8 +570,8 @@ func (q *queueScreen) rebuildBrowser() {
 		}
 		items = append(items, components.ListItem{
 			Leading:  leading,
-			Title:    entry.Title,
-			Subtitle: firstNonEmpty(entry.Subtitle, entry.Source),
+			Title:    queueRowTitle(entry.Source, entry.Title),
+			Subtitle: entry.Subtitle,
 			Meta:     meta,
 		})
 	}
@@ -562,8 +583,8 @@ func (q *queueScreen) rebuildBrowser() {
 			meta += " · " + formatDuration(result.Duration)
 		}
 		items = append(items, components.ListItem{
-			Title:    result.Title,
-			Subtitle: firstNonEmpty(result.Subtitle, result.Source),
+			Title:    queueRowTitle(result.Source, result.Title),
+			Subtitle: result.Subtitle,
 			Meta:     meta,
 		})
 	}

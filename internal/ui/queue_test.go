@@ -82,6 +82,30 @@ func TestQueueBrowserShowsQueuedItemsBeforeSearchResults(t *testing.T) {
 	}
 }
 
+func TestQueueBrowserPrefixesQueuedRowTitlesWithNormalizedSource(t *testing.T) {
+	screen := newQueueScreen(Services{})
+	screen.queueData = []QueueEntry{{ID: "queued-1", Title: "Queued track", Source: "youtube music"}}
+	screen.SetSize(60, 8)
+	screen.rebuildBrowser()
+
+	view := screen.browser.View()
+	if !strings.Contains(view, "youtube: Queued track") {
+		t.Fatalf("expected normalized source prefix in queued row, got %q", view)
+	}
+}
+
+func TestQueueBrowserPrefixesSearchResultTitlesWithNormalizedSource(t *testing.T) {
+	screen := newQueueScreen(Services{})
+	screen.resultData = []SearchResult{{ID: "result-1", Title: "Search result", Source: "Local files", Kind: MediaTrack}}
+	screen.SetSize(60, 8)
+	screen.rebuildBrowser()
+
+	view := screen.browser.View()
+	if !strings.Contains(view, "local: Search result") {
+		t.Fatalf("expected normalized source prefix in search result row, got %q", view)
+	}
+}
+
 func TestQueueBrowserAddsSearchResultToQueue(t *testing.T) {
 	screen := newQueueScreen(Services{})
 	screen.resultData = []SearchResult{{ID: "result-1", Title: "Search result", Source: "Local files", Kind: MediaTrack}}
