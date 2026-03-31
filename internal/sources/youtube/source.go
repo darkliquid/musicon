@@ -114,6 +114,13 @@ func (s *Source) Sources() []teaui.SourceDescriptor {
 		ID:          sourceID,
 		Name:        sourceName,
 		Description: "Search YouTube Music directly and play streams through yt-dlp plus pure-Go Opus decode.",
+		SearchModes: []teaui.SearchModeDescriptor{
+			{ID: teaui.SearchModeSongs, Name: teaui.SearchModeSongs.String()},
+			{ID: teaui.SearchModeArtists, Name: teaui.SearchModeArtists.String()},
+			{ID: teaui.SearchModeAlbums, Name: teaui.SearchModeAlbums.String()},
+			{ID: teaui.SearchModePlaylists, Name: teaui.SearchModePlaylists.String()},
+		},
+		DefaultMode: teaui.SearchModeSongs,
 	}}
 }
 
@@ -141,9 +148,23 @@ func (s *Source) Search(ctx context.Context, request teaui.SearchRequest) ([]tea
 		if !isYouTubeURL(query) {
 			return nil, nil
 		}
-		return s.inspectURL(ctx, query, request.Filters)
+		return s.inspectURL(ctx, query, request)
 	}
-	return s.searchQuery(ctx, query, request.Filters)
+	return s.searchQuery(ctx, query, request)
+}
+
+// ExpandCollection resolves a searched album or playlist row into its child songs.
+func (s *Source) ExpandCollection(ctx context.Context, result teaui.SearchResult) ([]teaui.SearchResult, error) {
+	if s == nil || !s.enabled {
+		return nil, nil
+	}
+	if result.Source != "" && !strings.EqualFold(result.Source, sourceName) && !strings.EqualFold(result.Source, "youtube") {
+		return nil, nil
+	}
+	if result.Kind != teaui.MediaAlbum && result.Kind != teaui.MediaPlaylist {
+		return nil, nil
+	}
+	return s.expandCollection(ctx, result)
 }
 
 // Resolve turns a queued YouTube entry into a playable track.

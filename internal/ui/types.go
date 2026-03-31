@@ -59,6 +59,8 @@ type MediaKind string
 const (
 	MediaTrack    MediaKind = "track"
 	MediaStream   MediaKind = "stream"
+	MediaArtist   MediaKind = "artist"
+	MediaAlbum    MediaKind = "album"
 	MediaPlaylist MediaKind = "playlist"
 )
 
@@ -67,11 +69,62 @@ func (k MediaKind) String() string {
 	switch k {
 	case MediaStream:
 		return "Stream"
+	case MediaArtist:
+		return "Artist"
+	case MediaAlbum:
+		return "Album"
 	case MediaPlaylist:
 		return "Playlist"
 	default:
 		return "Track"
 	}
+}
+
+// SearchMode identifies a source-specific search focus such as songs or albums.
+type SearchMode string
+
+// SearchMode values enumerate the focused search modes supported by richer sources.
+const (
+	SearchModeDefault   SearchMode = ""
+	SearchModeAll       SearchMode = "all"
+	SearchModeTracks    SearchMode = "tracks"
+	SearchModeStreams   SearchMode = "streams"
+	SearchModeSongs     SearchMode = "songs"
+	SearchModeArtists   SearchMode = "artists"
+	SearchModeAlbums    SearchMode = "albums"
+	SearchModePlaylists SearchMode = "playlists"
+)
+
+// String returns a user-facing label for the search mode.
+func (m SearchMode) String() string {
+	switch m {
+	case SearchModeAll:
+		return "All"
+	case SearchModeTracks:
+		return "Tracks"
+	case SearchModeStreams:
+		return "Streams"
+	case SearchModeArtists:
+		return "Artists"
+	case SearchModeAlbums:
+		return "Albums"
+	case SearchModePlaylists:
+		return "Playlists"
+	default:
+		return "Songs"
+	}
+}
+
+// SearchModeDescriptor describes one source-specific search mode shown by the UI.
+type SearchModeDescriptor struct {
+	ID   SearchMode
+	Name string
+}
+
+// SearchArtistFilter captures the active YouTube-artist narrowing chosen from artist-mode results.
+type SearchArtistFilter struct {
+	ID   string
+	Name string
 }
 
 // SearchFilters declares which media kinds should be included in queue searches.
@@ -121,36 +174,50 @@ type SourceDescriptor struct {
 	ID          string
 	Name        string
 	Description string
+	SearchModes []SearchModeDescriptor
+	DefaultMode SearchMode
 }
 
 // SearchRequest captures one source-scoped search query from the UI.
 type SearchRequest struct {
-	SourceID string
-	Query    string
-	Filters  SearchFilters
+	SourceID     string
+	Query        string
+	Filters      SearchFilters
+	Mode         SearchMode
+	ArtistFilter SearchArtistFilter
 }
 
 // SearchResult describes one queueable item returned by a source search.
 type SearchResult struct {
-	ID        string
-	Title     string
-	Subtitle  string
-	Source    string
-	Kind      MediaKind
-	Duration  time.Duration
-	QueueHint string
-	Artwork   coverart.Metadata
+	ID              string
+	Title           string
+	Subtitle        string
+	Source          string
+	Kind            MediaKind
+	Duration        time.Duration
+	QueueHint       string
+	Artwork         coverart.Metadata
+	BrowseID        string
+	PlaylistID      string
+	ArtistFilter    SearchArtistFilter
+	CollectionCount int
+	CollectionItems []QueueEntry
 }
 
 // QueueEntry stores the metadata the playback queue needs for one item.
 type QueueEntry struct {
-	ID       string
-	Title    string
-	Subtitle string
-	Source   string
-	Kind     MediaKind
-	Duration time.Duration
-	Artwork  coverart.Metadata
+	ID         string
+	Title      string
+	Subtitle   string
+	Source     string
+	Kind       MediaKind
+	Duration   time.Duration
+	Artwork    coverart.Metadata
+	GroupID    string
+	GroupTitle string
+	GroupKind  MediaKind
+	GroupIndex int
+	GroupSize  int
 }
 
 // TrackInfo describes the currently resolved track for playback and artwork display.
@@ -190,6 +257,7 @@ type PlaybackSnapshot struct {
 type SearchService interface {
 	Sources() []SourceDescriptor
 	Search(context.Context, SearchRequest) ([]SearchResult, error)
+	ExpandCollection(context.Context, SearchResult) ([]SearchResult, error)
 }
 
 // QueueService provides queue snapshots and queue mutations to the UI.
@@ -198,6 +266,7 @@ type QueueService interface {
 	Add(SearchResult) error
 	Move(id string, delta int) error
 	Remove(id string) error
+	RemoveGroup(groupID string) error
 	Clear() error
 }
 

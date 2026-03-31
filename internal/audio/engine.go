@@ -3,6 +3,7 @@ package audio
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -129,6 +130,10 @@ func (e *Engine) AddToQueue(result teaui.SearchResult) error {
 		return errors.New("audio runtime is closed")
 	}
 
+	if isGroupedCollectionResult(result) {
+		return e.addCollectionLocked(result)
+	}
+
 	entry := teaui.QueueEntry{
 		ID:       result.ID,
 		Title:    result.Title,
@@ -147,6 +152,23 @@ func (e *Engine) AddToQueue(result teaui.SearchResult) error {
 
 	e.queue = append(e.queue, entry)
 	if e.currentIndex < 0 {
+		e.currentIndex = 0
+	}
+	return nil
+}
+
+func (e *Engine) addCollectionLocked(result teaui.SearchResult) error {
+	groupID := result.ID
+	if groupID == "" {
+		groupID = fmt.Sprintf("queue-group-%d", len(e.queue)+1)
+	}
+
+	children, err := groupedCollectionEntries(result)
+	if err != nil {
+		return err
+	}
+	e.queue = append(e.queue, children...)
+	if e.currentIndex < 0 && len(e.queue) > 0 {
 		e.currentIndex = 0
 	}
 	return nil
@@ -189,6 +211,65 @@ func (e *Engine) RemoveFromQueue(id string) error {
 	}
 	if removingCurrent {
 		return e.startCurrentLocked(false)
+	}
+	return nil
+}
+
+// RemoveGroupFromQueue removes every queued child that belongs to the supplied collection group.
+func (e *Engine) RemoveGroupFromQueue(groupID string) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return errors.New("audio runtime is closed")
+	}
+	if strings.TrimSpace(groupID) == "" {
+		return errors.New("queue group id is required")
+	}
+
+	indices := make([]int, 0, len(e.queue))
+	for i, entry := range e.queue {
+		if entry.GroupID == groupID {
+			indices = append(indices, i)
+		}
+	}
+	if len(indices) == 0 {
+		return fmt.Errorf("queue group %q not found", groupID)
+	}
+
+	removingCurrent := false
+	for _, index := range indices {
+		if e.current != nil && index == e.currentIndex {
+			removingCurrent = true
+			break
+		}
+	}
+	if removingCurrent {
+		e.stopCurrentLocked(false)
+	}
+
+	filtered := e.queue[:0]
+	for _, entry := range e.queue {
+		if entry.GroupID != groupID {
+			filtered = append(filtered, entry)
+		}
+	}
+	e.queue = append([]teaui.QueueEntry(nil), filtered...)
+	e.normalizeQueueGroupsLocked()
+
+	if len(e.queue) == 0 {
+		e.currentIndex = -1
+		return nil
+	}
+
+	if removingCurrent {
+		if e.currentIndex >= len(e.queue) {
+			e.currentIndex = len(e.queue) - 1
+		}
+		return e.startCurrentLocked(false)
+	}
+
+	if e.currentIndex >= len(e.queue) {
+		e.currentIndex = len(e.queue) - 1
 	}
 	return nil
 }
@@ -659,8 +740,66 @@ func (s queueService) Move(id string, delta int) error { return s.engine.MoveQue
 // Remove deletes a queued entry through the UI adapter.
 func (s queueService) Remove(id string) error { return s.engine.RemoveFromQueue(id) }
 
+// RemoveGroup deletes a grouped collection through the UI adapter.
+func (s queueService) RemoveGroup(groupID string) error { return s.engine.RemoveGroupFromQueue(groupID) }
+
 // Clear removes all queued entries through the UI adapter.
 func (s queueService) Clear() error { return s.engine.ClearQueue() }
+
+func isGroupedCollectionResult(result teaui.SearchResult) bool {
+	return (result.Kind == teaui.MediaAlbum || result.Kind == teaui.MediaPlaylist) && len(result.CollectionItems) > 0
+}
+
+func groupedCollectionEntries(result teaui.SearchResult) ([]teaui.QueueEntry, error) {
+	entries := make([]teaui.QueueEntry, 0, len(result.CollectionItems))
+	for _, child := range result.CollectionItems {
+		entry := child
+		entry.GroupID = result.ID
+		entry.GroupTitle = result.Title
+		entry.GroupKind = result.Kind
+		if entry.Source == "" {
+			entry.Source = result.Source
+		}
+		entries = append(entries, entry)
+	}
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("collection %q has no queueable children", result.Title)
+	}
+	for index := range entries {
+		entries[index].GroupIndex = index
+		entries[index].GroupSize = len(entries)
+	}
+	return entries, nil
+}
+
+func (e *Engine) normalizeQueueGroupsLocked() {
+	groupCounts := make(map[string]int)
+	for _, entry := range e.queue {
+		if entry.GroupID != "" {
+			groupCounts[entry.GroupID]++
+		}
+	}
+
+	groupOffsets := make(map[string]int)
+	for index := range e.queue {
+		entry := &e.queue[index]
+		if entry.GroupID == "" {
+			continue
+		}
+		size := groupCounts[entry.GroupID]
+		if size <= 1 {
+			entry.GroupID = ""
+			entry.GroupTitle = ""
+			entry.GroupKind = ""
+			entry.GroupIndex = 0
+			entry.GroupSize = 0
+			continue
+		}
+		entry.GroupIndex = groupOffsets[entry.GroupID]
+		entry.GroupSize = size
+		groupOffsets[entry.GroupID]++
+	}
+}
 
 // Snapshot returns the current playback state exposed through the UI adapter.
 func (s playbackService) Snapshot() teaui.PlaybackSnapshot { return s.engine.PlaybackSnapshot() }

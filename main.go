@@ -122,9 +122,12 @@ func main() {
 				ToggleSearchFocus: loaded.Config.Keybinds.Queue.ToggleSearchFocus,
 				SourcePrev:        loaded.Config.Keybinds.Queue.SourcePrev,
 				SourceNext:        loaded.Config.Keybinds.Queue.SourceNext,
-				FilterTracks:      loaded.Config.Keybinds.Queue.FilterTracks,
-				FilterStreams:     loaded.Config.Keybinds.Queue.FilterStreams,
-				FilterPlaylists:   loaded.Config.Keybinds.Queue.FilterPlaylists,
+				CycleSearchMode:   loaded.Config.Keybinds.Queue.CycleSearchMode,
+				ModeSongs:         loaded.Config.Keybinds.Queue.ModeSongs,
+				ModeArtists:       loaded.Config.Keybinds.Queue.ModeArtists,
+				ModeAlbums:        loaded.Config.Keybinds.Queue.ModeAlbums,
+				ModePlaylists:     loaded.Config.Keybinds.Queue.ModePlaylists,
+				ExpandSelected:    loaded.Config.Keybinds.Queue.ExpandSelected,
 				ActivateSelected:  loaded.Config.Keybinds.Queue.ActivateSelected,
 				MoveSelectedUp:    loaded.Config.Keybinds.Queue.MoveSelectedUp,
 				MoveSelectedDown:  loaded.Config.Keybinds.Queue.MoveSelectedDown,
@@ -268,6 +271,13 @@ func (c combinedSearch) Sources() []ui.SourceDescriptor {
 			ID:          "all",
 			Name:        "All sources",
 			Description: "Search across every configured music source.",
+			SearchModes: []ui.SearchModeDescriptor{
+				{ID: ui.SearchModeAll, Name: ui.SearchModeAll.String()},
+				{ID: ui.SearchModeTracks, Name: ui.SearchModeTracks.String()},
+				{ID: ui.SearchModeStreams, Name: ui.SearchModeStreams.String()},
+				{ID: ui.SearchModePlaylists, Name: ui.SearchModePlaylists.String()},
+			},
+			DefaultMode: ui.SearchModeAll,
 		}}, descriptors...)
 	}
 	return descriptors
@@ -297,6 +307,23 @@ func (c combinedSearch) Search(ctx context.Context, request ui.SearchRequest) ([
 		}
 	}
 	return results, nil
+}
+
+// ExpandCollection asks the source that owns the collection row for its child tracks.
+func (c combinedSearch) ExpandCollection(ctx context.Context, result ui.SearchResult) ([]ui.SearchResult, error) {
+	for _, provider := range c.providers {
+		if provider == nil {
+			continue
+		}
+		matches, err := provider.ExpandCollection(ctx, result)
+		if err != nil {
+			return nil, err
+		}
+		if len(matches) > 0 {
+			return matches, nil
+		}
+	}
+	return nil, nil
 }
 
 type combinedResolver struct {

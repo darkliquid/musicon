@@ -15,6 +15,17 @@ type stubQueueService struct {
 
 func (s *stubQueueService) Snapshot() []QueueEntry { return append([]QueueEntry(nil), s.entries...) }
 func (s *stubQueueService) Add(result SearchResult) error {
+	if isCollectionResult(result) && len(result.CollectionItems) > 0 {
+		for index, entry := range result.CollectionItems {
+			entry.GroupID = result.ID
+			entry.GroupTitle = result.Title
+			entry.GroupKind = result.Kind
+			entry.GroupIndex = index
+			entry.GroupSize = len(result.CollectionItems)
+			s.entries = append(s.entries, entry)
+		}
+		return nil
+	}
 	s.entries = append(s.entries, QueueEntry{ID: result.ID, Title: result.Title, Subtitle: result.Subtitle, Source: result.Source, Kind: result.Kind, Duration: result.Duration, Artwork: result.Artwork})
 	return nil
 }
@@ -46,7 +57,8 @@ func (s *stubQueueService) Move(id string, delta int) error {
 	s.entries = append(head, s.entries[target:]...)
 	return nil
 }
-func (s *stubQueueService) Remove(id string) error { return nil }
+func (s *stubQueueService) Remove(id string) error           { return nil }
+func (s *stubQueueService) RemoveGroup(groupID string) error { return nil }
 func (s *stubQueueService) Clear() error {
 	s.entries = nil
 	return nil
@@ -111,7 +123,7 @@ func TestQueueBrowserAddsSearchResultToQueue(t *testing.T) {
 	screen.resultData = []SearchResult{{ID: "result-1", Title: "Search result", Source: "Local files", Kind: MediaTrack}}
 	screen.rebuildBrowser()
 
-	got := screen.activateSelectedRow()
+	got, _ := screen.activateSelectedRow()
 	if !strings.Contains(got, `Added "Search result"`) {
 		t.Fatalf("expected add status, got %q", got)
 	}
@@ -129,7 +141,7 @@ func TestQueueBrowserRemovesQueuedItemFromMergedList(t *testing.T) {
 	screen.resultData = []SearchResult{{ID: "result-1", Title: "Search result", Source: "Local files", Kind: MediaTrack}}
 	screen.rebuildBrowser()
 
-	got := screen.activateSelectedRow()
+	got, _ := screen.activateSelectedRow()
 	if !strings.Contains(got, `Removed "Queued track"`) {
 		t.Fatalf("expected remove status, got %q", got)
 	}
@@ -271,6 +283,9 @@ func (s *blockingSearchService) Search(ctx context.Context, request SearchReques
 	}
 	return []SearchResult{{ID: "result-1", Title: "Async result", Source: "YouTube Music", Kind: MediaTrack}}, nil
 }
+func (s *blockingSearchService) ExpandCollection(context.Context, SearchResult) ([]SearchResult, error) {
+	return nil, nil
+}
 
 type multiSourceSearchService struct {
 	sources []SourceDescriptor
@@ -281,6 +296,30 @@ func (s multiSourceSearchService) Sources() []SourceDescriptor {
 }
 func (s multiSourceSearchService) Search(context.Context, SearchRequest) ([]SearchResult, error) {
 	return nil, nil
+}
+func (s multiSourceSearchService) ExpandCollection(context.Context, SearchResult) ([]SearchResult, error) {
+	return nil, nil
+}
+
+type expandingSearchService struct {
+	sources   []SourceDescriptor
+	expanded  []SearchResult
+	expandFor string
+}
+
+func (s expandingSearchService) Sources() []SourceDescriptor {
+	return append([]SourceDescriptor(nil), s.sources...)
+}
+
+func (s expandingSearchService) Search(context.Context, SearchRequest) ([]SearchResult, error) {
+	return nil, nil
+}
+
+func (s expandingSearchService) ExpandCollection(_ context.Context, result SearchResult) ([]SearchResult, error) {
+	if result.ID != s.expandFor {
+		return nil, nil
+	}
+	return append([]SearchResult(nil), s.expanded...), nil
 }
 
 func TestQueueBrowserTypingStartsAsyncSearch(t *testing.T) {
@@ -433,20 +472,34 @@ func TestQueueBrowserSourceHotkeysDoNotEditSearchInput(t *testing.T) {
 	}
 }
 
-func TestQueueBrowserFilterHotkeysDoNotEditSearchInput(t *testing.T) {
-	screen := newQueueScreen(Services{})
+func TestQueueBrowserSearchKindHotkeysDoNotEditSearchInput(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{{
+				ID:   "all",
+				Name: "All sources",
+				SearchModes: []SearchModeDescriptor{
+					{ID: SearchModeAll, Name: "All"},
+					{ID: SearchModeTracks, Name: "Tracks"},
+					{ID: SearchModeStreams, Name: "Streams"},
+					{ID: SearchModePlaylists, Name: "Playlists"},
+				},
+				DefaultMode: SearchModeAll,
+			}},
+		},
+	})
 	screen.searchInput.SetValue("mix")
 	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
 
-	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Text: "1"}))
-	if status != "Filters: streams, playlists" {
-		t.Fatalf("expected filter toggle status, got %q", status)
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Code: '1', Text: "1"}))
+	if status != "Search mode: All" {
+		t.Fatalf("expected search mode status, got %q", status)
 	}
 	if screen.searchInput.Value() != "mix" {
-		t.Fatalf("expected filter hotkey to leave query unchanged, got %q", screen.searchInput.Value())
+		t.Fatalf("expected search kind hotkey to leave query unchanged, got %q", screen.searchInput.Value())
 	}
-	if screen.filters.Tracks {
-		t.Fatal("expected track filter to toggle off")
+	if screen.activeSearchMode() != SearchModeAll {
+		t.Fatalf("expected first visible search kind to be selected, got %q", screen.activeSearchMode())
 	}
 }
 
@@ -501,5 +554,183 @@ func TestQueueSourceHotkeysRequireUnfocusedSearch(t *testing.T) {
 	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Text: "]"}))
 	if status != "Active source: YouTube Music" {
 		t.Fatalf("expected source switch once search is unfocused, got %q", status)
+	}
+}
+
+func TestQueueModeCycleSwitchesFocusedSearchModes(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{{
+				ID:   "youtube-music",
+				Name: "YouTube Music",
+				SearchModes: []SearchModeDescriptor{
+					{ID: SearchModeSongs, Name: "Songs"},
+					{ID: SearchModeArtists, Name: "Artists"},
+					{ID: SearchModeAlbums, Name: "Albums"},
+				},
+				DefaultMode: SearchModeSongs,
+			}},
+		},
+	})
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Text: "m"}))
+	if status != "Search mode: Artists" {
+		t.Fatalf("expected mode cycle status, got %q", status)
+	}
+	if screen.activeSearchMode() != SearchModeArtists {
+		t.Fatalf("expected artists mode, got %q", screen.activeSearchMode())
+	}
+}
+
+func TestQueueModeHotkeysSelectSpecificMode(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{{
+				ID:   "youtube-music",
+				Name: "YouTube Music",
+				SearchModes: []SearchModeDescriptor{
+					{ID: SearchModeSongs, Name: "Songs"},
+					{ID: SearchModeArtists, Name: "Artists"},
+					{ID: SearchModeAlbums, Name: "Albums"},
+					{ID: SearchModePlaylists, Name: "Playlists"},
+				},
+				DefaultMode: SearchModeSongs,
+			}},
+		},
+	})
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Text: "4"}))
+	if status != "Search mode: Playlists" {
+		t.Fatalf("expected direct playlist mode status, got %q", status)
+	}
+	if screen.activeSearchMode() != SearchModePlaylists {
+		t.Fatalf("expected playlists mode, got %q", screen.activeSearchMode())
+	}
+}
+
+func TestQueueArtistSelectionAppliesSongsFilter(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{{
+				ID:   "youtube-music",
+				Name: "YouTube Music",
+				SearchModes: []SearchModeDescriptor{
+					{ID: SearchModeSongs, Name: "Songs"},
+					{ID: SearchModeArtists, Name: "Artists"},
+				},
+				DefaultMode: SearchModeArtists,
+			}},
+		},
+	})
+	screen.searchMode = SearchModeArtists
+	screen.searchInput.SetValue("beatles")
+	screen.resultData = []SearchResult{{
+		ID:           "youtube:artist:beatles",
+		Title:        "The Beatles",
+		Source:       "YouTube Music",
+		Kind:         MediaArtist,
+		ArtistFilter: SearchArtistFilter{ID: "beatles", Name: "The Beatles"},
+	}}
+	screen.rebuildBrowser()
+
+	status, cmd := screen.activateSelectedRow()
+	if status != "Artist filter: The Beatles" {
+		t.Fatalf("expected artist filter status, got %q", status)
+	}
+	if cmd == nil {
+		t.Fatal("expected follow-up search command after artist selection")
+	}
+	if screen.activeSearchMode() != SearchModeSongs {
+		t.Fatalf("expected songs mode after artist selection, got %q", screen.activeSearchMode())
+	}
+	if screen.artistFilter.Name != "The Beatles" {
+		t.Fatalf("expected artist filter to be stored, got %#v", screen.artistFilter)
+	}
+}
+
+func TestQueueExpandCollectionShowsChildSongs(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: expandingSearchService{
+			sources: []SourceDescriptor{{
+				ID:          "youtube-music",
+				Name:        "YouTube Music",
+				SearchModes: []SearchModeDescriptor{{ID: SearchModeAlbums, Name: "Albums"}},
+				DefaultMode: SearchModeAlbums,
+			}},
+			expandFor: "youtube:album:album-1",
+			expanded: []SearchResult{{
+				ID:       "youtube:https://music.youtube.com/watch?v=track-1",
+				Title:    "Track One",
+				Subtitle: "Artist One",
+				Source:   "YouTube Music",
+				Kind:     MediaTrack,
+			}},
+		},
+	})
+	screen.resultData = []SearchResult{{
+		ID:              "youtube:album:album-1",
+		Title:           "Album One",
+		Subtitle:        "Artist One",
+		Source:          "YouTube Music",
+		Kind:            MediaAlbum,
+		BrowseID:        "album-1",
+		CollectionCount: 1,
+	}}
+	screen.rebuildBrowser()
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
+
+	status, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Text: "e"}))
+	if status != `Loading songs from "Album One".` {
+		t.Fatalf("expected expand status, got %q", status)
+	}
+	if cmd == nil {
+		t.Fatal("expected async expand command")
+	}
+
+	msg := cmd()
+	status, _ = screen.Update(msg)
+	if status != "" {
+		t.Fatalf("expected expand result application to leave status unchanged, got %q", status)
+	}
+	if !screen.expandedCollectionIDs["youtube:album:album-1"] {
+		t.Fatal("expected collection to be marked expanded")
+	}
+	if len(screen.expandedCollections["youtube:album:album-1"]) != 1 {
+		t.Fatalf("expected cached child rows, got %#v", screen.expandedCollections)
+	}
+}
+
+func TestQueueCollectionAddCreatesRemovableGroupRow(t *testing.T) {
+	queue := &stubQueueService{}
+	screen := newQueueScreen(Services{Queue: queue})
+	screen.resultData = []SearchResult{{
+		ID:     "youtube:playlist:mix-1",
+		Title:  "Mix One",
+		Source: "YouTube Music",
+		Kind:   MediaPlaylist,
+		CollectionItems: []QueueEntry{
+			{ID: "track-1", Title: "Track One", Source: "YouTube Music", Kind: MediaTrack},
+			{ID: "track-2", Title: "Track Two", Source: "YouTube Music", Kind: MediaTrack},
+		},
+	}}
+	screen.rebuildBrowser()
+
+	status, _ := screen.activateSelectedRow()
+	if status != `Added "Mix One" to the queue.` {
+		t.Fatalf("expected add-all collection status, got %q", status)
+	}
+	if len(screen.queueData) != 2 {
+		t.Fatalf("expected grouped child entries in queue, got %#v", screen.queueData)
+	}
+	if len(screen.browserData) == 0 || screen.browserData[0].kind != queueRowQueueGroup {
+		t.Fatalf("expected synthetic group row at top of browser, got %#v", screen.browserData)
+	}
+
+	screen.browser.SetSelectedIndex(0)
+	status, _ = screen.activateSelectedRow()
+	if status != `Removed "Mix One" from the queue.` {
+		t.Fatalf("expected group removal status, got %q", status)
 	}
 }

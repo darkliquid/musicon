@@ -14,6 +14,7 @@ The expected shape is:
 - backend-name canonicalization collapses config aliases such as `pulseaudio` and `directsound` onto the same labels used by backend discovery so CLI annotation and runtime selection agree
 - thin queue/playback adapter wrappers expose the UI contracts over one shared engine state object
 - queue mutation includes relative move operations so queue mode can reorder entries while the engine remains the single source of truth for playback order
+- queue mutation can now add grouped album/playlist collections and remove those groups as one unit, while still storing the playable queue as ordinary child track entries
 - queue-carried artwork metadata is merged with resolver-provided track info so the UI artwork path keeps local paths, embedded-art hints, and external IDs even when different layers know different parts of the metadata
 - resolved track info can carry richer cover-art metadata forward to the UI artwork path without forcing the runtime itself to fetch or render artwork
 - snapshot reads should remain fast even while the runtime is busy resolving or swapping tracks, so UI polling can fall back to the last published playback snapshot instead of blocking the Bubble Tea render loop on the engine mutex
@@ -32,3 +33,4 @@ This node should own concurrency, lifecycle, and cleanup concerns so `internal/u
 - Chose to probe only the current platform's canonical backend candidates and return config-safe names because the user wanted `--list-backends` output to be directly usable as config values, not a dump of every alias the parser accepts.
 - Chose to serve playback snapshot polling from the latest published snapshot when the engine mutex is already busy because the user reported rapid playback key input appearing to lock the input thread, and stale-but-fast UI state is safer than blocking the render loop behind slow resolver work.
 - Chose replacement-stream swapping over forcing all providers to implement far seeks in place because the user explicitly wanted seek preparation to happen away from the UI/input path while the old audio continues until the new stream is ready.
+- Chose flat child-track queue storage plus group metadata over introducing a second nested runtime queue model because playback still needs a linear play order even when the UI exposes whole-collection removal.

@@ -9,10 +9,15 @@ The package source now also carries richer package-level, exported-symbol, and i
 Its expected shape is:
 
 - call the YouTube Music search endpoint for free-text queries and use `youtube/v2` for pasted video or playlist inspection
+- expose YouTube-specific focused search modes for songs, artists, albums, and playlists instead of flattening every free-text query into one unfocused mixed result set
+- send mode-specific YouTube Music search params for focused songs/artists/albums/playlists requests, and accept both tabbed mixed-search responses and direct filtered `sectionListRenderer` responses from Innertube
+- map artist rows into filter-selection results that the UI can apply back onto songs-mode searches
+- return album and playlist rows as collection results that can either queue the whole collection or expand into song rows on demand
 - treat YouTube Music search shelves as playable whenever an item exposes a `videoId`, instead of assuming the API always labels sections as "Songs" or "Videos"
-- flatten pasted playlist URLs into queueable track entries rather than forcing the UI to understand playlist expansion
+- treat pasted playlist URLs as playlist collection rows so the queue UI can use the same add-all and expand flows for explicit URLs and free-text collection searches
 - map YouTube Music search metadata and `youtube/v2` metadata into Musicon search results and playback track info
 - honor caller cancellation in search so stale queue queries can terminate superseded HTTP requests promptly
+- resolve searched collection rows into songs through a provider-side expansion path: playlist ids reuse `youtube/v2` playlist inspection while album browse ids call the YouTube Music browse endpoint and extract child track rows from the resulting nested response
 - inspect YouTube metadata with `youtube/v2`, then call `yt-dlp -j` to obtain the final media URL and request headers
 - read the selected WebM media through a custom HTTP range-backed `io.ReadSeeker` instead of streaming audio bytes over `yt-dlp` stdout
 - persist fetched range blocks in a per-stream temp-directory cache so revisiting an earlier aligned byte range can reuse already-downloaded media locally instead of forcing another network request
@@ -36,3 +41,6 @@ Its expected shape is:
 - Chose `yt-dlp -j` plus direct HTTP range requests over piping media bytes through `yt-dlp` stdout because the extractor already exposes the final media URL and headers, ranged reads avoid the sluggish long-lived stdout transport, and WebM cue-based seeking becomes practical without reintroducing ffmpeg.
 - Chose a per-stream on-disk range-block cache over the previous single in-memory block because the user explicitly wanted repeated reseeks to reuse previously downloaded ranges instead of invalidating old blocks and triggering fresh HTTP range downloads; the cache is still cleared on `Close` so stream lifetime remains the cleanup boundary.
 - Chose shared-cache replacement streams over resurrecting synchronous far seeks on the live streamer because the user explicitly wanted seek preparation to happen in the background while current playback continues, and the existing range transport could already amortize repeated byte fetches once its cache became cloneable.
+- Chose focused YouTube search modes over continuing to return one mixed list because the user explicitly wanted songs, artists, albums, and playlists to behave differently in the queue workflow.
+- Chose to send YouTube Music's filter params for focused non-default search kinds instead of relying only on local post-filtering because live filtered searches can return a different response shape and otherwise left artist/album/playlist modes empty in the queue UI.
+- Chose provider-side collection expansion over preloading every album or playlist's child tracks in the initial search response because the user wanted expandable collection rows without turning each query into a burst of collection-member fetches.

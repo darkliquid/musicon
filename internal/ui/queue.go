@@ -20,50 +20,65 @@ type queueBrowserRowKind int
 
 const (
 	queueRowQueued queueBrowserRowKind = iota
+	queueRowQueueGroup
 	queueRowSearchResult
+	queueRowExpandedCollectionTrack
 )
 
 type queueBrowserRow struct {
-	kind   queueBrowserRowKind
-	queue  QueueEntry
-	result SearchResult
+	kind    queueBrowserRowKind
+	queue   QueueEntry
+	result  SearchResult
+	groupID string
+	childOf string
 }
 
 type queueScreen struct {
-	services      Services
-	width         int
-	height        int
-	keymap        QueueKeyMap
-	sources       []SourceDescriptor
-	sourceIndex   int
-	filters       SearchFilters
-	searchInput   components.Input
-	browser       components.List
-	searchFocused bool
-	browserData   []queueBrowserRow
-	resultData    []SearchResult
-	queueData     []QueueEntry
-	status        string
-	lastQuery     string
-	lastSourceID  string
-	searchSeq     uint64
-	searching     bool
-	searchDelay   time.Duration
-	cancelSearch  context.CancelFunc
+	services              Services
+	width                 int
+	height                int
+	keymap                QueueKeyMap
+	sources               []SourceDescriptor
+	sourceIndex           int
+	searchMode            SearchMode
+	artistFilter          SearchArtistFilter
+	searchInput           components.Input
+	browser               components.List
+	searchFocused         bool
+	browserData           []queueBrowserRow
+	resultData            []SearchResult
+	queueData             []QueueEntry
+	status                string
+	lastQuery             string
+	lastSourceID          string
+	searchSeq             uint64
+	searching             bool
+	searchDelay           time.Duration
+	cancelSearch          context.CancelFunc
+	expandedCollections   map[string][]SearchResult
+	expandedCollectionIDs map[string]bool
+	expandingCollectionID string
+	cancelExpand          context.CancelFunc
 }
 
 type queueStartSearchMsg struct {
 	seq      uint64
 	query    string
 	sourceID string
-	filters  SearchFilters
+	request  SearchRequest
 }
 
 type queueSearchResultsMsg struct {
 	seq      uint64
 	query    string
 	sourceID string
-	filters  SearchFilters
+	request  SearchRequest
+	results  []SearchResult
+	err      error
+}
+
+type queueExpandResultsMsg struct {
+	resultID string
 	results  []SearchResult
 	err      error
 }
@@ -82,17 +97,19 @@ func newQueueScreenWithKeyMap(services Services, keymap QueueKeyMap) *queueScree
 	browser.SetFocused(true)
 
 	screen := &queueScreen{
-		services:      services,
-		keymap:        keymap,
-		filters:       DefaultSearchFilters(),
-		searchInput:   searchInput,
-		browser:       browser,
-		searchFocused: true,
-		sources:       configuredSources(services),
-		status:        "Queue mode ready. Focus search to type, unfocus it to use queue shortcuts.",
-		searchDelay:   defaultQueueSearchDebounce,
+		services:              services,
+		keymap:                keymap,
+		searchInput:           searchInput,
+		browser:               browser,
+		searchFocused:         true,
+		sources:               configuredSources(services),
+		status:                "Queue mode ready. Focus search to type, unfocus it to use queue shortcuts.",
+		searchDelay:           defaultQueueSearchDebounce,
+		expandedCollections:   make(map[string][]SearchResult),
+		expandedCollectionIDs: make(map[string]bool),
 	}
 
+	screen.searchMode = screen.defaultSearchModeForSource(screen.activeSource())
 	screen.syncFocus()
 	screen.syncQueue()
 	return screen
@@ -118,15 +135,15 @@ func (q *queueScreen) SetSize(width, height int) {
 }
 
 func (q *queueScreen) resizeBrowser() {
-	listHeight := max(3, q.height-5)
+	listHeight := max(3, q.height-6)
 	q.browser.SetSize(max(6, q.width), listHeight)
 }
 
-// Update handles queue-screen input, debounced searches, and async search results.
+// Update handles queue-screen input, debounced searches, collection expansion, and async search results.
 func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	switch typed := msg.(type) {
 	case queueStartSearchMsg:
-		if typed.seq != q.searchSeq || typed.query != q.lastQuery || typed.sourceID != q.lastSourceID || typed.filters != q.filters {
+		if typed.seq != q.searchSeq || typed.query != q.lastQuery || typed.sourceID != q.lastSourceID || typed.request != q.activeSearchRequest() {
 			return "", nil
 		}
 		search := q.services.Search
@@ -134,25 +151,14 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 		q.cancelSearch = cancel
 		return "", func() tea.Msg {
 			defer cancel()
-			results, err := search.Search(ctx, SearchRequest{
-				SourceID: typed.sourceID,
-				Query:    typed.query,
-				Filters:  typed.filters,
-			})
+			results, err := search.Search(ctx, typed.request)
 			if err != nil && errors.Is(err, context.Canceled) {
 				return nil
 			}
-			return queueSearchResultsMsg{
-				seq:      typed.seq,
-				query:    typed.query,
-				sourceID: typed.sourceID,
-				filters:  typed.filters,
-				results:  results,
-				err:      err,
-			}
+			return queueSearchResultsMsg{seq: typed.seq, query: typed.query, sourceID: typed.sourceID, request: typed.request, results: results, err: err}
 		}
 	case queueSearchResultsMsg:
-		if typed.seq != q.searchSeq || typed.query != q.lastQuery || typed.sourceID != q.lastSourceID || typed.filters != q.filters {
+		if typed.seq != q.searchSeq || typed.query != q.lastQuery || typed.sourceID != q.lastSourceID || typed.request != q.activeSearchRequest() {
 			return "", nil
 		}
 		q.cancelSearch = nil
@@ -166,11 +172,25 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 
 		filtered := make([]SearchResult, 0, len(typed.results))
 		for _, result := range typed.results {
-			if q.filters.Matches(result.Kind) {
-				filtered = append(filtered, result)
+			if !q.matchesActiveSearchKind(result) {
+				continue
 			}
+			filtered = append(filtered, result)
 		}
 		q.resultData = filtered
+		q.rebuildBrowser()
+		return "", nil
+	case queueExpandResultsMsg:
+		if typed.resultID != q.expandingCollectionID {
+			return "", nil
+		}
+		q.expandingCollectionID = ""
+		q.cancelExpand = nil
+		if typed.err != nil {
+			return typed.err.Error(), nil
+		}
+		q.expandedCollections[typed.resultID] = typed.results
+		q.expandedCollectionIDs[typed.resultID] = true
 		q.rebuildBrowser()
 		return "", nil
 	}
@@ -201,19 +221,22 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 				if q.sourceIndex < 0 {
 					q.sourceIndex = len(q.sources) - 1
 				}
+				q.resetSourceScopedState()
 				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
 			case bubblekey.Matches(keypress, q.keymap.SourceNext):
 				q.sourceIndex = (q.sourceIndex + 1) % len(q.sources)
+				q.resetSourceScopedState()
 				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
-			case bubblekey.Matches(keypress, q.keymap.FilterTracks):
-				q.filters.Toggle(MediaTrack)
-				return q.filterStatus(), q.refreshResultsCmd()
-			case bubblekey.Matches(keypress, q.keymap.FilterStreams):
-				q.filters.Toggle(MediaStream)
-				return q.filterStatus(), q.refreshResultsCmd()
-			case bubblekey.Matches(keypress, q.keymap.FilterPlaylists):
-				q.filters.Toggle(MediaPlaylist)
-				return q.filterStatus(), q.refreshResultsCmd()
+			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModeSongs):
+				return q.selectVisibleSearchMode(0), q.refreshResultsCmd()
+			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModeArtists):
+				return q.selectVisibleSearchMode(1), q.refreshResultsCmd()
+			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModeAlbums):
+				return q.selectVisibleSearchMode(2), q.refreshResultsCmd()
+			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModePlaylists):
+				return q.selectVisibleSearchMode(3), q.refreshResultsCmd()
+			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.CycleSearchMode):
+				return q.cycleSearchMode(), q.refreshResultsCmd()
 			case bubblekey.Matches(keypress, q.keymap.MoveSelectedUp):
 				return q.moveSelectedQueueEntry(-1), nil
 			case bubblekey.Matches(keypress, q.keymap.MoveSelectedDown):
@@ -222,11 +245,13 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 				return q.clearQueue(), nil
 			case bubblekey.Matches(keypress, q.keymap.RemoveSelected):
 				return q.removeSelectedQueueItem(), nil
+			case bubblekey.Matches(keypress, q.keymap.ExpandSelected):
+				return q.expandSelectedCollection()
 			}
 		}
 
 		if bubblekey.Matches(keypress, q.keymap.ActivateSelected) {
-			return q.activateSelectedRow(), nil
+			return q.activateSelectedRow()
 		}
 	}
 
@@ -255,7 +280,8 @@ func (q *queueScreen) View() string {
 
 	body := joinLines(
 		renderSourceChips(q.sources, q.sourceIndex),
-		renderFilterChips(q.filters),
+		renderSearchModeChips(q.visibleSearchModes(), q.activeSearchMode(), q.keymap),
+		renderArtistFilterChip(q.artistFilter),
 		q.searchInput.View(),
 		q.browser.View(),
 	)
@@ -265,25 +291,22 @@ func (q *queueScreen) View() string {
 
 // HelpView renders the queue-screen help overlay.
 func (q *queueScreen) HelpView() string {
-	width := min(q.width, 64)
-	height := min(q.height, 14)
-	return components.RenderPanel(components.PanelOptions{
-		Title:    "Queue help",
-		Subtitle: "focus search to type, unfocus it for queue shortcuts",
-		Width:    width,
-		Height:   height,
-		Focused:  true,
-	}, strings.Join([]string{
+	width := min(q.width, 72)
+	height := min(q.height, 16)
+	lines := []string{
 		helpLine(q.keymap.ToggleSearchFocus, "focus or unfocus the search input"),
 		"type text          update the search query while search is focused",
 		helpLinePair(q.keymap.SourcePrev, q.keymap.SourceNext, "switch active source when search is unfocused"),
-		helpLinePair(q.keymap.FilterTracks, q.keymap.FilterStreams, "toggle Track and Stream filters when unfocused"),
-		helpLine(q.keymap.FilterPlaylists, "toggle Playlist filter when unfocused"),
+		helpLine(q.keymap.CycleSearchMode, "cycle the visible search-kind chips"),
+		helpLinePair(q.keymap.ModeSongs, q.keymap.ModeArtists, "select the first or second visible search kind"),
+		helpLinePair(q.keymap.ModeAlbums, q.keymap.ModePlaylists, "select the third or fourth visible search kind"),
+		helpLine(q.keymap.ExpandSelected, "expand or collapse the selected album or playlist"),
 		helpLinePair(q.keymap.Browser.Up, q.keymap.Browser.Down, "move through queued items and search results"),
 		helpLinePair(q.keymap.MoveSelectedUp, q.keymap.MoveSelectedDown, "move the selected queued item up or down"),
-		helpLine(q.keymap.ActivateSelected, "toggle the selected item between enqueued and not enqueued"),
+		helpLine(q.keymap.ActivateSelected, "queue, unqueue, filter by artist, or add a whole collection"),
 		helpLinePair(q.keymap.RemoveSelected, q.keymap.ClearQueue, "remove selected queued item or clear the queue"),
-	}, "\n"))
+	}
+	return components.RenderPanel(components.PanelOptions{Title: "Queue help", Subtitle: "focus search to type, unfocus it for queue shortcuts", Width: width, Height: height, Focused: true}, strings.Join(lines, "\n"))
 }
 
 func (q *queueScreen) syncFocus() {
@@ -301,9 +324,58 @@ func (q *queueScreen) activeSource() SourceDescriptor {
 	return q.sources[q.sourceIndex]
 }
 
+func (q *queueScreen) activeSearchMode() SearchMode {
+	mode := q.searchMode
+	if mode == SearchModeDefault {
+		mode = q.defaultSearchModeForSource(q.activeSource())
+	}
+	return mode
+}
+
+func (q *queueScreen) defaultSearchModeForSource(source SourceDescriptor) SearchMode {
+	if len(source.SearchModes) == 0 {
+		return SearchModeDefault
+	}
+	if source.DefaultMode != "" {
+		return source.DefaultMode
+	}
+	return source.SearchModes[0].ID
+}
+
+func (q *queueScreen) filtersForActiveSearchMode() SearchFilters {
+	switch q.activeSearchMode() {
+	case SearchModeAll:
+		return SearchFilters{Tracks: true, Streams: true, Playlists: true}
+	case SearchModeStreams:
+		return SearchFilters{Tracks: false, Streams: true, Playlists: false}
+	case SearchModePlaylists:
+		return SearchFilters{Tracks: false, Streams: false, Playlists: true}
+	default:
+		return SearchFilters{Tracks: true, Streams: false, Playlists: false}
+	}
+}
+
+func (q *queueScreen) visibleSearchModes() []SearchModeDescriptor {
+	return append([]SearchModeDescriptor(nil), q.activeSource().SearchModes...)
+}
+
+func (q *queueScreen) activeSearchRequest() SearchRequest {
+	request := SearchRequest{
+		SourceID: q.activeSource().ID,
+		Query:    strings.TrimSpace(q.searchInput.Value()),
+		Filters:  q.filtersForActiveSearchMode(),
+		Mode:     q.activeSearchMode(),
+	}
+	if q.activeSearchMode() == SearchModeSongs {
+		request.ArtistFilter = q.artistFilter
+	}
+	return request
+}
+
 func (q *queueScreen) refreshResultsCmd() tea.Cmd {
 	query := strings.TrimSpace(q.searchInput.Value())
 	sourceID := q.activeSource().ID
+	request := q.activeSearchRequest()
 	seq := atomic.AddUint64(&q.searchSeq, 1)
 	q.lastQuery = query
 	q.lastSourceID = sourceID
@@ -324,24 +396,13 @@ func (q *queueScreen) refreshResultsCmd() tea.Cmd {
 
 	q.searching = true
 	q.rebuildBrowser()
-	filters := q.filters
 	if q.searchDelay <= 0 {
 		return func() tea.Msg {
-			return queueStartSearchMsg{
-				seq:      seq,
-				query:    query,
-				sourceID: sourceID,
-				filters:  filters,
-			}
+			return queueStartSearchMsg{seq: seq, query: query, sourceID: sourceID, request: request}
 		}
 	}
 	return tea.Tick(q.searchDelay, func(time.Time) tea.Msg {
-		return queueStartSearchMsg{
-			seq:      seq,
-			query:    query,
-			sourceID: sourceID,
-			filters:  filters,
-		}
+		return queueStartSearchMsg{seq: seq, query: query, sourceID: sourceID, request: request}
 	})
 }
 
@@ -352,13 +413,12 @@ func (q *queueScreen) cancelRunningSearch() {
 	}
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return value
-		}
+func (q *queueScreen) cancelRunningExpand() {
+	if q.cancelExpand != nil {
+		q.cancelExpand()
+		q.cancelExpand = nil
 	}
-	return ""
+	q.expandingCollectionID = ""
 }
 
 func queueSourceLabel(raw string) string {
@@ -382,43 +442,78 @@ func queueRowTitle(source, title string) string {
 	return title
 }
 
-func (q *queueScreen) activateSelectedRow() string {
+func (q *queueScreen) activateSelectedRow() (string, tea.Cmd) {
 	index := q.browser.SelectedIndex()
 	if index < 0 || index >= len(q.browserData) {
-		return "Select a row to act on it."
+		return "Select a row to act on it.", nil
 	}
 
 	row := q.browserData[index]
 	switch row.kind {
 	case queueRowQueued:
-		return q.removeQueueEntry(row.queue)
-	case queueRowSearchResult:
-		if entry, ok := q.findQueuedEntryByID(row.result.ID); ok {
-			return q.removeQueueEntry(entry)
-		}
-		return q.addSearchResult(row.result)
+		return q.removeQueueEntry(row.queue), nil
+	case queueRowQueueGroup:
+		return q.removeQueueGroup(row.groupID), nil
+	case queueRowSearchResult, queueRowExpandedCollectionTrack:
+		return q.activateSearchResult(row.result)
 	default:
-		return "Select a row to act on it."
+		return "Select a row to act on it.", nil
 	}
 }
 
+func (q *queueScreen) activateSearchResult(result SearchResult) (string, tea.Cmd) {
+	switch result.Kind {
+	case MediaArtist:
+		return q.applyArtistFilter(result.ArtistFilter), q.refreshResultsCmd()
+	case MediaAlbum, MediaPlaylist:
+		return q.addSearchResult(result), nil
+	default:
+		if entry, ok := q.findQueuedEntryByID(result.ID); ok {
+			return q.removeQueueEntry(entry), nil
+		}
+		return q.addSearchResult(result), nil
+	}
+}
+
+func (q *queueScreen) applyArtistFilter(filter SearchArtistFilter) string {
+	q.artistFilter = filter
+	q.searchMode = SearchModeSongs
+	return fmt.Sprintf("Artist filter: %s", filter.Name)
+}
+
 func (q *queueScreen) addSearchResult(result SearchResult) string {
+	if isCollectionResult(result) {
+		children := q.expandedCollections[result.ID]
+		if len(children) > 0 {
+			result.CollectionItems = make([]QueueEntry, 0, len(children))
+			for _, child := range children {
+				result.CollectionItems = append(result.CollectionItems, QueueEntry{ID: child.ID, Title: child.Title, Subtitle: child.Subtitle, Source: child.Source, Kind: child.Kind, Duration: child.Duration, Artwork: child.Artwork})
+			}
+		}
+	}
+
 	if q.services.Queue != nil {
 		if err := q.services.Queue.Add(result); err != nil {
 			return err.Error()
 		}
 		q.syncQueue()
 	} else {
-		q.queueData = append(q.queueData, QueueEntry{
-			ID:       result.ID,
-			Title:    result.Title,
-			Subtitle: result.Subtitle,
-			Source:   result.Source,
-			Kind:     result.Kind,
-			Duration: result.Duration,
-			Artwork:  result.Artwork,
-		})
+		entries := []QueueEntry{{ID: result.ID, Title: result.Title, Subtitle: result.Subtitle, Source: result.Source, Kind: result.Kind, Duration: result.Duration, Artwork: result.Artwork}}
+		if isCollectionResult(result) {
+			entries = append([]QueueEntry(nil), result.CollectionItems...)
+			for index := range entries {
+				entries[index].GroupID = result.ID
+				entries[index].GroupTitle = result.Title
+				entries[index].GroupKind = result.Kind
+				entries[index].GroupIndex = index
+				entries[index].GroupSize = len(entries)
+			}
+		}
+		q.queueData = append(q.queueData, entries...)
 		q.rebuildBrowser()
+	}
+	if isCollectionResult(result) {
+		return fmt.Sprintf("Added %q to the queue.", result.Title)
 	}
 	return fmt.Sprintf("Added %q to the queue.", result.Title)
 }
@@ -432,7 +527,9 @@ func (q *queueScreen) removeSelectedQueueItem() string {
 	switch row.kind {
 	case queueRowQueued:
 		return q.removeQueueEntry(row.queue)
-	case queueRowSearchResult:
+	case queueRowQueueGroup:
+		return q.removeQueueGroup(row.groupID)
+	case queueRowSearchResult, queueRowExpandedCollectionTrack:
 		entry, ok := q.findQueuedEntryByID(row.result.ID)
 		if !ok {
 			return "Selected item is not currently queued."
@@ -521,6 +618,29 @@ func (q *queueScreen) removeQueueEntry(entry QueueEntry) string {
 	return fmt.Sprintf("Removed %q from the queue.", entry.Title)
 }
 
+func (q *queueScreen) removeQueueGroup(groupID string) string {
+	groupTitle := q.groupTitle(groupID)
+	if groupTitle == "" {
+		groupTitle = groupID
+	}
+	if q.services.Queue != nil {
+		if err := q.services.Queue.RemoveGroup(groupID); err != nil {
+			return err.Error()
+		}
+		q.syncQueue()
+	} else {
+		filtered := q.queueData[:0]
+		for _, entry := range q.queueData {
+			if entry.GroupID != groupID {
+				filtered = append(filtered, entry)
+			}
+		}
+		q.queueData = append([]QueueEntry(nil), filtered...)
+		q.rebuildBrowser()
+	}
+	return fmt.Sprintf("Removed %q from the queue.", groupTitle)
+}
+
 func (q *queueScreen) clearQueue() string {
 	if len(q.queueData) == 0 {
 		return "Queue is already empty."
@@ -556,8 +676,22 @@ func (q *queueScreen) rebuildBrowser() {
 	nowPlayingID := q.nowPlayingID()
 	rows := make([]queueBrowserRow, 0, len(q.queueData)+len(q.resultData))
 	items := make([]components.ListItem, 0, len(q.queueData)+len(q.resultData))
+	seenGroups := make(map[string]struct{})
 
 	for index, entry := range q.queueData {
+		if entry.GroupID != "" {
+			if _, seen := seenGroups[entry.GroupID]; !seen {
+				seenGroups[entry.GroupID] = struct{}{}
+				rows = append(rows, queueBrowserRow{kind: queueRowQueueGroup, groupID: entry.GroupID})
+				items = append(items, components.ListItem{
+					Leading:  "◆",
+					Title:    queueRowTitle(entry.Source, entry.GroupTitle),
+					Subtitle: strings.ToLower(entry.GroupKind.String()) + " collection",
+					Meta:     fmt.Sprintf("%d songs", entry.GroupSize),
+				})
+			}
+		}
+
 		rows = append(rows, queueBrowserRow{kind: queueRowQueued, queue: entry})
 		meta := fmt.Sprintf("%d", index+1)
 		leading := "●"
@@ -568,12 +702,10 @@ func (q *queueScreen) rebuildBrowser() {
 		if entry.Duration > 0 {
 			meta += " · " + formatDuration(entry.Duration)
 		}
-		items = append(items, components.ListItem{
-			Leading:  leading,
-			Title:    queueRowTitle(entry.Source, entry.Title),
-			Subtitle: entry.Subtitle,
-			Meta:     meta,
-		})
+		if entry.GroupID != "" {
+			meta = fmt.Sprintf("%d/%d · %s", entry.GroupIndex+1, entry.GroupSize, meta)
+		}
+		items = append(items, components.ListItem{Leading: leading, Title: queueRowTitle(entry.Source, entry.Title), Subtitle: entry.Subtitle, Meta: meta})
 	}
 
 	for _, result := range q.resultData {
@@ -582,11 +714,21 @@ func (q *queueScreen) rebuildBrowser() {
 		if result.Duration > 0 {
 			meta += " · " + formatDuration(result.Duration)
 		}
-		items = append(items, components.ListItem{
-			Title:    queueRowTitle(result.Source, result.Title),
-			Subtitle: result.Subtitle,
-			Meta:     meta,
-		})
+		if isCollectionResult(result) {
+			meta = collectionMeta(result, q.expandingCollectionID == result.ID, q.expandedCollectionIDs[result.ID], q.keymap)
+		}
+		items = append(items, components.ListItem{Title: queueRowTitle(result.Source, result.Title), Subtitle: result.Subtitle, Meta: meta})
+
+		if q.expandedCollectionIDs[result.ID] {
+			for _, child := range q.expandedCollections[result.ID] {
+				rows = append(rows, queueBrowserRow{kind: queueRowExpandedCollectionTrack, result: child, childOf: result.ID})
+				meta := child.Kind.String()
+				if child.Duration > 0 {
+					meta += " · " + formatDuration(child.Duration)
+				}
+				items = append(items, components.ListItem{Leading: "↳", Title: queueRowTitle(child.Source, child.Title), Subtitle: child.Subtitle, Meta: meta})
+			}
+		}
 	}
 
 	q.browserData = rows
@@ -611,8 +753,20 @@ func (q *queueScreen) rebuildBrowser() {
 	}
 }
 
-func (q *queueScreen) browserSubtitle() string {
-	return fmt.Sprintf("%d queued · %d results · type to search, ctrl+k/j to reorder, enter to toggle", len(q.queueData), len(q.resultData))
+func collectionMeta(result SearchResult, expanding, expanded bool, keymap QueueKeyMap) string {
+	parts := []string{result.Kind.String()}
+	if result.CollectionCount > 0 {
+		parts = append(parts, fmt.Sprintf("%d songs", result.CollectionCount))
+	}
+	parts = append(parts, bindingLabel(keymap.ActivateSelected)+" adds all")
+	if expanding {
+		parts = append(parts, "loading…")
+	} else if expanded {
+		parts = append(parts, bindingLabel(keymap.ExpandSelected)+" collapses")
+	} else {
+		parts = append(parts, bindingLabel(keymap.ExpandSelected)+" expands")
+	}
+	return strings.Join(parts, " · ")
 }
 
 func (q *queueScreen) findQueuedEntryByID(id string) (QueueEntry, bool) {
@@ -647,25 +801,11 @@ func (q *queueScreen) selectedQueueEntry(row queueBrowserRow) (QueueEntry, bool)
 	switch row.kind {
 	case queueRowQueued:
 		return row.queue, true
-	case queueRowSearchResult:
+	case queueRowSearchResult, queueRowExpandedCollectionTrack:
 		return q.findQueuedEntryByID(row.result.ID)
 	default:
 		return QueueEntry{}, false
 	}
-}
-
-func (q *queueScreen) filterStatus() string {
-	parts := make([]string, 0, 3)
-	if q.filters.Tracks {
-		parts = append(parts, "tracks")
-	}
-	if q.filters.Streams {
-		parts = append(parts, "streams")
-	}
-	if q.filters.Playlists {
-		parts = append(parts, "playlists")
-	}
-	return fmt.Sprintf("Filters: %s", strings.Join(parts, ", "))
 }
 
 func renderSourceChips(sources []SourceDescriptor, active int) string {
@@ -676,21 +816,183 @@ func renderSourceChips(sources []SourceDescriptor, active int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Left, chips...)
 }
 
-func renderFilterChips(filters SearchFilters) string {
-	return lipgloss.JoinHorizontal(lipgloss.Left,
-		pill("1 Track", filters.Tracks),
-		pill("2 Stream", filters.Streams),
-		pill("3 Playlist", filters.Playlists),
-	)
+func renderSearchModeChips(modes []SearchModeDescriptor, active SearchMode, keymap QueueKeyMap) string {
+	if len(modes) == 0 {
+		return ""
+	}
+	chips := make([]string, 0, len(modes))
+	for index, mode := range modes {
+		chips = append(chips, pill(searchModeChipLabel(index, mode.Name, keymap), mode.ID == active))
+	}
+	return lipgloss.JoinHorizontal(lipgloss.Left, chips...)
+}
+
+func renderArtistFilterChip(filter SearchArtistFilter) string {
+	if strings.TrimSpace(filter.Name) == "" {
+		return ""
+	}
+	return pill("artist: "+filter.Name, true)
+}
+
+func searchModeChipLabel(index int, name string, keymap QueueKeyMap) string {
+	switch index {
+	case 0:
+		return bindingLabel(keymap.ModeSongs) + " " + name
+	case 1:
+		return bindingLabel(keymap.ModeArtists) + " " + name
+	case 2:
+		return bindingLabel(keymap.ModeAlbums) + " " + name
+	case 3:
+		return bindingLabel(keymap.ModePlaylists) + " " + name
+	default:
+		return name
+	}
 }
 
 func (r queueBrowserRow) key() string {
 	switch r.kind {
 	case queueRowQueued:
 		return "queue:" + r.queue.ID
+	case queueRowQueueGroup:
+		return "group:" + r.groupID
+	case queueRowExpandedCollectionTrack:
+		return "child:" + r.childOf + ":" + r.result.ID
 	case queueRowSearchResult:
 		return "result:" + r.result.ID
 	default:
 		return ""
+	}
+}
+
+func (q *queueScreen) cycleSearchMode() string {
+	modes := q.visibleSearchModes()
+	if len(modes) == 0 {
+		return "Active source uses a single search mode."
+	}
+	current := q.activeSearchMode()
+	for index, mode := range modes {
+		if mode.ID == current {
+			next := modes[(index+1)%len(modes)]
+			q.searchMode = next.ID
+			if next.ID != SearchModeSongs {
+				q.artistFilter = SearchArtistFilter{}
+			}
+			return fmt.Sprintf("Search mode: %s", next.Name)
+		}
+	}
+	q.searchMode = modes[0].ID
+	return fmt.Sprintf("Search mode: %s", modes[0].Name)
+}
+
+func (q *queueScreen) selectVisibleSearchMode(index int) string {
+	modes := q.visibleSearchModes()
+	if index < 0 || index >= len(modes) {
+		return "That search kind is not available for the active source."
+	}
+	return q.setSearchMode(modes[index].ID)
+}
+
+func (q *queueScreen) setSearchMode(mode SearchMode) string {
+	if !q.sourceSupportsMode(mode) {
+		return "Active source does not expose that search mode."
+	}
+	q.searchMode = mode
+	if mode != SearchModeSongs {
+		q.artistFilter = SearchArtistFilter{}
+	}
+	return fmt.Sprintf("Search mode: %s", mode.String())
+}
+
+func (q *queueScreen) sourceSupportsMode(mode SearchMode) bool {
+	for _, descriptor := range q.visibleSearchModes() {
+		if descriptor.ID == mode {
+			return true
+		}
+	}
+	return false
+}
+
+func (q *queueScreen) hasFocusedSearchModes() bool {
+	return len(q.visibleSearchModes()) > 0
+}
+
+func (q *queueScreen) matchesActiveSearchKind(result SearchResult) bool {
+	switch q.activeSearchMode() {
+	case SearchModeAll:
+		return result.Kind == MediaTrack || result.Kind == MediaStream || result.Kind == MediaPlaylist
+	case SearchModeTracks, SearchModeSongs:
+		return result.Kind == MediaTrack
+	case SearchModeStreams:
+		return result.Kind == MediaStream
+	case SearchModePlaylists:
+		return result.Kind == MediaPlaylist
+	case SearchModeArtists:
+		return result.Kind == MediaArtist
+	case SearchModeAlbums:
+		return result.Kind == MediaAlbum
+	default:
+		return true
+	}
+}
+
+func (q *queueScreen) expandSelectedCollection() (string, tea.Cmd) {
+	index := q.browser.SelectedIndex()
+	if index < 0 || index >= len(q.browserData) {
+		return "Select a collection row to expand.", nil
+	}
+	row := q.browserData[index]
+	if row.kind != queueRowSearchResult || !isCollectionResult(row.result) {
+		return "Select an album or playlist result to expand it.", nil
+	}
+	if q.expandedCollectionIDs[row.result.ID] {
+		delete(q.expandedCollectionIDs, row.result.ID)
+		q.rebuildBrowser()
+		return fmt.Sprintf("Collapsed %q.", row.result.Title), nil
+	}
+	if cached := q.expandedCollections[row.result.ID]; len(cached) > 0 {
+		q.expandedCollectionIDs[row.result.ID] = true
+		q.rebuildBrowser()
+		return fmt.Sprintf("Expanded %q.", row.result.Title), nil
+	}
+	if q.services.Search == nil {
+		return "Collection expansion is unavailable.", nil
+	}
+
+	q.cancelRunningExpand()
+	ctx, cancel := context.WithCancel(context.Background())
+	q.cancelExpand = cancel
+	q.expandingCollectionID = row.result.ID
+	q.rebuildBrowser()
+	return fmt.Sprintf("Loading songs from %q.", row.result.Title), func() tea.Msg {
+		defer cancel()
+		results, err := q.services.Search.ExpandCollection(ctx, row.result)
+		if err != nil && errors.Is(err, context.Canceled) {
+			return nil
+		}
+		return queueExpandResultsMsg{resultID: row.result.ID, results: results, err: err}
+	}
+}
+
+func isCollectionResult(result SearchResult) bool {
+	return result.Kind == MediaAlbum || result.Kind == MediaPlaylist
+}
+
+func isSpecialYouTubeResult(result SearchResult) bool {
+	return result.Kind == MediaArtist || result.Kind == MediaAlbum || result.Kind == MediaPlaylist
+}
+
+func (q *queueScreen) groupTitle(groupID string) string {
+	for _, entry := range q.queueData {
+		if entry.GroupID == groupID {
+			return entry.GroupTitle
+		}
+	}
+	return ""
+}
+
+func (q *queueScreen) resetSourceScopedState() {
+	q.searchMode = q.defaultSearchModeForSource(q.activeSource())
+	if q.activeSearchMode() != SearchModeSongs {
+		q.artistFilter = SearchArtistFilter{}
 	}
 }

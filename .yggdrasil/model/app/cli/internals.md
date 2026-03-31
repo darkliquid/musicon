@@ -12,7 +12,7 @@ The current implementation:
 - constructs the yt-dlp-backed YouTube Music source from typed config, including cookie-based auth and cache settings
 - composes the source layer into one search service plus one resolver so the UI and audio runtime can stay source-agnostic
 - constructs the concrete audio runtime
-- injects queue and playback services from the runtime into `ui.Services` plus typed UI options derived from config, including the `[keybinds]` section
+- injects queue and playback services from the runtime into `ui.Services` plus typed UI options derived from config, including the `[keybinds]` section and queue bindings for visible search-kind slot selection, search-kind cycling, and collection expansion
 - calls `ui.Run(app)`
 - defers `engine.Close()` to release audio resources on exit
 - writes failures to stderr and exits with a non-zero status

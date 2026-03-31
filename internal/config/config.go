@@ -50,9 +50,12 @@ type QueueKeybindsConfig struct {
 	ToggleSearchFocus []string `toml:"toggle_search_focus"`
 	SourcePrev        []string `toml:"source_prev"`
 	SourceNext        []string `toml:"source_next"`
-	FilterTracks      []string `toml:"filter_tracks"`
-	FilterStreams     []string `toml:"filter_streams"`
-	FilterPlaylists   []string `toml:"filter_playlists"`
+	CycleSearchMode   []string `toml:"cycle_search_mode"`
+	ModeSongs         []string `toml:"mode_songs"`
+	ModeArtists       []string `toml:"mode_artists"`
+	ModeAlbums        []string `toml:"mode_albums"`
+	ModePlaylists     []string `toml:"mode_playlists"`
+	ExpandSelected    []string `toml:"expand_selected"`
 	ActivateSelected  []string `toml:"activate_selected"`
 	MoveSelectedUp    []string `toml:"move_selected_up"`
 	MoveSelectedDown  []string `toml:"move_selected_down"`
@@ -284,9 +287,12 @@ func defaultKeybinds() KeybindsConfig {
 			ToggleSearchFocus: []string{"ctrl+f"},
 			SourcePrev:        []string{"["},
 			SourceNext:        []string{"]"},
-			FilterTracks:      []string{"1"},
-			FilterStreams:     []string{"2"},
-			FilterPlaylists:   []string{"3"},
+			CycleSearchMode:   []string{"m"},
+			ModeSongs:         []string{"1"},
+			ModeArtists:       []string{"2"},
+			ModeAlbums:        []string{"3"},
+			ModePlaylists:     []string{"4"},
+			ExpandSelected:    []string{"e"},
 			ActivateSelected:  []string{"enter"},
 			MoveSelectedUp:    []string{"ctrl+k"},
 			MoveSelectedDown:  []string{"ctrl+j"},
@@ -324,9 +330,12 @@ func (k *KeybindsConfig) normalize() {
 	k.Queue.ToggleSearchFocus = normalizeKeyList(k.Queue.ToggleSearchFocus, defaults.Queue.ToggleSearchFocus)
 	k.Queue.SourcePrev = normalizeKeyList(k.Queue.SourcePrev, defaults.Queue.SourcePrev)
 	k.Queue.SourceNext = normalizeKeyList(k.Queue.SourceNext, defaults.Queue.SourceNext)
-	k.Queue.FilterTracks = normalizeKeyList(k.Queue.FilterTracks, defaults.Queue.FilterTracks)
-	k.Queue.FilterStreams = normalizeKeyList(k.Queue.FilterStreams, defaults.Queue.FilterStreams)
-	k.Queue.FilterPlaylists = normalizeKeyList(k.Queue.FilterPlaylists, defaults.Queue.FilterPlaylists)
+	k.Queue.CycleSearchMode = normalizeKeyList(k.Queue.CycleSearchMode, defaults.Queue.CycleSearchMode)
+	k.Queue.ModeSongs = normalizeKeyList(k.Queue.ModeSongs, defaults.Queue.ModeSongs)
+	k.Queue.ModeArtists = normalizeKeyList(k.Queue.ModeArtists, defaults.Queue.ModeArtists)
+	k.Queue.ModeAlbums = normalizeKeyList(k.Queue.ModeAlbums, defaults.Queue.ModeAlbums)
+	k.Queue.ModePlaylists = normalizeKeyList(k.Queue.ModePlaylists, defaults.Queue.ModePlaylists)
+	k.Queue.ExpandSelected = normalizeKeyList(k.Queue.ExpandSelected, defaults.Queue.ExpandSelected)
 	k.Queue.ActivateSelected = normalizeKeyList(k.Queue.ActivateSelected, defaults.Queue.ActivateSelected)
 	k.Queue.MoveSelectedUp = normalizeKeyList(k.Queue.MoveSelectedUp, defaults.Queue.MoveSelectedUp)
 	k.Queue.MoveSelectedDown = normalizeKeyList(k.Queue.MoveSelectedDown, defaults.Queue.MoveSelectedDown)

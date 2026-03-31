@@ -26,9 +26,12 @@ type QueueKeybindOptions struct {
 	ToggleSearchFocus []string
 	SourcePrev        []string
 	SourceNext        []string
-	FilterTracks      []string
-	FilterStreams     []string
-	FilterPlaylists   []string
+	CycleSearchMode   []string
+	ModeSongs         []string
+	ModeArtists       []string
+	ModeAlbums        []string
+	ModePlaylists     []string
+	ExpandSelected    []string
 	ActivateSelected  []string
 	MoveSelectedUp    []string
 	MoveSelectedDown  []string
@@ -76,9 +79,12 @@ type QueueKeyMap struct {
 	ToggleSearchFocus bubblekey.Binding
 	SourcePrev        bubblekey.Binding
 	SourceNext        bubblekey.Binding
-	FilterTracks      bubblekey.Binding
-	FilterStreams     bubblekey.Binding
-	FilterPlaylists   bubblekey.Binding
+	CycleSearchMode   bubblekey.Binding
+	ModeSongs         bubblekey.Binding
+	ModeArtists       bubblekey.Binding
+	ModeAlbums        bubblekey.Binding
+	ModePlaylists     bubblekey.Binding
+	ExpandSelected    bubblekey.Binding
 	ActivateSelected  bubblekey.Binding
 	MoveSelectedUp    bubblekey.Binding
 	MoveSelectedDown  bubblekey.Binding
@@ -113,9 +119,12 @@ func defaultKeybindOptions() KeybindOptions {
 			ToggleSearchFocus: []string{"ctrl+f"},
 			SourcePrev:        []string{"["},
 			SourceNext:        []string{"]"},
-			FilterTracks:      []string{"1"},
-			FilterStreams:     []string{"2"},
-			FilterPlaylists:   []string{"3"},
+			CycleSearchMode:   []string{"m"},
+			ModeSongs:         []string{"1"},
+			ModeArtists:       []string{"2"},
+			ModeAlbums:        []string{"3"},
+			ModePlaylists:     []string{"4"},
+			ExpandSelected:    []string{"e"},
 			ActivateSelected:  []string{"enter"},
 			MoveSelectedUp:    []string{"ctrl+k"},
 			MoveSelectedDown:  []string{"ctrl+j"},
@@ -157,9 +166,12 @@ func normalizedKeyMap(options KeybindOptions) KeyMap {
 		ToggleSearchFocus: newBinding(options.Queue.ToggleSearchFocus, defaults.Queue.ToggleSearchFocus, "focus or unfocus search"),
 		SourcePrev:        newBinding(options.Queue.SourcePrev, defaults.Queue.SourcePrev, "previous source"),
 		SourceNext:        newBinding(options.Queue.SourceNext, defaults.Queue.SourceNext, "next source"),
-		FilterTracks:      newBinding(options.Queue.FilterTracks, defaults.Queue.FilterTracks, "toggle track filter"),
-		FilterStreams:     newBinding(options.Queue.FilterStreams, defaults.Queue.FilterStreams, "toggle stream filter"),
-		FilterPlaylists:   newBinding(options.Queue.FilterPlaylists, defaults.Queue.FilterPlaylists, "toggle playlist filter"),
+		CycleSearchMode:   newBinding(options.Queue.CycleSearchMode, defaults.Queue.CycleSearchMode, "cycle source search mode"),
+		ModeSongs:         newBinding(options.Queue.ModeSongs, defaults.Queue.ModeSongs, "select songs mode"),
+		ModeArtists:       newBinding(options.Queue.ModeArtists, defaults.Queue.ModeArtists, "select artists mode"),
+		ModeAlbums:        newBinding(options.Queue.ModeAlbums, defaults.Queue.ModeAlbums, "select albums mode"),
+		ModePlaylists:     newBinding(options.Queue.ModePlaylists, defaults.Queue.ModePlaylists, "select playlists mode"),
+		ExpandSelected:    newBinding(options.Queue.ExpandSelected, defaults.Queue.ExpandSelected, "expand selected collection"),
 		ActivateSelected:  newBinding(options.Queue.ActivateSelected, defaults.Queue.ActivateSelected, "toggle selected row"),
 		MoveSelectedUp:    newBinding(options.Queue.MoveSelectedUp, defaults.Queue.MoveSelectedUp, "move queued item up"),
 		MoveSelectedDown:  newBinding(options.Queue.MoveSelectedDown, defaults.Queue.MoveSelectedDown, "move queued item down"),

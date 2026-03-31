@@ -72,6 +72,13 @@ func (l *Library) Sources() []teaui.SourceDescriptor {
 		ID:          sourceID,
 		Name:        "Local files",
 		Description: "Search and play local audio files from " + summarizeRoots(l.roots),
+		SearchModes: []teaui.SearchModeDescriptor{
+			{ID: teaui.SearchModeAll, Name: teaui.SearchModeAll.String()},
+			{ID: teaui.SearchModeTracks, Name: teaui.SearchModeTracks.String()},
+			{ID: teaui.SearchModeStreams, Name: teaui.SearchModeStreams.String()},
+			{ID: teaui.SearchModePlaylists, Name: teaui.SearchModePlaylists.String()},
+		},
+		DefaultMode: teaui.SearchModeAll,
 	}}
 }
 
@@ -80,7 +87,7 @@ func (l *Library) Search(ctx context.Context, request teaui.SearchRequest) ([]te
 	if request.SourceID != "" && request.SourceID != "all" && request.SourceID != sourceID {
 		return nil, nil
 	}
-	if !request.Filters.Matches(teaui.MediaTrack) {
+	if !localSearchModeMatches(request.Mode, teaui.MediaTrack) {
 		return nil, nil
 	}
 	if err := ctx.Err(); err != nil {
@@ -109,6 +116,26 @@ func (l *Library) Search(ctx context.Context, request teaui.SearchRequest) ([]te
 		}
 	}
 	return results, nil
+}
+
+// ExpandCollection reports no child results because local-library rows are already tracks.
+func (l *Library) ExpandCollection(context.Context, teaui.SearchResult) ([]teaui.SearchResult, error) {
+	return nil, nil
+}
+
+func localSearchModeMatches(mode teaui.SearchMode, kind teaui.MediaKind) bool {
+	switch mode {
+	case teaui.SearchModeAll:
+		return kind == teaui.MediaTrack
+	case teaui.SearchModeTracks:
+		return kind == teaui.MediaTrack
+	case teaui.SearchModeStreams:
+		return kind == teaui.MediaStream
+	case teaui.SearchModePlaylists:
+		return kind == teaui.MediaPlaylist
+	default:
+		return kind == teaui.MediaTrack
+	}
 }
 
 // Resolve opens and decodes the queued local file represented by entry.

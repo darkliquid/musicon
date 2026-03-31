@@ -67,7 +67,141 @@ func TestSearchQueryMapsJSONResults(t *testing.T) {
 	}
 }
 
-func TestInspectURLFlattensPlaylistEntries(t *testing.T) {
+func TestSearchQuerySupportsFocusedArtistAndPlaylistModes(t *testing.T) {
+	source := NewSource(Options{Enabled: true, MaxResults: 5})
+	source.httpClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		body, _ := io.ReadAll(req.Body)
+		switch {
+		case strings.Contains(string(body), `"query":"artist"`):
+			if !strings.Contains(string(body), `"params":"EgWKAQIgAWoMEA4QChADEAQQCRAF"`) {
+				t.Fatalf("expected artist search params in request body, got %s", string(body))
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+				"contents": {
+					"sectionListRenderer": {
+						"contents": [
+							{
+								"musicShelfRenderer": {
+									"contents": [
+										{
+											"musicResponsiveListItemRenderer": {
+												"navigationEndpoint": {
+													"browseEndpoint": {
+														"browseId": "artist-1",
+														"browseEndpointContextSupportedConfigs": {
+															"browseEndpointContextMusicConfig": {
+																"pageType": "MUSIC_PAGE_TYPE_ARTIST"
+															}
+														}
+													}
+												},
+												"flexColumns": [
+													{
+														"musicResponsiveListItemFlexColumnRenderer": {
+															"text": {
+																"runs": [
+																	{
+																		"text": "Artist One",
+																		"navigationEndpoint": {
+																			"browseEndpoint": {
+																				"browseId": "artist-1",
+																				"browseEndpointContextSupportedConfigs": {
+																					"browseEndpointContextMusicConfig": {
+																						"pageType": "MUSIC_PAGE_TYPE_ARTIST"
+																					}
+																				}
+																			}
+																		}
+																	}
+																]
+															}
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			}`)), Header: make(http.Header)}, nil
+		case strings.Contains(string(body), `"query":"playlist"`):
+			if !strings.Contains(string(body), `"params":"Eg-KAQwIABAAGAAgACgBMABqChAEEAMQCRAFEAo%3D"`) {
+				t.Fatalf("expected playlist search params in request body, got %s", string(body))
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{
+				"contents": {
+					"sectionListRenderer": {
+						"contents": [
+							{
+								"musicShelfRenderer": {
+									"contents": [
+										{
+											"musicResponsiveListItemRenderer": {
+												"navigationEndpoint": {
+													"watchEndpoint": {
+														"playlistId": "playlist-1"
+													}
+												},
+												"flexColumns": [
+													{
+														"musicResponsiveListItemFlexColumnRenderer": {
+															"text": {
+																"runs": [
+																	{
+																		"text": "Playlist One"
+																	}
+																]
+															}
+														}
+													},
+													{
+														"musicResponsiveListItemFlexColumnRenderer": {
+															"text": {
+																"runs": [
+																	{
+																		"text": "Curator"
+																	}
+																]
+															}
+														}
+													}
+												]
+											}
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			}`)), Header: make(http.Header)}, nil
+		default:
+			t.Fatalf("unexpected request body: %s", string(body))
+			return nil, nil
+		}
+	})}
+
+	artists, err := source.Search(context.Background(), teaui.SearchRequest{SourceID: sourceID, Query: "artist", Mode: teaui.SearchModeArtists, Filters: teaui.DefaultSearchFilters()})
+	if err != nil {
+		t.Fatalf("artist search failed: %v", err)
+	}
+	if len(artists) != 1 || artists[0].Kind != teaui.MediaArtist || artists[0].ArtistFilter.Name != "Artist One" {
+		t.Fatalf("unexpected artist results: %#v", artists)
+	}
+
+	playlists, err := source.Search(context.Background(), teaui.SearchRequest{SourceID: sourceID, Query: "playlist", Mode: teaui.SearchModePlaylists, Filters: teaui.DefaultSearchFilters()})
+	if err != nil {
+		t.Fatalf("playlist search failed: %v", err)
+	}
+	if len(playlists) != 1 || playlists[0].Kind != teaui.MediaPlaylist || playlists[0].PlaylistID != "playlist-1" {
+		t.Fatalf("unexpected playlist results: %#v", playlists)
+	}
+}
+
+func TestInspectURLReturnsPlaylistCollectionRow(t *testing.T) {
 	source := NewSource(Options{Enabled: true, MaxResults: 10})
 	source.yt = stubYouTubeClient{
 		getPlaylist: func(context.Context, string) (*youtubev2.Playlist, error) {
@@ -83,8 +217,41 @@ func TestInspectURLFlattensPlaylistEntries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("playlist inspect failed: %v", err)
 	}
-	if len(results) != 2 || results[1].ID != entryIDPrefix+"https://music.youtube.com/watch?v=track-b" {
+	if len(results) != 1 || results[0].Kind != teaui.MediaPlaylist || results[0].CollectionCount != 2 || results[0].PlaylistID != "abc" {
 		t.Fatalf("unexpected playlist results: %#v", results)
+	}
+}
+
+func TestExpandCollectionUsesPlaylistLookup(t *testing.T) {
+	source := NewSource(Options{Enabled: true, MaxResults: 10})
+	source.yt = stubYouTubeClient{
+		getPlaylist: func(context.Context, string) (*youtubev2.Playlist, error) {
+			return &youtubev2.Playlist{
+				Title: "Private Mix",
+				Videos: []*youtubev2.PlaylistEntry{
+					{ID: "track-a", Title: "Track A", Author: "Artist A", Duration: 111 * time.Second},
+					{ID: "track-b", Title: "Track B", Author: "Artist B", Duration: 222 * time.Second},
+				},
+			}, nil
+		},
+		getVideo: func(context.Context, string) (*youtubev2.Video, error) {
+			t.Fatal("unexpected GetVideoContext call")
+			return nil, nil
+		},
+	}
+
+	results, err := source.ExpandCollection(context.Background(), teaui.SearchResult{
+		ID:         entryIDPrefix + "playlist:abc",
+		Title:      "Private Mix",
+		Source:     sourceName,
+		Kind:       teaui.MediaPlaylist,
+		PlaylistID: "abc",
+	})
+	if err != nil {
+		t.Fatalf("expand collection failed: %v", err)
+	}
+	if len(results) != 2 || results[1].ID != entryIDPrefix+"https://music.youtube.com/watch?v=track-b" {
+		t.Fatalf("unexpected expanded playlist results: %#v", results)
 	}
 }
 

@@ -422,14 +422,23 @@ func mergeKeybindOptions(defaults, provided KeybindOptions) KeybindOptions {
 	if len(provided.Queue.SourceNext) > 0 {
 		merged.Queue.SourceNext = append([]string(nil), provided.Queue.SourceNext...)
 	}
-	if len(provided.Queue.FilterTracks) > 0 {
-		merged.Queue.FilterTracks = append([]string(nil), provided.Queue.FilterTracks...)
+	if len(provided.Queue.CycleSearchMode) > 0 {
+		merged.Queue.CycleSearchMode = append([]string(nil), provided.Queue.CycleSearchMode...)
 	}
-	if len(provided.Queue.FilterStreams) > 0 {
-		merged.Queue.FilterStreams = append([]string(nil), provided.Queue.FilterStreams...)
+	if len(provided.Queue.ModeSongs) > 0 {
+		merged.Queue.ModeSongs = append([]string(nil), provided.Queue.ModeSongs...)
 	}
-	if len(provided.Queue.FilterPlaylists) > 0 {
-		merged.Queue.FilterPlaylists = append([]string(nil), provided.Queue.FilterPlaylists...)
+	if len(provided.Queue.ModeArtists) > 0 {
+		merged.Queue.ModeArtists = append([]string(nil), provided.Queue.ModeArtists...)
+	}
+	if len(provided.Queue.ModeAlbums) > 0 {
+		merged.Queue.ModeAlbums = append([]string(nil), provided.Queue.ModeAlbums...)
+	}
+	if len(provided.Queue.ModePlaylists) > 0 {
+		merged.Queue.ModePlaylists = append([]string(nil), provided.Queue.ModePlaylists...)
+	}
+	if len(provided.Queue.ExpandSelected) > 0 {
+		merged.Queue.ExpandSelected = append([]string(nil), provided.Queue.ExpandSelected...)
 	}
 	if len(provided.Queue.ActivateSelected) > 0 {
 		merged.Queue.ActivateSelected = append([]string(nil), provided.Queue.ActivateSelected...)

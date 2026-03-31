@@ -8,6 +8,7 @@ The expected shape is:
 - otherwise load the global XDG config and then overlay the user XDG config if it is present
 - start from code defaults, then overlay TOML values
 - normalize values such as audio backend names, image-renderer backend names, start mode, fill mode, local directories, configurable keybinding lists, and YouTube source paths/args
+- carry queue-mode bindings for source switching, visible search-kind slot selection, search-kind cycling, and collection expansion so the richer multi-source queue workflow stays configurable from TOML instead of hardcoded in the UI
 - apply the shared fallback cell ratio when the config does not pin one explicitly
 - pass typed options into `internal/audio`, `internal/ui`, `internal/sources/local`, and `internal/sources/youtube`
 
