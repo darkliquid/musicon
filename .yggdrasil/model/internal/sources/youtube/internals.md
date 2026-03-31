@@ -11,6 +11,7 @@ Its expected shape is:
 - call the YouTube Music search endpoint for free-text queries and use `youtube/v2` for pasted video or playlist inspection
 - expose YouTube-specific focused search modes for songs, artists, albums, and playlists instead of flattening every free-text query into one unfocused mixed result set
 - send mode-specific YouTube Music search params for focused songs/artists/albums/playlists requests, and accept both tabbed mixed-search responses and direct filtered `sectionListRenderer` responses from Innertube
+- extract YouTube Music thumbnails from search/browse renderers and pass the best available image URL through Musicon's reusable cover-art metadata so playback can try source-provided artwork first
 - map artist rows into filter-selection results that the UI can apply back onto songs-mode searches
 - return album and playlist rows as collection results that can either queue the whole collection or expand into song rows on demand
 - treat YouTube Music search shelves as playable whenever an item exposes a `videoId`, instead of assuming the API always labels sections as "Songs" or "Videos"
@@ -44,3 +45,4 @@ Its expected shape is:
 - Chose focused YouTube search modes over continuing to return one mixed list because the user explicitly wanted songs, artists, albums, and playlists to behave differently in the queue workflow.
 - Chose to send YouTube Music's filter params for focused non-default search kinds instead of relying only on local post-filtering because live filtered searches can return a different response shape and otherwise left artist/album/playlist modes empty in the queue UI.
 - Chose provider-side collection expansion over preloading every album or playlist's child tracks in the initial search response because the user wanted expandable collection rows without turning each query into a burst of collection-member fetches.
+- Chose to preserve YouTube thumbnail URLs inside source-agnostic cover-art metadata instead of rendering them directly in the source package because playback already has one artwork-resolution path and the same metadata field can be reused by future providers.

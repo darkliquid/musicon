@@ -55,14 +55,14 @@ func TestSearchQueryMapsJSONResults(t *testing.T) {
 		if !strings.Contains(string(body), `"query":"song"`) {
 			t.Fatalf("expected query in request body, got %s", string(body))
 		}
-		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"contents":{"tabbedSearchResultsRenderer":{"tabs":[{"tabRenderer":{"title":"YT Music","content":{"sectionListRenderer":{"contents":[{"musicShelfRenderer":{"contents":[{"musicResponsiveListItemRenderer":{"flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Album Only"}]}}},{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Album"},{"text":"2024"}]}}}]}} ,{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"video-1"},"flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Song One"}]}}},{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Artist One","navigationEndpoint":{"browseEndpoint":{"browseId":"artist-1","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ARTIST"}}}}},{"text":"Album One","navigationEndpoint":{"browseEndpoint":{"browseId":"album-1","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}},{"text":"2:03"}]}}}]}},{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"video-2"},"flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Video Two"}]}}},{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Channel Two","navigationEndpoint":{"browseEndpoint":{"browseId":"channel-2","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_USER_CHANNEL"}}}}},{"text":"5:21"}]}}}]}}]}}]}}}}]}}}`)), Header: make(http.Header)}, nil
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"contents":{"tabbedSearchResultsRenderer":{"tabs":[{"tabRenderer":{"title":"YT Music","content":{"sectionListRenderer":{"contents":[{"musicShelfRenderer":{"contents":[{"musicResponsiveListItemRenderer":{"flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Album Only"}]}}},{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Album"},{"text":"2024"}]}}}]}} ,{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"video-1"},"thumbnail":{"musicThumbnailRenderer":{"thumbnail":{"thumbnails":[{"url":"https://img.youtube.test/song-small.jpg","width":60,"height":60},{"url":"https://img.youtube.test/song-large.jpg","width":300,"height":300}]}}},"flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Song One"}]}}},{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Artist One","navigationEndpoint":{"browseEndpoint":{"browseId":"artist-1","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ARTIST"}}}}},{"text":"Album One","navigationEndpoint":{"browseEndpoint":{"browseId":"album-1","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_ALBUM"}}}}},{"text":"2:03"}]}}}]}},{"musicResponsiveListItemRenderer":{"playlistItemData":{"videoId":"video-2"},"flexColumns":[{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Video Two"}]}}},{"musicResponsiveListItemFlexColumnRenderer":{"text":{"runs":[{"text":"Channel Two","navigationEndpoint":{"browseEndpoint":{"browseId":"channel-2","browseEndpointContextSupportedConfigs":{"browseEndpointContextMusicConfig":{"pageType":"MUSIC_PAGE_TYPE_USER_CHANNEL"}}}}},{"text":"5:21"}]}}}]}}]}}]}}}}]}}}`)), Header: make(http.Header)}, nil
 	})}
 
 	results, err := source.Search(context.Background(), teaui.SearchRequest{SourceID: sourceID, Query: "song", Filters: teaui.DefaultSearchFilters()})
 	if err != nil {
 		t.Fatalf("search failed: %v", err)
 	}
-	if len(results) != 2 || results[0].Artwork.Artist != "Artist One" || results[1].Subtitle != "Channel Two" {
+	if len(results) != 2 || results[0].Artwork.Artist != "Artist One" || results[0].Artwork.RemoteURL != "https://img.youtube.test/song-large.jpg" || results[1].Subtitle != "Channel Two" {
 		t.Fatalf("unexpected search results: %#v", results)
 	}
 }
@@ -92,6 +92,15 @@ func TestSearchQuerySupportsFocusedArtistAndPlaylistModes(t *testing.T) {
 															"browseEndpointContextMusicConfig": {
 																"pageType": "MUSIC_PAGE_TYPE_ARTIST"
 															}
+														}
+													}
+												},
+												"thumbnail": {
+													"musicThumbnailRenderer": {
+														"thumbnail": {
+															"thumbnails": [
+																{"url": "https://img.youtube.test/artist.jpg", "width": 240, "height": 240}
+															]
 														}
 													}
 												},
@@ -145,6 +154,15 @@ func TestSearchQuerySupportsFocusedArtistAndPlaylistModes(t *testing.T) {
 														"playlistId": "playlist-1"
 													}
 												},
+												"thumbnail": {
+													"croppedSquareThumbnailRenderer": {
+														"thumbnail": {
+															"thumbnails": [
+																{"url": "https://img.youtube.test/playlist.jpg", "width": 512, "height": 512}
+															]
+														}
+													}
+												},
 												"flexColumns": [
 													{
 														"musicResponsiveListItemFlexColumnRenderer": {
@@ -188,7 +206,7 @@ func TestSearchQuerySupportsFocusedArtistAndPlaylistModes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("artist search failed: %v", err)
 	}
-	if len(artists) != 1 || artists[0].Kind != teaui.MediaArtist || artists[0].ArtistFilter.Name != "Artist One" {
+	if len(artists) != 1 || artists[0].Kind != teaui.MediaArtist || artists[0].ArtistFilter.Name != "Artist One" || artists[0].Artwork.RemoteURL != "https://img.youtube.test/artist.jpg" {
 		t.Fatalf("unexpected artist results: %#v", artists)
 	}
 
@@ -196,7 +214,7 @@ func TestSearchQuerySupportsFocusedArtistAndPlaylistModes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("playlist search failed: %v", err)
 	}
-	if len(playlists) != 1 || playlists[0].Kind != teaui.MediaPlaylist || playlists[0].PlaylistID != "playlist-1" {
+	if len(playlists) != 1 || playlists[0].Kind != teaui.MediaPlaylist || playlists[0].PlaylistID != "playlist-1" || playlists[0].Artwork.RemoteURL != "https://img.youtube.test/playlist.jpg" {
 		t.Fatalf("unexpected playlist results: %#v", playlists)
 	}
 }

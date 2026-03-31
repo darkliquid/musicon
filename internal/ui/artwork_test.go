@@ -19,6 +19,15 @@ func (s stubCoverArtResolver) Resolve(ctx context.Context, metadata coverart.Met
 	return s.result, s.err
 }
 
+func (s stubCoverArtResolver) ResolveObserved(ctx context.Context, metadata coverart.Metadata, report func(coverart.AttemptEvent)) (coverart.Result, error) {
+	_ = ctx
+	_ = metadata
+	if report != nil {
+		report(coverart.AttemptEvent{Provider: "stub", Status: coverart.AttemptTrying, Message: "trying provider"})
+	}
+	return s.result, s.err
+}
+
 func TestCoverArtProviderMapsResult(t *testing.T) {
 	provider := NewCoverArtProvider(stubCoverArtResolver{
 		result: coverart.Result{
@@ -54,5 +63,23 @@ func TestCoverArtProviderSurfacesHardError(t *testing.T) {
 	_, err := provider.Artwork(coverart.Metadata{Title: "Song"})
 	if !errors.Is(err, want) {
 		t.Fatalf("expected %v, got %v", want, err)
+	}
+}
+
+func TestCoverArtProviderReportsObservedAttempts(t *testing.T) {
+	provider := NewCoverArtProvider(stubCoverArtResolver{
+		result: coverart.Result{
+			Image: coverart.Image{Data: []byte("img")},
+		},
+	})
+	var attempts []ArtworkAttempt
+	_, err := provider.ArtworkObserved(coverart.Metadata{Title: "Song"}, func(attempt ArtworkAttempt) {
+		attempts = append(attempts, attempt)
+	})
+	if err != nil {
+		t.Fatalf("artwork observed failed: %v", err)
+	}
+	if len(attempts) != 1 || attempts[0].Provider != "stub" || attempts[0].Status != string(coverart.AttemptTrying) {
+		t.Fatalf("unexpected attempts: %#v", attempts)
 	}
 }

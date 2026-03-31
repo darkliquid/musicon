@@ -7,6 +7,9 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/darkliquid/musicon/internal/audio"
 	"github.com/darkliquid/musicon/internal/config"
@@ -24,6 +27,12 @@ func main() {
 	audioBackend := flag.String("audio-backend", "", "force a specific audio backend (e.g. alsa, pulse, jack)")
 	imageBackend := flag.String("image-backend", "", "force a specific image renderer (e.g. kitty, sixel, iterm2, halfblocks)")
 	flag.Parse()
+
+	if err := configureDebugLogging(*debug, *debugLogPath); err != nil {
+		fmt.Fprintf(os.Stderr, "musicon: configure debug logging: %v\n", err)
+		os.Exit(1)
+	}
+	defer closeDebugLogging()
 
 	listingOnly := *listBackends || *listImageRenderers
 	if listingOnly {
@@ -185,17 +194,30 @@ func buildArtworkProvider() ui.ArtworkProvider {
 		APIKey: os.Getenv("LASTFM_API_KEY"),
 	}
 
+	debuglog(
+		"coverart: configured providers cache=%t spotify_credentials=%t apple_token=%t lastfm_key=%t",
+		cache != nil,
+		strings.TrimSpace(spotify.ClientID) != "" && strings.TrimSpace(spotify.ClientSecret) != "",
+		strings.TrimSpace(apple.DeveloperToken) != "",
+		strings.TrimSpace(lastfm.APIKey) != "",
+	)
+
 	var providers []coverart.Provider
 	providers = append(providers,
 		coverart.NewLocalFilesProvider(),
 		coverart.EmbeddedProvider{},
+		withCache(coverart.MetadataURLProvider{}, cache),
 		withCache(mb, cache),
 		withCache(spotify, cache),
 		withCache(apple, cache),
 		withCache(lastfm, cache),
 	)
 
-	return ui.NewCoverArtProvider(coverart.NewChain(providers...))
+	resolver := coverart.NewChain(providers...)
+	if debugLoggingEnabled() {
+		return ui.NewCoverArtProvider(artworkDebugResolver{next: resolver, logf: debuglog})
+	}
+	return ui.NewCoverArtProvider(resolver)
 }
 
 func withCache(provider coverart.Provider, cache coverart.Cache) coverart.Provider {
@@ -236,12 +258,244 @@ func printSelectedOptions(out io.Writer, selected string, list func() ([]string,
 }
 
 func debuglog(format string, args ...interface{}) {
-	if *debug {
-		fmt.Fprintf(os.Stderr, format+"\n", args...)
-	}
+	debugOutput.logf(format, args...)
 }
 
 var debug = flag.Bool("debug", false, "enable debug logging to stderr")
+var debugLogPath = flag.String("debug-log", "", "write debug logging to the specified file")
+
+type debugSink struct {
+	mu   sync.Mutex
+	out  io.Writer
+	file io.Closer
+}
+
+func (s *debugSink) configure(toStderr bool, path string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.file != nil {
+		_ = s.file.Close()
+		s.file = nil
+	}
+	s.out = nil
+
+	var outputs []io.Writer
+	if toStderr {
+		outputs = append(outputs, os.Stderr)
+	}
+	if path = strings.TrimSpace(path); path != "" {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		file, err := os.Create(path)
+		if err != nil {
+			return err
+		}
+		s.file = file
+		outputs = append(outputs, file)
+	}
+	if len(outputs) == 1 {
+		s.out = outputs[0]
+	} else if len(outputs) > 1 {
+		s.out = io.MultiWriter(outputs...)
+	}
+	return nil
+}
+
+func (s *debugSink) close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.out = nil
+	if s.file == nil {
+		return nil
+	}
+	err := s.file.Close()
+	s.file = nil
+	return err
+}
+
+func (s *debugSink) enabled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.out != nil
+}
+
+func (s *debugSink) logf(format string, args ...interface{}) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.out == nil {
+		return
+	}
+	fmt.Fprintf(s.out, format+"\n", args...)
+}
+
+var debugOutput debugSink
+
+func configureDebugLogging(toStderr bool, path string) error {
+	return debugOutput.configure(toStderr, path)
+}
+
+func closeDebugLogging() {
+	_ = debugOutput.close()
+}
+
+func debugLoggingEnabled() bool {
+	return debugOutput.enabled()
+}
+
+type artworkDebugResolver struct {
+	next interface {
+		Resolve(context.Context, coverart.Metadata) (coverart.Result, error)
+	}
+	logf func(string, ...interface{})
+}
+
+func (r artworkDebugResolver) Resolve(ctx context.Context, metadata coverart.Metadata) (coverart.Result, error) {
+	return r.ResolveObserved(ctx, metadata, nil)
+}
+
+func (r artworkDebugResolver) ResolveObserved(ctx context.Context, metadata coverart.Metadata, report func(coverart.AttemptEvent)) (coverart.Result, error) {
+	metadata = metadata.Normalize()
+	startedAt := time.Now()
+	providers := resolverProviderNames(r.next)
+	r.log("coverart: request started metadata=%s", summarizeArtworkMetadata(metadata))
+	if len(providers) > 0 {
+		r.log("coverart: provider-order=%s", strings.Join(providers, " -> "))
+	}
+
+	observed, ok := r.next.(interface {
+		ResolveObserved(context.Context, coverart.Metadata, func(coverart.AttemptEvent)) (coverart.Result, error)
+	})
+	if !ok {
+		result, err := r.next.Resolve(ctx, metadata)
+		r.logOutcome(result, err, time.Since(startedAt))
+		return result, err
+	}
+
+	attemptCounts := make(map[string]int)
+	result, err := observed.ResolveObserved(ctx, metadata, func(event coverart.AttemptEvent) {
+		attemptCounts[event.Provider]++
+		r.log(
+			"coverart: attempt=%d provider=%s status=%s message=%s",
+			attemptCounts[event.Provider],
+			event.Provider,
+			event.Status,
+			event.Message,
+		)
+		if report != nil {
+			report(event)
+		}
+	})
+	r.logOutcome(result, err, time.Since(startedAt))
+	return result, err
+}
+
+func (r artworkDebugResolver) logOutcome(result coverart.Result, err error, elapsed time.Duration) {
+	switch {
+	case err == nil:
+		r.log(
+			"coverart: resolved provider=%s mime=%q description=%q bytes=%d elapsed=%s",
+			result.Provider,
+			result.Image.MIMEType,
+			result.Image.Description,
+			len(result.Image.Data),
+			elapsed.Truncate(time.Millisecond),
+		)
+	case coverart.IsNotFound(err):
+		r.log("coverart: no artwork found elapsed=%s", elapsed.Truncate(time.Millisecond))
+	default:
+		r.log("coverart: lookup failed elapsed=%s error=%v", elapsed.Truncate(time.Millisecond), err)
+	}
+}
+
+func (r artworkDebugResolver) log(format string, args ...interface{}) {
+	if r.logf == nil {
+		return
+	}
+	r.logf(format, args...)
+}
+
+func summarizeArtworkMetadata(metadata coverart.Metadata) string {
+	parts := make([]string, 0, 8)
+	if metadata.Title != "" {
+		parts = append(parts, fmt.Sprintf("title=%q", metadata.Title))
+	}
+	if metadata.Artist != "" {
+		parts = append(parts, fmt.Sprintf("artist=%q", metadata.Artist))
+	}
+	if metadata.Album != "" {
+		parts = append(parts, fmt.Sprintf("album=%q", metadata.Album))
+	}
+	if metadata.RemoteURL != "" {
+		parts = append(parts, fmt.Sprintf("remote_url=%q", metadata.RemoteURL))
+	}
+	if metadata.IDs.MusicBrainzReleaseID != "" {
+		parts = append(parts, fmt.Sprintf("mb_release=%q", metadata.IDs.MusicBrainzReleaseID))
+	}
+	if metadata.IDs.MusicBrainzReleaseGroupID != "" {
+		parts = append(parts, fmt.Sprintf("mb_group=%q", metadata.IDs.MusicBrainzReleaseGroupID))
+	}
+	if metadata.IDs.MusicBrainzRecordingID != "" {
+		parts = append(parts, fmt.Sprintf("mb_recording=%q", metadata.IDs.MusicBrainzRecordingID))
+	}
+	if metadata.IDs.SpotifyAlbumID != "" {
+		parts = append(parts, fmt.Sprintf("spotify_album=%q", metadata.IDs.SpotifyAlbumID))
+	}
+	if metadata.IDs.SpotifyTrackID != "" {
+		parts = append(parts, fmt.Sprintf("spotify_track=%q", metadata.IDs.SpotifyTrackID))
+	}
+	if metadata.IDs.AppleMusicAlbumID != "" {
+		parts = append(parts, fmt.Sprintf("apple_album=%q", metadata.IDs.AppleMusicAlbumID))
+	}
+	if metadata.IDs.AppleMusicSongID != "" {
+		parts = append(parts, fmt.Sprintf("apple_song=%q", metadata.IDs.AppleMusicSongID))
+	}
+	if metadata.Local != nil {
+		if metadata.Local.AudioPath != "" {
+			parts = append(parts, fmt.Sprintf("audio_path=%q", metadata.Local.AudioPath))
+		}
+		if metadata.Local.CoverFilePath != "" {
+			parts = append(parts, fmt.Sprintf("cover_path=%q", metadata.Local.CoverFilePath))
+		}
+		if metadata.Local.Embedded != nil {
+			parts = append(parts, fmt.Sprintf("embedded_bytes=%d", len(metadata.Local.Embedded.Data)))
+		}
+	}
+	if len(parts) == 0 {
+		return "<empty>"
+	}
+	return strings.Join(parts, " ")
+}
+
+func resolverProviderNames(resolver any) []string {
+	type providerLister interface {
+		Providers() []coverart.Provider
+	}
+
+	list, ok := resolver.(providerLister)
+	if !ok {
+		return nil
+	}
+	providers := list.Providers()
+	names := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		if provider == nil {
+			continue
+		}
+		name := strings.TrimSpace(provider.Name())
+		if name == "" {
+			continue
+		}
+		names = append(names, name)
+	}
+	if len(names) == 0 {
+		return nil
+	}
+	return names
+}
 
 type combinedSearch struct {
 	providers []ui.SearchService

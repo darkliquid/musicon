@@ -10,7 +10,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - `SearchService` for source discovery and result retrieval, with caller-supplied context so UI search can cancel superseded provider work
 - `QueueService` for queue snapshots and mutation
 - `PlaybackService` for transport, volume, and playback snapshots
-- `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with artwork providers receiving reusable cover-art metadata and supplying image data to reusable rendering components
+- `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with artwork providers receiving reusable cover-art metadata, optionally reporting provider-attempt progress, and supplying image data to reusable rendering components
 - `Options` for startup mode, theme selection, cell-width ratio, and playback artwork rendering preferences
 
 # Contracts
@@ -40,6 +40,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - When rendered artwork does not occupy the full playback pane, the remaining pane area should use a muted filler pattern so the image bounds remain legible without overwhelming the artwork itself.
 - Playback artwork rendering should route provider-supplied image data through reusable `pkg/components` image rendering instead of embedding terminal-image protocol logic inside the screen model.
 - Playback artwork requests should pass normalized cover-art metadata into the provider path instead of relying on a narrow track-ID-only contract.
+- Playback artwork providers should also be able to report recent provider/cache attempts so the playback pane can surface lookup progress without embedding provider-chain logic directly in the screen.
 - Musicon-specific adaptation from reusable cover-art resolvers into the UI artwork contract belongs in `internal/ui`, not in `pkg/coverart`.
 
 # Failure modes

@@ -68,13 +68,26 @@ type artworkTestProvider struct {
 	mu     sync.Mutex
 	calls  int
 	source *components.ImageSource
+	block  chan struct{}
 }
 
-func (p *artworkTestProvider) Artwork(_ coverart.Metadata) (*components.ImageSource, error) {
+func (p *artworkTestProvider) Artwork(metadata coverart.Metadata) (*components.ImageSource, error) {
+	return p.ArtworkObserved(metadata, nil)
+}
+
+func (p *artworkTestProvider) ArtworkObserved(_ coverart.Metadata, report func(ArtworkAttempt)) (*components.ImageSource, error) {
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	p.calls++
-	return p.source, nil
+	block := p.block
+	source := p.source
+	p.mu.Unlock()
+	if report != nil {
+		report(ArtworkAttempt{Provider: "stub", Status: "trying", Message: "trying provider"})
+	}
+	if block != nil {
+		<-block
+	}
+	return source, nil
 }
 
 type lyricsTestProvider struct {
@@ -258,6 +271,109 @@ func TestPlaybackArtworkLookupIsCachedAcrossViews(t *testing.T) {
 	provider.mu.Unlock()
 	if calls != 1 {
 		t.Fatalf("expected artwork provider to be called once, got %d", calls)
+	}
+}
+
+func TestPlaybackArtworkLookupRestartsWhenArtworkMetadataChanges(t *testing.T) {
+	provider := &artworkTestProvider{
+		source: &components.ImageSource{Description: "cached artwork"},
+	}
+	screen := newPlaybackScreen(Services{Artwork: provider}, AlbumArtOptions{})
+	screen.SetSize(40, 20)
+	screen.snapshot = PlaybackSnapshot{
+		Track: &TrackInfo{
+			ID:     "track-1",
+			Title:  "Song",
+			Artist: "Artist",
+			Album:  "Album",
+			Source: "youtube",
+		},
+	}
+
+	_ = screen.View()
+	screen.snapshot.Track.Artwork = coverart.Metadata{
+		IDs: coverart.IDs{SpotifyAlbumID: "spotify-album"},
+	}
+	_ = screen.View()
+
+	provider.mu.Lock()
+	calls := provider.calls
+	provider.mu.Unlock()
+	if calls != 2 {
+		t.Fatalf("expected artwork provider to rerun after metadata changed, got %d calls", calls)
+	}
+}
+
+func TestPlaybackArtworkOverlayShowsRecentAttemptsWhileLoading(t *testing.T) {
+	block := make(chan struct{})
+	provider := &artworkTestProvider{
+		source: &components.ImageSource{Description: "art"},
+		block:  block,
+	}
+	screen := newPlaybackScreen(Services{Artwork: provider}, AlbumArtOptions{})
+	screen.SetSize(48, 24)
+	screen.snapshot = PlaybackSnapshot{
+		Track: &TrackInfo{
+			ID:     "track-1",
+			Title:  "Song",
+			Artist: "Artist",
+			Album:  "Album",
+			Source: "youtube",
+		},
+	}
+
+	_ = screen.View()
+	deadline := time.Now().Add(250 * time.Millisecond)
+	for {
+		screen.consumeArtworkLookup()
+		if len(screen.artworkAttempts) > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("expected artwork attempt to be recorded while loading")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	view := screen.View()
+	if !strings.Contains(view, "Artwork lookup") || !strings.Contains(view, "trying provider") {
+		t.Fatalf("expected overlay log in artwork view, got %q", view)
+	}
+	close(block)
+}
+
+func TestPlaybackArtworkOverlayHidesAfterSuccessfulLoad(t *testing.T) {
+	provider := &artworkTestProvider{
+		source: &components.ImageSource{Description: "art"},
+	}
+	screen := newPlaybackScreen(Services{Artwork: provider}, AlbumArtOptions{})
+	screen.SetSize(48, 24)
+	screen.snapshot = PlaybackSnapshot{
+		Track: &TrackInfo{
+			ID:     "track-1",
+			Title:  "Song",
+			Artist: "Artist",
+			Album:  "Album",
+			Source: "youtube",
+		},
+	}
+
+	_ = screen.View()
+	deadline := time.Now().Add(250 * time.Millisecond)
+	for {
+		screen.consumeArtworkLookup()
+		if !screen.artworkLoading {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("expected artwork lookup to settle")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	view := screen.View()
+	if strings.Contains(view, "Artwork lookup") {
+		t.Fatalf("expected artwork overlay to hide after successful load, got %q", view)
 	}
 }
 

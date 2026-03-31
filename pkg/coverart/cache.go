@@ -92,24 +92,34 @@ func (p CachedProvider) Name() string {
 
 // Lookup consults the cache before delegating to the wrapped provider.
 func (p CachedProvider) Lookup(ctx context.Context, metadata Metadata) (Result, error) {
+	return p.LookupObserved(ctx, metadata, nil)
+}
+
+// LookupObserved consults the cache before delegating to the wrapped provider and reports cache/provider events.
+func (p CachedProvider) LookupObserved(ctx context.Context, metadata Metadata, report func(AttemptEvent)) (Result, error) {
 	if p.Provider == nil {
 		return Result{}, ErrNotFound
 	}
 	key, err := cacheKey(p.Provider.Name(), metadata.Normalize())
 	if err != nil {
+		reportAttempt(report, AttemptEvent{Provider: p.Provider.Name(), Status: AttemptError, Message: err.Error()})
 		return Result{}, err
 	}
 	if image, err := p.Cache.Get(key); err == nil {
+		reportAttempt(report, AttemptEvent{Provider: p.Provider.Name(), Status: AttemptCacheHit, Message: "loaded from disk cache"})
 		return Result{Image: image, Provider: p.Provider.Name()}, nil
 	} else if !IsNotFound(err) {
+		reportAttempt(report, AttemptEvent{Provider: p.Provider.Name(), Status: AttemptError, Message: err.Error()})
 		return Result{}, err
 	}
+	reportAttempt(report, AttemptEvent{Provider: p.Provider.Name(), Status: AttemptCacheMiss, Message: "cache miss"})
 
-	result, err := p.Provider.Lookup(ctx, metadata)
+	result, err := lookupProviderObserved(ctx, p.Provider, metadata, report)
 	if err != nil {
 		return Result{}, err
 	}
 	if err := p.Cache.Put(key, result.Image); err != nil {
+		reportAttempt(report, AttemptEvent{Provider: p.Provider.Name(), Status: AttemptError, Message: err.Error()})
 		return Result{}, err
 	}
 	return result, nil
@@ -121,11 +131,17 @@ func cacheKey(provider string, metadata Metadata) (string, error) {
 		Metadata Metadata `json:"metadata"`
 	}{
 		Provider: provider,
-		Metadata: metadata,
+		Metadata: cacheableMetadata(metadata),
 	}
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func cacheableMetadata(metadata Metadata) Metadata {
+	metadata = metadata.Normalize()
+	metadata.Local = nil
+	return metadata
 }

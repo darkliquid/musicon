@@ -67,9 +67,10 @@ type musicSearchTab struct {
 
 type musicSearchSection struct {
 	MusicCardShelfRenderer struct {
-		Title    musicRuns     `json:"title"`
-		Subtitle musicRuns     `json:"subtitle"`
-		OnTap    musicWatchTap `json:"onTap"`
+		Title     musicRuns          `json:"title"`
+		Subtitle  musicRuns          `json:"subtitle"`
+		OnTap     musicWatchTap      `json:"onTap"`
+		Thumbnail musicThumbnailNode `json:"thumbnail"`
 	} `json:"musicCardShelfRenderer"`
 	MusicShelfRenderer struct {
 		Title    musicRuns           `json:"title"`
@@ -83,6 +84,7 @@ type musicSearchResult struct {
 			VideoID string `json:"videoId"`
 		} `json:"playlistItemData"`
 		NavigationEndpoint musicNavigationEndpoint `json:"navigationEndpoint"`
+		Thumbnail          musicThumbnailNode      `json:"thumbnail"`
 		FlexColumns        []struct {
 			MusicResponsiveListItemFlexColumnRenderer struct {
 				Text musicRuns `json:"text"`
@@ -117,6 +119,27 @@ type musicRuns struct {
 		Text               string                  `json:"text"`
 		NavigationEndpoint musicNavigationEndpoint `json:"navigationEndpoint"`
 	} `json:"runs"`
+}
+
+type musicThumbnailNode struct {
+	MusicThumbnailRenderer struct {
+		Thumbnail musicThumbnailList `json:"thumbnail"`
+	} `json:"musicThumbnailRenderer"`
+	CroppedSquareThumbnailRenderer struct {
+		Thumbnail musicThumbnailList `json:"thumbnail"`
+	} `json:"croppedSquareThumbnailRenderer"`
+	Thumbnail  musicThumbnailList `json:"thumbnail"`
+	Thumbnails []musicThumbnail   `json:"thumbnails"`
+}
+
+type musicThumbnailList struct {
+	Thumbnails []musicThumbnail `json:"thumbnails"`
+}
+
+type musicThumbnail struct {
+	URL    string `json:"url"`
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
 }
 
 // OwnsEntryID reports whether a queued entry ID belongs to this provider.
@@ -457,7 +480,7 @@ func (s musicSearchSection) TopResult() teaui.SearchResult {
 	title := firstNonEmpty(s.MusicCardShelfRenderer.Title.FirstText(), videoID)
 	artist := s.MusicCardShelfRenderer.Subtitle.ArtistsText()
 	album := s.MusicCardShelfRenderer.Subtitle.AlbumText()
-	return newMusicTrackResult(videoID, title, artist, album, s.MusicCardShelfRenderer.Subtitle.Duration())
+	return newMusicTrackResult(videoID, title, artist, album, s.MusicCardShelfRenderer.Subtitle.Duration(), s.MusicCardShelfRenderer.Thumbnail.bestURL())
 }
 
 func (r musicSearchResult) resultForMode(mode teaui.SearchMode) teaui.SearchResult {
@@ -480,7 +503,7 @@ func (r musicSearchResult) ToTrackResult() teaui.SearchResult {
 	}
 	title := r.titleRuns().FirstText()
 	metaRuns := r.metaRuns()
-	return newMusicTrackResult(videoID, firstNonEmpty(title, videoID), metaRuns.ArtistsText(), metaRuns.AlbumText(), metaRuns.Duration())
+	return newMusicTrackResult(videoID, firstNonEmpty(title, videoID), metaRuns.ArtistsText(), metaRuns.AlbumText(), metaRuns.Duration(), r.MusicResponsiveListItemRenderer.Thumbnail.bestURL())
 }
 
 func (r musicSearchResult) ToArtistResult() teaui.SearchResult {
@@ -502,7 +525,7 @@ func (r musicSearchResult) ToArtistResult() teaui.SearchResult {
 		Kind:         teaui.MediaArtist,
 		BrowseID:     browseID,
 		ArtistFilter: teaui.SearchArtistFilter{ID: browseID, Name: name},
-		Artwork:      coverart.Metadata{Artist: name}.Normalize(),
+		Artwork:      coverart.Metadata{Artist: name, RemoteURL: r.MusicResponsiveListItemRenderer.Thumbnail.bestURL()}.Normalize(),
 	}
 }
 
@@ -517,7 +540,7 @@ func (r musicSearchResult) ToAlbumResult() teaui.SearchResult {
 		return teaui.SearchResult{}
 	}
 	artists := r.metaRuns().ArtistsText()
-	metadata := coverart.Metadata{Title: title, Artist: artists, Album: title}.Normalize()
+	metadata := coverart.Metadata{Title: title, Artist: artists, Album: title, RemoteURL: r.MusicResponsiveListItemRenderer.Thumbnail.bestURL()}.Normalize()
 	return teaui.SearchResult{
 		ID:              entryIDPrefix + "album:" + browseID,
 		Title:           title,
@@ -538,7 +561,7 @@ func (r musicSearchResult) ToPlaylistResult() teaui.SearchResult {
 		return teaui.SearchResult{}
 	}
 	artists := r.metaRuns().ArtistsText()
-	metadata := coverart.Metadata{Title: title, Artist: artists, Album: title}.Normalize()
+	metadata := coverart.Metadata{Title: title, Artist: artists, Album: title, RemoteURL: r.MusicResponsiveListItemRenderer.Thumbnail.bestURL()}.Normalize()
 	return teaui.SearchResult{
 		ID:              entryIDPrefix + "playlist:" + firstNonEmpty(playlistID, browseID),
 		Title:           title,
@@ -566,9 +589,40 @@ func (r musicSearchResult) metaRuns() musicRuns {
 	return r.MusicResponsiveListItemRenderer.FlexColumns[1].MusicResponsiveListItemFlexColumnRenderer.Text
 }
 
-func newMusicTrackResult(videoID, title, artist, album string, duration time.Duration) teaui.SearchResult {
-	metadata := coverart.Metadata{Title: title, Artist: artist, Album: album}.Normalize()
+func newMusicTrackResult(videoID, title, artist, album string, duration time.Duration, artworkURL string) teaui.SearchResult {
+	metadata := coverart.Metadata{Title: title, Artist: artist, Album: album, RemoteURL: artworkURL}.Normalize()
 	return teaui.SearchResult{ID: entryIDPrefix + videoURL(videoID), Title: title, Subtitle: firstNonEmpty(artist, album, sourceName), Source: sourceName, Kind: teaui.MediaTrack, Duration: duration, Artwork: metadata}
+}
+
+func (n musicThumbnailNode) bestURL() string {
+	best := func(thumbnails []musicThumbnail) string {
+		bestURL := ""
+		bestArea := -1
+		for _, thumbnail := range thumbnails {
+			url := strings.TrimSpace(thumbnail.URL)
+			if url == "" {
+				continue
+			}
+			area := thumbnail.Width * thumbnail.Height
+			if area >= bestArea {
+				bestArea = area
+				bestURL = url
+			}
+		}
+		return bestURL
+	}
+
+	for _, thumbnails := range [][]musicThumbnail{
+		n.MusicThumbnailRenderer.Thumbnail.Thumbnails,
+		n.CroppedSquareThumbnailRenderer.Thumbnail.Thumbnails,
+		n.Thumbnail.Thumbnails,
+		n.Thumbnails,
+	} {
+		if url := best(thumbnails); url != "" {
+			return url
+		}
+	}
+	return ""
 }
 
 // The musicRuns helpers interpret YouTube Music's loosely typed text runs into
@@ -703,7 +757,7 @@ func browseCollectionTracks(payload any, parent teaui.SearchResult) []teaui.Sear
 		}
 		seen[result.ID] = struct{}{}
 		if parent.Kind == teaui.MediaAlbum && result.Artwork.Album == "" {
-			result.Artwork = result.Artwork.Merge(coverart.Metadata{Album: parent.Title})
+			result.Artwork = result.Artwork.Merge(coverart.Metadata{Album: parent.Title, RemoteURL: parent.Artwork.RemoteURL})
 		}
 		if strings.TrimSpace(result.Subtitle) == "" {
 			result.Subtitle = firstNonEmpty(parent.Subtitle, sourceName)

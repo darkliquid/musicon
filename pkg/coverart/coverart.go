@@ -3,6 +3,8 @@ package coverart
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
 	"strings"
 )
 
@@ -36,11 +38,12 @@ type LocalMetadata struct {
 
 // Metadata describes the inputs a cover-art provider can use to locate art.
 type Metadata struct {
-	Title  string
-	Album  string
-	Artist string
-	IDs    IDs
-	Local  *LocalMetadata
+	Title     string
+	Album     string
+	Artist    string
+	RemoteURL string
+	IDs       IDs
+	Local     *LocalMetadata
 }
 
 // Merge returns metadata that prefers the receiver's populated fields and fills
@@ -57,6 +60,9 @@ func (m Metadata) Merge(fallback Metadata) Metadata {
 	}
 	if m.Artist == "" {
 		m.Artist = fallback.Artist
+	}
+	if m.RemoteURL == "" {
+		m.RemoteURL = fallback.RemoteURL
 	}
 
 	if m.IDs.MusicBrainzReleaseID == "" {
@@ -104,6 +110,7 @@ func (m Metadata) Normalize() Metadata {
 	m.Title = strings.TrimSpace(m.Title)
 	m.Album = strings.TrimSpace(m.Album)
 	m.Artist = strings.TrimSpace(m.Artist)
+	m.RemoteURL = strings.TrimSpace(m.RemoteURL)
 	m.IDs.MusicBrainzReleaseID = strings.TrimSpace(m.IDs.MusicBrainzReleaseID)
 	m.IDs.MusicBrainzReleaseGroupID = strings.TrimSpace(m.IDs.MusicBrainzReleaseGroupID)
 	m.IDs.MusicBrainzRecordingID = strings.TrimSpace(m.IDs.MusicBrainzRecordingID)
@@ -127,8 +134,61 @@ func (m Metadata) Empty() bool {
 	return m.Title == "" &&
 		m.Album == "" &&
 		m.Artist == "" &&
+		m.RemoteURL == "" &&
 		m.IDs == (IDs{}) &&
 		m.Local == nil
+}
+
+// MetadataURLProvider downloads artwork directly from metadata-supplied remote URLs.
+type MetadataURLProvider struct {
+	Client *http.Client
+}
+
+// Name returns the provider's stable identifier.
+func (p MetadataURLProvider) Name() string { return "metadata-url" }
+
+// Lookup fetches artwork directly from Metadata.RemoteURL when present.
+func (p MetadataURLProvider) Lookup(ctx context.Context, metadata Metadata) (Result, error) {
+	metadata = metadata.Normalize()
+	if metadata.RemoteURL == "" {
+		return Result{}, ErrNotFound
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, metadata.RemoteURL, nil)
+	if err != nil {
+		return Result{}, err
+	}
+
+	resp, err := p.client().Do(req)
+	if err != nil {
+		return Result{}, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		return Result{}, ErrNotFound
+	default:
+		return Result{}, errors.New("metadata artwork fetch returned " + resp.Status)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return Result{}, err
+	}
+	if len(data) == 0 {
+		return Result{}, ErrNotFound
+	}
+
+	return Result{
+		Image: Image{
+			Data:        data,
+			MIMEType:    strings.TrimSpace(resp.Header.Get("Content-Type")),
+			Description: "metadata artwork",
+		},
+		Provider: p.Name(),
+	}, nil
 }
 
 // Result is a successful provider lookup.
@@ -137,10 +197,36 @@ type Result struct {
 	Provider string
 }
 
+// AttemptStatus classifies one step in the provider resolution flow.
+type AttemptStatus string
+
+// AttemptStatus values capture cache checks, provider execution, and outcomes.
+const (
+	AttemptCacheHit  AttemptStatus = "cache-hit"
+	AttemptCacheMiss AttemptStatus = "cache-miss"
+	AttemptTrying    AttemptStatus = "trying"
+	AttemptSuccess   AttemptStatus = "success"
+	AttemptNotFound  AttemptStatus = "not-found"
+	AttemptError     AttemptStatus = "error"
+)
+
+// AttemptEvent reports one observable step while resolving artwork.
+type AttemptEvent struct {
+	Provider string
+	Status   AttemptStatus
+	Message  string
+}
+
 // Provider looks up cover art from one source.
 type Provider interface {
 	Name() string
 	Lookup(ctx context.Context, metadata Metadata) (Result, error)
+}
+
+// AttemptReportingProvider can stream provider/cache progress while resolving.
+type AttemptReportingProvider interface {
+	Provider
+	LookupObserved(ctx context.Context, metadata Metadata, report func(AttemptEvent)) (Result, error)
 }
 
 // Chain resolves cover art through providers in priority order.
@@ -169,6 +255,11 @@ func (c *Chain) Providers() []Provider {
 
 // Resolve runs providers in order until one returns a usable image.
 func (c *Chain) Resolve(ctx context.Context, metadata Metadata) (Result, error) {
+	return c.ResolveObserved(ctx, metadata, nil)
+}
+
+// ResolveObserved runs providers in order while optionally reporting progress.
+func (c *Chain) ResolveObserved(ctx context.Context, metadata Metadata, report func(AttemptEvent)) (Result, error) {
 	metadata = metadata.Normalize()
 	if metadata.Empty() {
 		return Result{}, ErrNotFound
@@ -178,7 +269,7 @@ func (c *Chain) Resolve(ctx context.Context, metadata Metadata) (Result, error) 
 	}
 
 	for _, provider := range c.providers {
-		result, err := provider.Lookup(ctx, metadata)
+		result, err := lookupProviderObserved(ctx, provider, metadata, report)
 		switch {
 		case err == nil:
 			result.Provider = strings.TrimSpace(result.Provider)
@@ -194,6 +285,39 @@ func (c *Chain) Resolve(ctx context.Context, metadata Metadata) (Result, error) 
 	}
 
 	return Result{}, ErrNotFound
+}
+
+func lookupProviderObserved(ctx context.Context, provider Provider, metadata Metadata, report func(AttemptEvent)) (Result, error) {
+	if observed, ok := provider.(AttemptReportingProvider); ok {
+		return observed.LookupObserved(ctx, metadata, report)
+	}
+	reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptTrying, Message: "trying provider"})
+	result, err := provider.Lookup(ctx, metadata)
+	switch {
+	case err == nil:
+		reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptSuccess, Message: "artwork found"})
+	case errors.Is(err, ErrNotFound):
+		reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptNotFound, Message: "no artwork found"})
+	default:
+		reportAttempt(report, AttemptEvent{Provider: provider.Name(), Status: AttemptError, Message: err.Error()})
+	}
+	return result, err
+}
+
+func reportAttempt(report func(AttemptEvent), event AttemptEvent) {
+	if report == nil {
+		return
+	}
+	event.Provider = strings.TrimSpace(event.Provider)
+	event.Message = strings.TrimSpace(event.Message)
+	report(event)
+}
+
+func (p MetadataURLProvider) client() *http.Client {
+	if p.Client != nil {
+		return p.Client
+	}
+	return http.DefaultClient
 }
 
 // IsNotFound reports whether the error is a provider miss rather than a hard failure.

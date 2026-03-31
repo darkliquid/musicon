@@ -15,6 +15,7 @@ The resulting type implements:
 - Pasted YouTube or YouTube Music URLs should resolve into queueable items, including flattened public playlist entries when the URL targets a playlist.
 - Search should honor caller cancellation so the queue UI can abandon superseded YouTube Music HTTP requests instead of leaving stale searches running.
 - Resolver output should use `yt-dlp` for extraction, fetch playback bytes through Musicon's own ranged HTTP reader, decode the resulting WebM/Opus bytes in pure Go into a buffered seekable stream, and return a `beep`-compatible stream with title, artist, album, duration, and downstream cover-art metadata preserved.
+- Search and browse result mapping should preserve YouTube Music thumbnail URLs in downstream cover-art metadata so playback can render source-provided artwork before falling back to slower remote artwork lookups.
 
 # Failure modes
 

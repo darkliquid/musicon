@@ -3,6 +3,8 @@ package coverart
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -24,9 +26,10 @@ func (s *stubProvider) Lookup(ctx context.Context, metadata Metadata) (Result, e
 
 func TestMetadataNormalize(t *testing.T) {
 	meta := Metadata{
-		Title:  " Song ",
-		Album:  " Album ",
-		Artist: " Artist ",
+		Title:     " Song ",
+		Album:     " Album ",
+		Artist:    " Artist ",
+		RemoteURL: " https://img.example.test/cover.jpg ",
 		IDs: IDs{
 			MusicBrainzReleaseID:      " mbid ",
 			MusicBrainzReleaseGroupID: " rgid ",
@@ -40,7 +43,7 @@ func TestMetadataNormalize(t *testing.T) {
 	}
 
 	got := meta.Normalize()
-	if got.Title != "Song" || got.Album != "Album" || got.Artist != "Artist" {
+	if got.Title != "Song" || got.Album != "Album" || got.Artist != "Artist" || got.RemoteURL != "https://img.example.test/cover.jpg" {
 		t.Fatalf("unexpected normalized fields: %#v", got)
 	}
 	if got.IDs.MusicBrainzReleaseID != "mbid" || got.IDs.SpotifyAlbumID != "spotify" || got.IDs.AppleMusicAlbumID != "apple" {
@@ -91,10 +94,43 @@ func TestChainResolveRequiresUsefulMetadata(t *testing.T) {
 	}
 }
 
+func TestChainResolveObservedReportsAttempts(t *testing.T) {
+	first := &stubProvider{name: "first", err: ErrNotFound}
+	second := &stubProvider{name: "second", result: Result{Image: Image{Data: []byte("img")}}}
+	chain := NewChain(first, second)
+	var events []AttemptEvent
+
+	result, err := chain.ResolveObserved(context.Background(), Metadata{Title: "Song"}, func(event AttemptEvent) {
+		events = append(events, event)
+	})
+	if err != nil {
+		t.Fatalf("resolve observed failed: %v", err)
+	}
+	if result.Provider != "second" {
+		t.Fatalf("expected provider second, got %q", result.Provider)
+	}
+	if len(events) != 4 {
+		t.Fatalf("expected 4 events, got %#v", events)
+	}
+	if events[0].Provider != "first" || events[0].Status != AttemptTrying {
+		t.Fatalf("unexpected first event: %#v", events[0])
+	}
+	if events[1].Provider != "first" || events[1].Status != AttemptNotFound {
+		t.Fatalf("unexpected second event: %#v", events[1])
+	}
+	if events[2].Provider != "second" || events[2].Status != AttemptTrying {
+		t.Fatalf("unexpected third event: %#v", events[2])
+	}
+	if events[3].Provider != "second" || events[3].Status != AttemptSuccess {
+		t.Fatalf("unexpected fourth event: %#v", events[3])
+	}
+}
+
 func TestMetadataMergeFillsArtworkGaps(t *testing.T) {
 	embedded := &Image{Data: []byte("img"), MIMEType: "image/jpeg"}
 	base := Metadata{
-		Artist: "Artist",
+		Artist:    "Artist",
+		RemoteURL: "https://img.example.test/base.jpg",
 		IDs: IDs{
 			SpotifyTrackID: "track-id",
 		},
@@ -103,8 +139,9 @@ func TestMetadataMergeFillsArtworkGaps(t *testing.T) {
 		},
 	}
 	fallback := Metadata{
-		Title: "Song",
-		Album: "Album",
+		Title:     "Song",
+		Album:     "Album",
+		RemoteURL: "https://img.example.test/fallback.jpg",
 		IDs: IDs{
 			MusicBrainzReleaseID: "mb-release",
 			SpotifyAlbumID:       "album-id",
@@ -116,7 +153,7 @@ func TestMetadataMergeFillsArtworkGaps(t *testing.T) {
 	}
 
 	got := base.Merge(fallback)
-	if got.Title != "Song" || got.Album != "Album" || got.Artist != "Artist" {
+	if got.Title != "Song" || got.Album != "Album" || got.Artist != "Artist" || got.RemoteURL != "https://img.example.test/base.jpg" {
 		t.Fatalf("unexpected merged labels: %#v", got)
 	}
 	if got.IDs.SpotifyTrackID != "track-id" || got.IDs.SpotifyAlbumID != "album-id" || got.IDs.MusicBrainzReleaseID != "mb-release" {
@@ -124,5 +161,26 @@ func TestMetadataMergeFillsArtworkGaps(t *testing.T) {
 	}
 	if got.Local == nil || got.Local.AudioPath != "/music/song.mp3" || got.Local.CoverFilePath != "/music/cover.jpg" || got.Local.Embedded != embedded {
 		t.Fatalf("unexpected merged local metadata: %#v", got.Local)
+	}
+}
+
+func TestMetadataURLProviderFetchesRemoteArtwork(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/cover.jpg" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("jpeg-data"))
+	}))
+	defer server.Close()
+
+	provider := MetadataURLProvider{Client: server.Client()}
+	result, err := provider.Lookup(context.Background(), Metadata{RemoteURL: server.URL + "/cover.jpg"})
+	if err != nil {
+		t.Fatalf("Lookup returned error: %v", err)
+	}
+	if result.Provider != "metadata-url" || result.Image.MIMEType != "image/jpeg" || string(result.Image.Data) != "jpeg-data" {
+		t.Fatalf("unexpected metadata-url result: %#v", result)
 	}
 }

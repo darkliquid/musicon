@@ -240,6 +240,13 @@ func (t TrackInfo) CoverArtMetadata() coverart.Metadata {
 	})
 }
 
+// ArtworkAttempt reports one observable step while artwork resolution runs.
+type ArtworkAttempt struct {
+	Provider string
+	Status   string
+	Message  string
+}
+
 // PlaybackSnapshot reports the current queue and playback state visible to the UI.
 type PlaybackSnapshot struct {
 	Track       *TrackInfo
@@ -290,6 +297,7 @@ type LyricsProvider interface {
 // ArtworkProvider supplies optional artwork for the active track.
 type ArtworkProvider interface {
 	Artwork(metadata coverart.Metadata) (*components.ImageSource, error)
+	ArtworkObserved(metadata coverart.Metadata, report func(ArtworkAttempt)) (*components.ImageSource, error)
 }
 
 // VisualizationProvider supplies optional visualization placeholder content.

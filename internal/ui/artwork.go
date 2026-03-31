@@ -12,6 +12,10 @@ type CoverArtResolver interface {
 	Resolve(ctx context.Context, metadata coverart.Metadata) (coverart.Result, error)
 }
 
+type observedCoverArtResolver interface {
+	ResolveObserved(ctx context.Context, metadata coverart.Metadata, report func(coverart.AttemptEvent)) (coverart.Result, error)
+}
+
 type coverArtProvider struct {
 	resolver CoverArtResolver
 }
@@ -23,10 +27,15 @@ func NewCoverArtProvider(resolver CoverArtResolver) ArtworkProvider {
 
 // Artwork resolves cover art for the supplied metadata and adapts it to the UI image source contract.
 func (p coverArtProvider) Artwork(metadata coverart.Metadata) (*components.ImageSource, error) {
+	return p.ArtworkObserved(metadata, nil)
+}
+
+// ArtworkObserved resolves artwork while optionally reporting provider/cache attempts.
+func (p coverArtProvider) ArtworkObserved(metadata coverart.Metadata, report func(ArtworkAttempt)) (*components.ImageSource, error) {
 	if p.resolver == nil {
 		return nil, nil
 	}
-	result, err := p.resolver.Resolve(context.Background(), metadata)
+	result, err := p.resolve(metadata, report)
 	if err != nil {
 		if coverart.IsNotFound(err) {
 			return nil, nil
@@ -37,4 +46,20 @@ func (p coverArtProvider) Artwork(metadata coverart.Metadata) (*components.Image
 		Data:        append([]byte(nil), result.Image.Data...),
 		Description: result.Image.Description,
 	}, nil
+}
+
+func (p coverArtProvider) resolve(metadata coverart.Metadata, report func(ArtworkAttempt)) (coverart.Result, error) {
+	if observed, ok := p.resolver.(observedCoverArtResolver); ok {
+		return observed.ResolveObserved(context.Background(), metadata, func(event coverart.AttemptEvent) {
+			if report == nil {
+				return
+			}
+			report(ArtworkAttempt{
+				Provider: event.Provider,
+				Status:   string(event.Status),
+				Message:  event.Message,
+			})
+		})
+	}
+	return p.resolver.Resolve(context.Background(), metadata)
 }

@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -27,6 +29,10 @@ type playbackScreen struct {
 	artworkTrackKey string
 	artworkSource   *components.ImageSource
 	artworkErr      error
+	artworkLoading  bool
+	artworkSpinner  int
+	artworkAttempts []ArtworkAttempt
+	artworkLookup   *artworkLookupState
 
 	lyricsTrackID string
 	lyricsLines   []string
@@ -49,6 +55,14 @@ type playbackActionResult struct {
 type seekedMsg struct {
 	snapshot PlaybackSnapshot
 	err      error
+}
+
+type artworkLookupState struct {
+	mu       sync.Mutex
+	attempts []ArtworkAttempt
+	source   *components.ImageSource
+	err      error
+	done     bool
 }
 
 const (
@@ -102,6 +116,8 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 		p.snapshot = typed.snapshot
 		return "", nil
 	case tickMsg:
+		p.artworkSpinner = (p.artworkSpinner + 1) % len(artworkSpinnerFrames)
+		p.consumeArtworkLookup()
 		if p.services.Playback == nil || p.pending || p.seekAdjustment == 0 || time.Now().Before(p.seekDeadline) {
 			return "", nil
 		}
@@ -226,6 +242,9 @@ func (p *playbackScreen) View() string {
 	}
 
 	body := lipgloss.NewStyle().Width(p.width).Height(p.height).Render(p.centerView(p.width, p.height))
+	if overlay := p.artworkActivityOverlay(p.width, p.height); overlay != "" {
+		body = centeredOverlay(body, overlay, p.width, p.height)
+	}
 	top := p.paneOverlay()
 	body = bottomOverlay(body, p.controlsOverlay(), p.width, p.height)
 	if p.showInfo {
@@ -390,6 +409,7 @@ func (p *playbackScreen) centerView(width, height int) string {
 }
 
 func (p *playbackScreen) refreshArtwork(trackInfo *TrackInfo) {
+	p.consumeArtworkLookup()
 	p.artStatus = ""
 	if p.services.Artwork == nil || trackInfo == nil {
 		p.clearArtworkCache()
@@ -397,11 +417,20 @@ func (p *playbackScreen) refreshArtwork(trackInfo *TrackInfo) {
 	}
 	key := artworkCacheKey(trackInfo)
 	if key != p.artworkTrackKey {
-		source, err := p.services.Artwork.Artwork(trackInfo.CoverArtMetadata())
 		p.artworkTrackKey = key
-		p.artworkSource = source
-		p.artworkErr = err
-		p.artwork.SetSource(source)
+		p.artworkSource = nil
+		p.artworkErr = nil
+		p.artworkLoading = true
+		p.artworkSpinner = 0
+		p.artworkAttempts = nil
+		p.artwork.SetSource(nil)
+		lookup := &artworkLookupState{}
+		p.artworkLookup = lookup
+		metadata := trackInfo.CoverArtMetadata()
+		go func() {
+			source, err := p.services.Artwork.ArtworkObserved(metadata, lookup.appendAttempt)
+			lookup.complete(source, err)
+		}()
 		return
 	}
 }
@@ -410,6 +439,10 @@ func (p *playbackScreen) clearArtworkCache() {
 	p.artworkTrackKey = ""
 	p.artworkSource = nil
 	p.artworkErr = nil
+	p.artworkLoading = false
+	p.artworkSpinner = 0
+	p.artworkAttempts = nil
+	p.artworkLookup = nil
 	p.artwork.SetSource(nil)
 }
 
@@ -417,13 +450,124 @@ func artworkCacheKey(track *TrackInfo) string {
 	if track == nil {
 		return ""
 	}
-	return fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%s",
-		track.ID,
-		track.Source,
-		track.Title,
-		track.Artist,
-		track.Album,
-	)
+	payload := struct {
+		ID       string            `json:"id"`
+		Source   string            `json:"source"`
+		Title    string            `json:"title"`
+		Artist   string            `json:"artist"`
+		Album    string            `json:"album"`
+		Metadata map[string]string `json:"metadata"`
+	}{
+		ID:     track.ID,
+		Source: track.Source,
+		Title:  track.Title,
+		Artist: track.Artist,
+		Album:  track.Album,
+	}
+	metadata := track.CoverArtMetadata().Normalize()
+	payload.Metadata = map[string]string{
+		"title":                      metadata.Title,
+		"album":                      metadata.Album,
+		"artist":                     metadata.Artist,
+		"mb_release":                 metadata.IDs.MusicBrainzReleaseID,
+		"mb_release_group":           metadata.IDs.MusicBrainzReleaseGroupID,
+		"mb_recording":               metadata.IDs.MusicBrainzRecordingID,
+		"spotify_album":              metadata.IDs.SpotifyAlbumID,
+		"spotify_track":              metadata.IDs.SpotifyTrackID,
+		"apple_music_album":          metadata.IDs.AppleMusicAlbumID,
+		"apple_music_song":           metadata.IDs.AppleMusicSongID,
+		"local_audio_path":           "",
+		"local_cover_file_path":      "",
+		"local_embedded_description": "",
+	}
+	if metadata.Local != nil {
+		payload.Metadata["local_audio_path"] = metadata.Local.AudioPath
+		payload.Metadata["local_cover_file_path"] = metadata.Local.CoverFilePath
+		if metadata.Local.Embedded != nil {
+			payload.Metadata["local_embedded_description"] = metadata.Local.Embedded.Description
+		}
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%s", track.ID, track.Source, track.Title, track.Artist, track.Album)
+	}
+	return string(data)
+}
+
+var artworkSpinnerFrames = []string{"-", "\\", "|", "/"}
+
+func (p *playbackScreen) artworkActivityOverlay(width, height int) string {
+	if p.pane != PaneArtwork || width <= 0 || height <= 0 {
+		return ""
+	}
+	p.consumeArtworkLookup()
+	if !p.artworkLoading {
+		return ""
+	}
+	lines := make([]string, 0, 1+min(4, len(p.artworkAttempts)))
+	lines = append(lines, fmt.Sprintf("%s artwork lookup running", artworkSpinnerFrames[p.artworkSpinner%len(artworkSpinnerFrames)]))
+	for _, attempt := range p.recentArtworkAttempts(4) {
+		message := attempt.Message
+		if strings.TrimSpace(message) == "" {
+			message = attempt.Status
+		}
+		lines = append(lines, fmt.Sprintf("%s: %s", attempt.Provider, message))
+	}
+	width = min(width-4, 44)
+	if width < 18 {
+		width = 18
+	}
+	return components.RenderPanel(components.PanelOptions{
+		Title:    "Artwork lookup",
+		Subtitle: "recent provider activity",
+		Width:    width,
+		Height:   min(height-2, max(4, len(lines)+2)),
+		Focused:  false,
+	}, strings.Join(lines, "\n"))
+}
+
+func (p *playbackScreen) recentArtworkAttempts(limit int) []ArtworkAttempt {
+	if limit <= 0 || len(p.artworkAttempts) == 0 {
+		return nil
+	}
+	start := max(0, len(p.artworkAttempts)-limit)
+	return append([]ArtworkAttempt(nil), p.artworkAttempts[start:]...)
+}
+
+func (p *playbackScreen) consumeArtworkLookup() {
+	if p.artworkLookup == nil {
+		return
+	}
+	attempts, source, err, done := p.artworkLookup.snapshot()
+	p.artworkAttempts = attempts
+	p.artworkLoading = !done
+	if !done {
+		return
+	}
+	p.artworkSource = source
+	p.artworkErr = err
+	p.artwork.SetSource(source)
+	p.artworkLookup = nil
+}
+
+func (s *artworkLookupState) appendAttempt(attempt ArtworkAttempt) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.attempts = append(s.attempts, attempt)
+}
+
+func (s *artworkLookupState) complete(source *components.ImageSource, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.source = source
+	s.err = err
+	s.done = true
+}
+
+func (s *artworkLookupState) snapshot() ([]ArtworkAttempt, *components.ImageSource, error, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]ArtworkAttempt(nil), s.attempts...), s.source, s.err, s.done
 }
 
 func (p *playbackScreen) refreshLyrics(trackID string) {

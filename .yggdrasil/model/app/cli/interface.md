@@ -5,6 +5,7 @@ This node does not expose a reusable library API, but it does define the executa
 - load and normalize startup configuration through `internal/config`
 - list usable audio backends through a CLI flag and mark the currently effective configured choice
 - list usable image renderers through a CLI flag and mark the currently effective choice after applying config plus env override precedence
+- mirror startup and artwork-resolution diagnostics to stderr and/or a caller-selected debug-log file through CLI flags
 - construct the audio runtime with `audio.NewEngine(...)`
 - construct and compose the active source/search implementation(s)
 - construct and start the MPRIS bridge with `mpris.NewBridge(...)` and `Start()`
@@ -20,6 +21,7 @@ This node does not expose a reusable library API, but it does define the executa
 - If the audio runtime cannot be constructed or shut down cleanly, the process must surface that failure.
 - If backend enumeration fails, the process should print nothing and exit non-zero instead of printing stale or guessed values.
 - If image-renderer enumeration or config lookup fails for a listing flag, the process should print nothing and exit non-zero instead of mixing diagnostics into machine-readable output.
+- If debug logging is enabled with a file path, the process must create or truncate that file before startup continues and write the same structured diagnostics there without exposing credential values.
 - If the configured local source directories are unavailable, startup should degrade clearly instead of crashing the entire UI.
 - If an optional remote source such as YouTube Music is configured, startup should still succeed even when yt-dlp tooling or auth is not usable until the source is actually queried.
 - If the configuration file is unreadable or invalid, the process must surface that error before startup continues.
