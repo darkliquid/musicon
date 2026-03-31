@@ -1,0 +1,8 @@
+name: RepositoryAutomation
+type: infrastructure
+description: "GitHub Actions CI and Goreleaser release automation for repository verification and distribution"
+mapping:
+  paths:
+    - .github/workflows/ci.yml
+    - .github/workflows/release.yml
+    - .goreleaser.yaml

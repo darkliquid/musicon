@@ -1,10 +1,12 @@
 package mpris
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/darkliquid/musicon/internal/ui"
+	"github.com/godbus/dbus/v5"
 )
 
 type stubPlayback struct {
@@ -63,7 +65,7 @@ func TestMetadataIncludesTrackFields(t *testing.T) {
 	}
 }
 
-func TestBridgeSeekUsesRelativeTargetAgainstSnapshotPosition(t *testing.T) {
+func TestBridgeSeekFailsExplicitly(t *testing.T) {
 	playback := &stubPlayback{
 		snapshot: ui.PlaybackSnapshot{
 			Position: 30 * time.Second,
@@ -72,18 +74,21 @@ func TestBridgeSeekUsesRelativeTargetAgainstSnapshotPosition(t *testing.T) {
 	}
 	bridge := NewBridge(playback)
 
-	if err := bridge.Seek(int64((5 * time.Second) / time.Microsecond)); err != nil {
-		t.Fatalf("seek failed: %v", err)
+	seek, ok := bridge.playerMethods()["Seek"].(func(int64) *dbus.Error)
+	if !ok {
+		t.Fatal("expected Seek method in player method table")
 	}
-	if playback.seekCalls != 1 {
-		t.Fatalf("expected one seek call, got %d", playback.seekCalls)
+
+	err := seek(int64((5 * time.Second) / time.Microsecond))
+	if err == nil || !strings.Contains(err.Error(), "seek is not supported") {
+		t.Fatalf("expected explicit seek unsupported error, got %v", err)
 	}
-	if got := playback.seekTargets[0]; got != 35*time.Second {
-		t.Fatalf("expected relative seek target 35s, got %s", got)
+	if playback.seekCalls != 0 {
+		t.Fatalf("expected no seek calls, got %d", playback.seekCalls)
 	}
 }
 
-func TestBridgeSetPositionUsesAbsoluteTargetForCurrentTrack(t *testing.T) {
+func TestBridgeSetPositionFailsExplicitly(t *testing.T) {
 	playback := &stubPlayback{
 		snapshot: ui.PlaybackSnapshot{
 			Position: 12 * time.Second,
@@ -92,13 +97,16 @@ func TestBridgeSetPositionUsesAbsoluteTargetForCurrentTrack(t *testing.T) {
 	}
 	bridge := NewBridge(playback)
 
-	if err := bridge.SetPosition(trackObjectPath("abc"), int64((42*time.Second)/time.Microsecond)); err != nil {
-		t.Fatalf("set position failed: %v", err)
+	setPosition, ok := bridge.playerMethods()["SetPosition"].(func(dbus.ObjectPath, int64) *dbus.Error)
+	if !ok {
+		t.Fatal("expected SetPosition method in player method table")
 	}
-	if playback.seekCalls != 1 {
-		t.Fatalf("expected one seek call, got %d", playback.seekCalls)
+
+	err := setPosition(trackObjectPath("abc"), int64((42*time.Second)/time.Microsecond))
+	if err == nil || !strings.Contains(err.Error(), "seek is not supported") {
+		t.Fatalf("expected explicit set position unsupported error, got %v", err)
 	}
-	if got := playback.seekTargets[0]; got != 42*time.Second {
-		t.Fatalf("expected absolute seek target 42s, got %s", got)
+	if playback.seekCalls != 0 {
+		t.Fatalf("expected no seek calls, got %d", playback.seekCalls)
 	}
 }

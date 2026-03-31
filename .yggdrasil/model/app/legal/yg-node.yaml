@@ -1,0 +1,6 @@
+name: RepositoryLicense
+type: infrastructure
+description: "Repository licensing metadata and legal distribution terms"
+mapping:
+  paths:
+    - LICENSE

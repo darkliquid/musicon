@@ -1,0 +1,23 @@
+{
+  "hash": "4f23c63950772025b0dc3dcf5a5ae73f8aaf0953693831f3b70a076d82ee104b",
+  "files": {
+    ".yggdrasil/model/app/automation/yg-node.yaml": "44fb6ed6819ff2f01f75c3b01559a11e8fc5311caab219275afc942588a4c2c3",
+    ".yggdrasil/model/app/automation/responsibility.md": "18a6dc5b056f44ca254ffc4dad460cf97b6d725388d7b5f0559890e0e74a0fdc",
+    ".yggdrasil/model/app/yg-node.yaml": "3ff1b09541a43f32a625db53aa813b01fc441539c2fef4ba37030d6eec3353ba",
+    ".yggdrasil/model/app/responsibility.md": "370acf592e591f7931933ac92849d7d565d233f955e1c7c2e2f6608071aff13c",
+    ".github/workflows/release.yml": "20567cd77e2a0f74657e0bdb6a69b139132da1003956670a269a4d04428242c6",
+    ".goreleaser.yaml": "82579f51660b3e9e3a24fc0149705682bd1aba8d6ade935037b5f1b2988f435d",
+    ".yggdrasil/model/app/automation/internals.md": "57a3ebfa8d84d44140cb59ba5d396651f41a15b35936db04cabe0f1271bd94cd",
+    ".github/workflows/ci.yml": "269ff60afc7b8c46f857daa741125d5c2a40777d04812550348f7ee7435e9492"
+  },
+  "mtimes": {
+    ".yggdrasil/model/app/automation/yg-node.yaml": 1774963854013.4592,
+    ".yggdrasil/model/app/automation/internals.md": 1774964376412.132,
+    ".yggdrasil/model/app/automation/responsibility.md": 1774963854055.4595,
+    ".yggdrasil/model/app/yg-node.yaml": 1774839898455.773,
+    ".yggdrasil/model/app/responsibility.md": 1774839901724.833,
+    ".github/workflows/ci.yml": 1774964376411.132,
+    ".github/workflows/release.yml": 1774963853892.459,
+    ".goreleaser.yaml": 1774964035777.8623
+  }
+}

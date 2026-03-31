@@ -10,7 +10,8 @@ It should:
 - translate incoming D-Bus control calls into playback-service method calls
 - refresh property-backed state on a background ticker so D-Bus clients can observe live playback progress without driving UI updates
 - use property callbacks for writable controls like loop mode and volume so remote desktop changes reuse the same playback mutations as local key presses
-- route both relative `Seek` and absolute `SetPosition` requests through the same playback-service `SeekTo` API used by the TUI, so desktop media controls participate in the same debounced absolute-seek/runtime-swap model rather than inventing a second transport path
+- export player transport methods through an explicit D-Bus method table so MPRIS method names such as `Seek` and `SetPosition` do not need to mirror Go method names that trigger `go vet` interface checks
+- fail both relative `Seek` and absolute `SetPosition` requests explicitly because Musicon no longer exposes seek control through its playback service and already advertises `CanSeek=false`
 
 The package source now also carries package-level and exported-symbol documentation so the MPRIS lifecycle and method mappings remain readable from Go tooling without replaying the D-Bus export sequence mentally.
 
@@ -20,4 +21,5 @@ This node should own D-Bus-specific details so the audio runtime and UI remain f
 
 - Chose a dedicated `internal/mpris` service over embedding D-Bus logic into `internal/audio` so desktop integration remains optional and isolated from playback output internals.
 - Chose direct `godbus/dbus/v5` usage because no reliable higher-level wrapper was available in this environment.
-- Chose to keep MPRIS seek semantics thin and delegate target validation/clamping to the playback runtime so desktop controls and TUI controls cannot drift into different seek behavior.
+- Chose explicit D-Bus method-table export for player controls over exported Go methods because the MPRIS method names must stay standard while `go vet` rejects the `Seek` method name/signature pairing on the Go type.
+- Chose to fail MPRIS seek requests explicitly over partially emulating them because the playback service no longer exposes seek support and the bridge already reports `CanSeek=false` to desktop clients.

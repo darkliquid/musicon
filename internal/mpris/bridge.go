@@ -64,7 +64,7 @@ func (b *Bridge) Start() error {
 		_ = conn.Close()
 		return err
 	}
-	if err := conn.Export(b, objectPath, playerInterface); err != nil {
+	if err := conn.ExportMethodTable(b.playerMethods(), objectPath, playerInterface); err != nil {
 		_ = conn.Close()
 		return err
 	}
@@ -90,7 +90,7 @@ func (b *Bridge) Start() error {
 			},
 			{
 				Name:       playerInterface,
-				Methods:    introspect.Methods(b),
+				Methods:    b.playerIntrospection(),
 				Properties: props.Introspection(playerInterface),
 			},
 		},
@@ -141,20 +141,10 @@ func (b *Bridge) Next() *dbus.Error { return b.call(b.playback.Next) }
 func (b *Bridge) Previous() *dbus.Error { return b.call(b.playback.Previous) }
 
 // PlayPause implements the MPRIS PlayPause transport method.
-func (b *Bridge) PlayPause() *dbus.Error { return b.call(b.playback.TogglePause) }
-
-// Seek implements the MPRIS relative-seek transport method.
-func (b *Bridge) Seek(offset int64) *dbus.Error {
-	snapshot := b.snapshot()
-	if snapshot.Track == nil {
-		return nil
-	}
-	target := snapshot.Position + time.Duration(offset)*time.Microsecond
-	return b.call(func() error { return b.playback.SeekTo(target) })
-}
+func (b *Bridge) playPause() *dbus.Error { return b.call(b.playback.TogglePause) }
 
 // Pause implements the MPRIS Pause transport method.
-func (b *Bridge) Pause() *dbus.Error {
+func (b *Bridge) pause() *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track == nil || snapshot.Paused {
 		return nil
@@ -163,7 +153,7 @@ func (b *Bridge) Pause() *dbus.Error {
 }
 
 // Play implements the MPRIS Play transport method.
-func (b *Bridge) Play() *dbus.Error {
+func (b *Bridge) play() *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track != nil && !snapshot.Paused {
 		return nil
@@ -172,7 +162,7 @@ func (b *Bridge) Play() *dbus.Error {
 }
 
 // Stop implements the MPRIS Stop transport method.
-func (b *Bridge) Stop() *dbus.Error {
+func (b *Bridge) stop() *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track == nil {
 		return nil
@@ -188,23 +178,68 @@ func (b *Bridge) Stop() *dbus.Error {
 	return nil
 }
 
-// SetPosition implements the MPRIS absolute-seek transport method.
-func (b *Bridge) SetPosition(trackID dbus.ObjectPath, position int64) *dbus.Error {
-	snapshot := b.snapshot()
-	if snapshot.Track == nil {
-		return nil
-	}
-	if trackID != trackObjectPath(snapshot.Track.ID) {
-		return nil
-	}
-	target := time.Duration(position) * time.Microsecond
-	return b.call(func() error { return b.playback.SeekTo(target) })
-}
-
 // OpenUri implements the MPRIS OpenUri method and currently no-ops because Musicon does not open external URIs directly.
-func (b *Bridge) OpenUri(uri string) *dbus.Error {
+func (b *Bridge) openURI(uri string) *dbus.Error {
 	_ = uri
 	return nil
+}
+
+func (b *Bridge) next() *dbus.Error { return b.call(b.playback.Next) }
+
+func (b *Bridge) previous() *dbus.Error { return b.call(b.playback.Previous) }
+
+func (b *Bridge) seek(offset int64) *dbus.Error {
+	_ = offset
+	return dbus.MakeFailedError(fmt.Errorf("seek is not supported"))
+}
+
+func (b *Bridge) setPosition(trackID dbus.ObjectPath, position int64) *dbus.Error {
+	_, _ = trackID, position
+	return dbus.MakeFailedError(fmt.Errorf("seek is not supported"))
+}
+
+func (b *Bridge) playerMethods() map[string]any {
+	return map[string]any{
+		"Next":        b.next,
+		"Previous":    b.previous,
+		"PlayPause":   b.playPause,
+		"Pause":       b.pause,
+		"Play":        b.play,
+		"Stop":        b.stop,
+		"Seek":        b.seek,
+		"SetPosition": b.setPosition,
+		"OpenUri":     b.openURI,
+	}
+}
+
+func (b *Bridge) playerIntrospection() []introspect.Method {
+	return []introspect.Method{
+		{Name: "Next"},
+		{Name: "Previous"},
+		{Name: "PlayPause"},
+		{
+			Name: "Seek",
+			Args: []introspect.Arg{
+				{Name: "Offset", Type: "x", Direction: "in"},
+			},
+		},
+		{Name: "Pause"},
+		{Name: "Play"},
+		{Name: "Stop"},
+		{
+			Name: "SetPosition",
+			Args: []introspect.Arg{
+				{Name: "TrackId", Type: "o", Direction: "in"},
+				{Name: "Position", Type: "x", Direction: "in"},
+			},
+		},
+		{
+			Name: "OpenUri",
+			Args: []introspect.Arg{
+				{Name: "Uri", Type: "s", Direction: "in"},
+			},
+		},
+	}
 }
 
 func (b *Bridge) rootProperties() map[string]*prop.Prop {

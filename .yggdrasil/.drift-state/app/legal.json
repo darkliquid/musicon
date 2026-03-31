@@ -1,0 +1,19 @@
+{
+  "hash": "9c5170bd60bc02f1f8e36fae55ff32345a3c9963a6e4ac55feb7d63e0d88ae71",
+  "files": {
+    ".yggdrasil/model/app/legal/yg-node.yaml": "959443220fa535b5918cc32a432cefb35b1f852768049765a3d73a265a2f0e66",
+    ".yggdrasil/model/app/legal/internals.md": "da4f4ab11cab3e50aabb03f98986a3b7eb9b6036d20e90d64e118c89d86c4f95",
+    ".yggdrasil/model/app/legal/responsibility.md": "6c375f9accb77666bcfaae55c62f38065d7f2621ee2f9fe92bc6cf9007f90fc6",
+    ".yggdrasil/model/app/yg-node.yaml": "3ff1b09541a43f32a625db53aa813b01fc441539c2fef4ba37030d6eec3353ba",
+    ".yggdrasil/model/app/responsibility.md": "370acf592e591f7931933ac92849d7d565d233f955e1c7c2e2f6608071aff13c",
+    "LICENSE": "600710ddfe81a88483cc713defc50146d75ab9a75026040047bbb6d73d1faeb3"
+  },
+  "mtimes": {
+    ".yggdrasil/model/app/legal/yg-node.yaml": 1774964035779.649,
+    ".yggdrasil/model/app/legal/internals.md": 1774964035779.8623,
+    ".yggdrasil/model/app/legal/responsibility.md": 1774964035779.649,
+    ".yggdrasil/model/app/yg-node.yaml": 1774839898455.773,
+    ".yggdrasil/model/app/responsibility.md": 1774839901724.833,
+    "LICENSE": 1774964035779.649
+  }
+}
