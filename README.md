@@ -97,8 +97,13 @@ The radio path is:
 
 ## Configuration
 
-Musicon loads TOML configuration from its default XDG search path, or from an
-explicit file path when configured externally.
+Musicon loads TOML configuration from:
+
+- `$MUSICON_CONFIG`, when set to an explicit TOML file path
+- `/etc/xdg/musicon/config.toml` and other `XDG_CONFIG_DIRS` entries
+- `$XDG_CONFIG_HOME/musicon/config.toml` or `~/.config/musicon/config.toml`
+
+The repository root also includes a complete example config in `musicon.toml`.
 
 The config surface includes:
 
@@ -111,11 +116,81 @@ The config surface includes:
   and search result limits
 - configurable global, queue, and playback keybindings
 
-The default config filename is:
+A complete example with every supported option set to its normal default value:
 
-```text
-musicon.toml
+```toml
+[audio]
+backend = "auto"
+
+[ui]
+theme = "default"
+start_mode = "queue"
+cell_width_ratio = 0.5
+
+[ui.album_art]
+fill_mode = "fill"
+backend = "halfblocks"
+protocol = "halfblocks"
+
+[keybinds.global]
+quit = ["ctrl+c"]
+toggle_mode = ["tab"]
+toggle_help = ["?"]
+
+[keybinds.queue]
+toggle_search_focus = ["ctrl+f"]
+source_prev = ["["]
+source_next = ["]"]
+cycle_search_mode = ["m"]
+mode_songs = ["1"]
+mode_artists = ["2"]
+mode_albums = ["3"]
+mode_playlists = ["4"]
+expand_selected = ["e"]
+activate_selected = ["enter"]
+move_selected_up = ["ctrl+k"]
+move_selected_down = ["ctrl+j"]
+clear_queue = ["ctrl+x"]
+remove_selected = ["x"]
+browser_up = ["up", "k"]
+browser_down = ["down", "j"]
+browser_home = ["home"]
+browser_end = ["end"]
+browser_page_up = ["pgup"]
+browser_page_down = ["pgdown"]
+
+[keybinds.playback]
+cycle_pane = ["v"]
+toggle_info = ["i"]
+toggle_repeat = ["r"]
+toggle_stream = ["s"]
+toggle_pause = ["space"]
+previous_track = ["["]
+next_track = ["]"]
+seek_backward = ["left"]
+seek_forward = ["right"]
+volume_down = ["-"]
+volume_up = ["=", "+"]
+
+[sources.local]
+dirs = ["~/Music"]
+
+[sources.youtube]
+enabled = true
+max_results = 20
+cookies_file = ""
+cookies_from_browser = ""
+extra_args = []
+cache_dir = "~/.cache/musicon/youtube"
+
+[sources.radio]
+enabled = true
+max_results = 20
+base_url = "https://all.api.radio-browser.info"
 ```
+
+On Linux, `~/Music` and `~/.cache/musicon/youtube` correspond to the normal
+per-user default library and cache locations.
 
 ## Cover art
 
