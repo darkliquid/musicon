@@ -10,6 +10,7 @@ This node does not expose a reusable library API, but it does define the executa
 - construct and compose the active source/search implementation(s)
 - construct and start the MPRIS bridge with `mpris.NewBridge(...)` and `Start()`
 - construct the reusable cover-art provider chain and adapt it into the UI artwork service
+- construct the reusable lyrics provider chain and adapt it into the UI lyrics service
 - inject queue and playback service adapters plus typed UI keybinding options into `ui.NewApp(...)`
 - start the Bubble Tea program through `ui.Run(app)`
 - close the MPRIS bridge and audio runtime during shutdown
@@ -27,4 +28,5 @@ This node does not expose a reusable library API, but it does define the executa
 - If the configuration file is unreadable or invalid, the process must surface that error before startup continues.
 - If the MPRIS bridge cannot connect to or claim the session bus, the process should report that explicitly but continue running the terminal player.
 - If optional artwork-provider credentials or cache directories are unavailable, startup should degrade to lower-priority providers or no-art fallback rather than preventing the TUI from running.
+- If optional lyrics cache directories are unavailable or a remote lyrics provider is temporarily unreachable, startup should still succeed and the Lyrics pane should degrade to empty-state behavior on demand.
 - If the Bubble Tea program returns an error, the process must print the error and exit instead of swallowing it.

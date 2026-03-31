@@ -19,6 +19,7 @@ import (
 	"github.com/darkliquid/musicon/internal/ui"
 	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/coverart"
+	"github.com/darkliquid/musicon/pkg/lyrics"
 )
 
 func main() {
@@ -112,6 +113,7 @@ func main() {
 		Search:   search,
 		Queue:    engine.QueueService(),
 		Playback: playback,
+		Lyrics:   buildLyricsProvider(),
 		Artwork:  buildArtworkProvider(),
 	}, ui.Options{
 		StartMode:      modeFromConfig(loaded.Config.UI.StartMode),
@@ -218,6 +220,22 @@ func buildArtworkProvider() ui.ArtworkProvider {
 		return ui.NewCoverArtProvider(artworkDebugResolver{next: resolver, logf: debuglog})
 	}
 	return ui.NewCoverArtProvider(resolver)
+}
+
+func buildLyricsProvider() ui.LyricsProvider {
+	var cache lyrics.Cache
+	if dir, err := os.UserCacheDir(); err == nil && dir != "" {
+		cache = lyrics.NewDiskCache(filepath.Join(dir, "musicon", "lyrics"))
+	}
+
+	lrclib := &lyrics.LRCLibProvider{}
+	debuglog("lyrics: configured providers cache=%t lrclib=%t", cache != nil, true)
+
+	resolver := lyrics.NewChain(
+		lyrics.LocalFileProvider{},
+		lyrics.NewCachedProvider(lrclib, cache),
+	)
+	return ui.NewLyricsProvider(resolver)
 }
 
 func withCache(provider coverart.Provider, cache coverart.Cache) coverart.Provider {

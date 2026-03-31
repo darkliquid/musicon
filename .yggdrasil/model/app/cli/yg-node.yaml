@@ -33,6 +33,10 @@ relations:
     type: calls
     consumes: [NewDiskCache, NewCachedProvider, NewChain]
     failure: "Treat optional artwork-provider startup issues as degradable runtime wiring while preserving the terminal player"
+  - target: pkg/lyrics
+    type: calls
+    consumes: [NewDiskCache, NewCachedProvider, NewChain, LocalFileProvider, LRCLibProvider]
+    failure: "Treat optional lyrics-provider startup issues as degradable runtime wiring while preserving playback and the rest of the UI"
   - target: pkg/components
     type: calls
     consumes: [CanonicalImageRenderer, ListUsableImageRenderers]

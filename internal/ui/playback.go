@@ -11,6 +11,7 @@ import (
 	bubblekey "github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/darkliquid/musicon/pkg/components"
+	"github.com/darkliquid/musicon/pkg/lyrics"
 )
 
 type playbackScreen struct {
@@ -34,9 +35,12 @@ type playbackScreen struct {
 	artworkAttempts []ArtworkAttempt
 	artworkLookup   *artworkLookupState
 
-	lyricsTrackID string
-	lyricsLines   []string
-	lyricsErr     error
+	lyricsTrackKey string
+	lyricsDoc      *lyrics.Document
+	lyricsErr      error
+	lyricsLoading  bool
+	lyricsLookup   *lyricsLookupState
+	lyricsScroll   int
 
 	visualKey     string
 	visualContent string
@@ -61,6 +65,13 @@ type artworkLookupState struct {
 	mu       sync.Mutex
 	attempts []ArtworkAttempt
 	source   *components.ImageSource
+	err      error
+	done     bool
+}
+
+type lyricsLookupState struct {
+	mu       sync.Mutex
+	document *lyrics.Document
 	err      error
 	done     bool
 }
@@ -118,6 +129,7 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	case tickMsg:
 		p.artworkSpinner = (p.artworkSpinner + 1) % len(artworkSpinnerFrames)
 		p.consumeArtworkLookup()
+		p.consumeLyricsLookup()
 		if p.services.Playback == nil || p.pending || p.seekAdjustment == 0 || time.Now().Before(p.seekDeadline) {
 			return "", nil
 		}
@@ -137,6 +149,11 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	keypress, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return "", nil
+	}
+	if p.pane == PaneLyrics {
+		if status, handled := p.handleLyricsScrollKey(keypress); handled {
+			return status, nil
+		}
 	}
 
 	switch {
@@ -257,7 +274,7 @@ func (p *playbackScreen) View() string {
 // HelpView renders the playback-screen help overlay.
 func (p *playbackScreen) HelpView() string {
 	width := min(p.width, 68)
-	height := min(p.height, 13)
+	height := min(p.height, 15)
 	return components.RenderPanel(components.PanelOptions{
 		Title:    "Playback help",
 		Subtitle: "controls and info overlay the active pane",
@@ -271,6 +288,9 @@ func (p *playbackScreen) HelpView() string {
 		helpLinePair(p.keymap.VolumeDown, p.keymap.VolumeUp, "lower / raise volume"),
 		helpLine(p.keymap.CyclePane, "cycle artwork, lyrics, eq, and visualizer panes"),
 		helpLine(p.keymap.ToggleInfo, "show or hide track information"),
+		helpLinePair(lyricsScrollUpKey, lyricsScrollDownKey, "scroll lyrics when Lyrics pane is active"),
+		helpLinePair(lyricsPageUpKey, lyricsPageDownKey, "page lyrics viewport"),
+		helpLinePair(lyricsHomeKey, lyricsEndKey, "jump to top / bottom of lyrics"),
 		helpLinePair(p.keymap.ToggleRepeat, p.keymap.ToggleStream, "toggle repeat and stream continuation flags"),
 	}, "\n"))
 }
@@ -358,21 +378,29 @@ func (p *playbackScreen) infoView(width, height int) string {
 }
 
 func (p *playbackScreen) centerView(width, height int) string {
-	trackID := ""
 	var trackInfo *TrackInfo
 	if p.snapshot.Track != nil {
 		trackInfo = p.snapshot.Track
-		trackID = trackInfo.ID
 	}
 
 	switch p.pane {
 	case PaneLyrics:
-		p.refreshLyrics(trackID)
-		if len(p.lyricsLines) > 0 {
-			content := strings.Join(p.lyricsLines, "\n")
-			return lipgloss.NewStyle().Width(width).Height(height).Render(content)
+		p.refreshLyrics(trackInfo)
+		if p.lyricsDoc != nil {
+			if content := p.renderLyricsView(width, height); strings.TrimSpace(content) != "" {
+				return content
+			}
 		}
-		return components.RenderEmptyState(width, height, "Lyrics unavailable", "Hook up a lyrics provider to replace this placeholder with scrollable lyric content.")
+		if p.lyricsLoading {
+			return components.RenderEmptyState(width, height, "Loading lyrics", "Fetching lyrics for the active track without blocking playback mode.")
+		}
+		if p.lyricsErr != nil {
+			return components.RenderEmptyState(width, height, "Lyrics unavailable", p.lyricsErr.Error())
+		}
+		if p.lyricsDoc != nil && p.lyricsDoc.Instrumental {
+			return lipgloss.NewStyle().Width(width).Height(height).Render(strings.Join(p.lyricsDoc.DisplayLines(), "\n"))
+		}
+		return components.RenderEmptyState(width, height, "Lyrics unavailable", "No lyrics matched the active track.")
 	case PaneEQ, PaneVisualizer:
 		p.refreshVisualization(width, height)
 		if strings.TrimSpace(p.visualContent) != "" {
@@ -496,6 +524,15 @@ func artworkCacheKey(track *TrackInfo) string {
 
 var artworkSpinnerFrames = []string{"-", "\\", "|", "/"}
 
+var (
+	lyricsScrollUpKey   = bubblekey.NewBinding(bubblekey.WithKeys("up"), bubblekey.WithHelp("up", "scroll up"))
+	lyricsScrollDownKey = bubblekey.NewBinding(bubblekey.WithKeys("down"), bubblekey.WithHelp("down", "scroll down"))
+	lyricsPageUpKey     = bubblekey.NewBinding(bubblekey.WithKeys("pgup"), bubblekey.WithHelp("pgup", "page up"))
+	lyricsPageDownKey   = bubblekey.NewBinding(bubblekey.WithKeys("pgdown"), bubblekey.WithHelp("pgdn", "page down"))
+	lyricsHomeKey       = bubblekey.NewBinding(bubblekey.WithKeys("home"), bubblekey.WithHelp("home", "jump to top"))
+	lyricsEndKey        = bubblekey.NewBinding(bubblekey.WithKeys("end"), bubblekey.WithHelp("end", "jump to bottom"))
+)
+
 func (p *playbackScreen) artworkActivityOverlay(width, height int) string {
 	if p.pane != PaneArtwork || width <= 0 || height <= 0 {
 		return ""
@@ -570,20 +607,205 @@ func (s *artworkLookupState) snapshot() ([]ArtworkAttempt, *components.ImageSour
 	return append([]ArtworkAttempt(nil), s.attempts...), s.source, s.err, s.done
 }
 
-func (p *playbackScreen) refreshLyrics(trackID string) {
-	if p.services.Lyrics == nil || trackID == "" {
-		p.lyricsTrackID = ""
-		p.lyricsLines = nil
-		p.lyricsErr = nil
+func (p *playbackScreen) refreshLyrics(track *TrackInfo) {
+	p.consumeLyricsLookup()
+	if p.services.Lyrics == nil || track == nil {
+		p.clearLyricsCache()
 		return
 	}
-	if trackID == p.lyricsTrackID {
+	key := lyricsCacheKey(track)
+	if key == p.lyricsTrackKey {
 		return
 	}
-	lines, err := p.services.Lyrics.Lyrics(trackID)
-	p.lyricsTrackID = trackID
-	p.lyricsLines = append([]string(nil), lines...)
+	p.lyricsTrackKey = key
+	p.lyricsDoc = nil
+	p.lyricsErr = nil
+	p.lyricsLoading = true
+	p.lyricsScroll = 0
+	lookup := &lyricsLookupState{}
+	p.lyricsLookup = lookup
+	request := track.LyricsRequest()
+	go func() {
+		document, err := p.services.Lyrics.Lyrics(request)
+		lookup.complete(document, err)
+	}()
+}
+
+func (p *playbackScreen) clearLyricsCache() {
+	p.lyricsTrackKey = ""
+	p.lyricsDoc = nil
+	p.lyricsErr = nil
+	p.lyricsLoading = false
+	p.lyricsLookup = nil
+	p.lyricsScroll = 0
+}
+
+func lyricsCacheKey(track *TrackInfo) string {
+	if track == nil {
+		return ""
+	}
+	payload := struct {
+		ID             string        `json:"id"`
+		Source         string        `json:"source"`
+		Title          string        `json:"title"`
+		Artist         string        `json:"artist"`
+		Album          string        `json:"album"`
+		Duration       time.Duration `json:"duration"`
+		LocalAudioPath string        `json:"local_audio_path"`
+	}{
+		ID:       track.ID,
+		Source:   track.Source,
+		Title:    track.Title,
+		Artist:   track.Artist,
+		Album:    track.Album,
+		Duration: track.Duration,
+	}
+	if local := track.CoverArtMetadata().Local; local != nil {
+		payload.LocalAudioPath = local.AudioPath
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Sprintf("%s\x00%s\x00%s\x00%s\x00%s", track.ID, track.Source, track.Title, track.Artist, track.Album)
+	}
+	return string(data)
+}
+
+func (p *playbackScreen) consumeLyricsLookup() {
+	if p.lyricsLookup == nil {
+		return
+	}
+	document, err, done := p.lyricsLookup.snapshot()
+	p.lyricsLoading = !done
+	if !done {
+		return
+	}
+	p.lyricsDoc = document
 	p.lyricsErr = err
+	p.lyricsLookup = nil
+}
+
+func (p *playbackScreen) handleLyricsScrollKey(keypress tea.KeyPressMsg) (string, bool) {
+	lines := p.lyricsDisplayLines()
+	if len(lines) == 0 {
+		return "", false
+	}
+
+	page := p.lyricsViewportHeight()
+	if page <= 0 {
+		page = 1
+	}
+
+	next := p.lyricsScroll
+	switch {
+	case bubblekey.Matches(keypress, lyricsScrollUpKey):
+		next--
+	case bubblekey.Matches(keypress, lyricsScrollDownKey):
+		next++
+	case bubblekey.Matches(keypress, lyricsPageUpKey):
+		next -= page
+	case bubblekey.Matches(keypress, lyricsPageDownKey):
+		next += page
+	case bubblekey.Matches(keypress, lyricsHomeKey):
+		next = 0
+	case bubblekey.Matches(keypress, lyricsEndKey):
+		next = p.maxLyricsScroll()
+	default:
+		return "", false
+	}
+
+	next = clamp(next, 0, p.maxLyricsScroll())
+	if next == p.lyricsScroll {
+		return "", true
+	}
+	p.lyricsScroll = next
+	start, end := p.lyricsWindow(len(lines))
+	return fmt.Sprintf("Lyrics lines %d-%d of %d.", start+1, end, len(lines)), true
+}
+
+func (p *playbackScreen) renderLyricsView(width, height int) string {
+	lines := p.lyricsViewportLines()
+	if len(lines) == 0 {
+		return ""
+	}
+
+	topInset, bottomInset := p.lyricsInsets()
+	canvas := make([]string, 0, height)
+	for i := 0; i < topInset; i++ {
+		canvas = append(canvas, "")
+	}
+	canvas = append(canvas, lines...)
+	for len(canvas)+bottomInset < height {
+		canvas = append(canvas, "")
+	}
+	for i := 0; i < bottomInset; i++ {
+		canvas = append(canvas, "")
+	}
+	if len(canvas) > height {
+		canvas = canvas[:height]
+	}
+	return lipgloss.NewStyle().Width(width).Height(height).Render(strings.Join(canvas, "\n"))
+}
+
+func (p *playbackScreen) lyricsDisplayLines() []string {
+	if p.lyricsDoc == nil {
+		return nil
+	}
+	return p.lyricsDoc.DisplayLines()
+}
+
+func (p *playbackScreen) lyricsViewportLines() []string {
+	lines := p.lyricsDisplayLines()
+	if len(lines) == 0 {
+		return nil
+	}
+	start, end := p.lyricsWindow(len(lines))
+	visible := append([]string(nil), lines[start:end]...)
+	for len(visible) < p.lyricsViewportHeight() {
+		visible = append(visible, "")
+	}
+	return visible
+}
+
+func (p *playbackScreen) lyricsWindow(total int) (int, int) {
+	if total <= 0 {
+		return 0, 0
+	}
+	start := clamp(p.lyricsScroll, 0, p.maxLyricsScroll())
+	p.lyricsScroll = start
+	end := min(total, start+p.lyricsViewportHeight())
+	return start, end
+}
+
+func (p *playbackScreen) maxLyricsScroll() int {
+	return max(0, len(p.lyricsDisplayLines())-p.lyricsViewportHeight())
+}
+
+func (p *playbackScreen) lyricsViewportHeight() int {
+	topInset, bottomInset := p.lyricsInsets()
+	return max(1, p.height-topInset-bottomInset)
+}
+
+func (p *playbackScreen) lyricsInsets() (int, int) {
+	topInset := lipgloss.Height(p.paneOverlay())
+	if p.showInfo {
+		topInset += 1 + lipgloss.Height(p.infoOverlay())
+	}
+	bottomInset := lipgloss.Height(p.controlsOverlay())
+	return topInset, bottomInset
+}
+
+func (s *lyricsLookupState) complete(document *lyrics.Document, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.document = document
+	s.err = err
+	s.done = true
+}
+
+func (s *lyricsLookupState) snapshot() (*lyrics.Document, error, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.document, s.err, s.done
 }
 
 func (p *playbackScreen) refreshVisualization(width, height int) {
@@ -658,7 +880,7 @@ func (p *playbackScreen) runPlaybackAction(run func(PlaybackService) error, stat
 func paneHint(pane PlaybackPane) string {
 	switch pane {
 	case PaneLyrics:
-		return "scrollable when lyrics exist"
+		return "scroll with up/down/pgup/pgdn when lyrics overflow"
 	case PaneEQ:
 		return "analysis-ready empty state"
 	case PaneVisualizer:

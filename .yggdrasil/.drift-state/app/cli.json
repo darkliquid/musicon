@@ -1,8 +1,9 @@
 {
-  "hash": "5d798c2c9b385d80cfd160766d6284c76a1f5c568824ca9f9c5beef9c58e3694",
+  "hash": "b0b964f0b53d9f5276229242797a4dd80552904647cb14d932780d58a4bd138b",
   "files": {
-    ".yggdrasil/model/app/cli/yg-node.yaml": "aedde9d785e740bd58799cbef7f01ba8f4cdf91ff8e7bc96fc27de7ded08f35c",
-    ".yggdrasil/model/app/cli/interface.md": "7b4249d0fd06203c27eb54c5f66cfb99880197c7554358321965445e12dc76e7",
+    ".yggdrasil/model/app/cli/yg-node.yaml": "7d7d04b219543f6f4601cee8e67df6b0d5e42c6cdad6e0c1b2376a441e8faed5",
+    ".yggdrasil/model/app/cli/interface.md": "b39d4ce74770eecbb8c7b559c6e8a25d37fc6d37b94589d7d12423b51b70ba94",
+    ".yggdrasil/model/app/cli/internals.md": "8d11cd24aa3a2e950713ad805686667e1a640504eee988ca91f832551fa53266",
     ".yggdrasil/model/app/cli/responsibility.md": "8e51407c85d89f7e27f30646b13cc384fd7416befe0509292cc0a10ad5d643eb",
     ".yggdrasil/model/app/yg-node.yaml": "3ff1b09541a43f32a625db53aa813b01fc441539c2fef4ba37030d6eec3353ba",
     ".yggdrasil/model/app/responsibility.md": "370acf592e591f7931933ac92849d7d565d233f955e1c7c2e2f6608071aff13c",
@@ -12,7 +13,6 @@
     ".yggdrasil/model/internal/config/interface.md": "20a5517f74a7d17ce2ebb3989be343e4c0204f59f013d784c748e2da03da1fea",
     ".yggdrasil/model/internal/responsibility.md": "90fa17d80db7c3265833b84cf53518ceac4f367db6fef86dd3ea8b4adf3ddee7",
     ".yggdrasil/model/internal/ui/responsibility.md": "fb311ab57a4553d9dd13ac0b0a204908c343140677af3de650b6a6853e155077",
-    ".yggdrasil/model/internal/ui/interface.md": "3726978b6ad29260bff1ce0adb5a501331f834ab353e4f8e37dde8cd0c81c8a5",
     ".yggdrasil/model/internal/audio/responsibility.md": "6f5e61c436c83e9fbeeb8a9dd229806ffd78f6a40e701fad98414782b549df01",
     ".yggdrasil/model/internal/audio/interface.md": "76006d9d4fc6c5c3d896778edda0ba339996719e378d6a38bd3e41e27c7b9505",
     ".yggdrasil/model/internal/mpris/responsibility.md": "d6278c03fcf41bffa8bfe80d1c8bf2906dd39dafdb5d646a6d3d0c7274246419",
@@ -25,6 +25,8 @@
     ".yggdrasil/model/pkg/responsibility.md": "027978e70222d23f608075d8ab639b9734a31cf3e2383dd9fef77d03392cd91f",
     ".yggdrasil/model/pkg/coverart/responsibility.md": "4817c3c79f32ceb9a072888b74e272eb72ce9d34d68e2d7cffd9bad1cbbc5b23",
     ".yggdrasil/model/pkg/coverart/interface.md": "3efbc54919598dd69bc441cea784e0ee04c34a23a494dd63d4107f3da3b2da4a",
+    ".yggdrasil/model/pkg/lyrics/responsibility.md": "64e6fdb1dacaaa1dba6188c25545b46840906be1b9777dabe96082568e6e627d",
+    ".yggdrasil/model/pkg/lyrics/interface.md": "5e42dac136d06f2519d2d76c120d8aa5754e2d5f891e50b02155c1754372a79e",
     ".yggdrasil/model/pkg/components/responsibility.md": "b39043908b94539d2b930fcc3e65ed1e3d95975af253f792159fc422668cfcd6",
     ".yggdrasil/model/pkg/components/interface.md": "ac3aa6603f88b66dd1a120c197f0345427ff8dc41852a5f06c0d53fac87d2c19",
     ".yggdrasil/model/pkg/coverart/providers/local/responsibility.md": "fe6e50428126e9338924efab310e2f677275d5aa3979b5156fba0ab9d800dcc3",
@@ -37,13 +39,13 @@
     ".yggdrasil/flows/playback-control/description.md": "bb98b04756342cbd0bdf68daac097a616a32ae5ca08997dc828ff9a36cf83f17",
     ".yggdrasil/flows/queue-management/yg-flow.yaml": "5b8ec5a9d543137cc4e0db0a736508939a2b2e2e6df0a2d86889283d79508af6",
     ".yggdrasil/flows/queue-management/description.md": "4115d56bbcfcd33f2683a931edbc5e7e46e4c20cd06efc7d9ba623bf10729123",
-    ".yggdrasil/model/app/cli/internals.md": "337f6244499307d5373f5e6593eb658629c098abe8c370849ad554ddaf6c4006",
-    "main.go": "553a9ee3e4aef9ce312395ba09bbbe6c1337474aa8e718645e3b148ba2bcfb2b"
+    "main.go": "e096a33f4eca318a9f2f3ba7d2e2939eee97910feb211e737a0df75c0ead5139",
+    ".yggdrasil/model/internal/ui/interface.md": "ffd393c58c13687daf75acaa55371290d44cb8eec8ae10b2c7dcec7740d742e3"
   },
   "mtimes": {
-    ".yggdrasil/model/app/cli/yg-node.yaml": 1774861211984.2817,
-    ".yggdrasil/model/app/cli/interface.md": 1774945072742.8206,
-    ".yggdrasil/model/app/cli/internals.md": 1774945609370.6775,
+    ".yggdrasil/model/app/cli/yg-node.yaml": 1774948240226.4368,
+    ".yggdrasil/model/app/cli/interface.md": 1774948240227.4365,
+    ".yggdrasil/model/app/cli/internals.md": 1774948240227.4365,
     ".yggdrasil/model/app/cli/responsibility.md": 1774848185793.962,
     ".yggdrasil/model/app/yg-node.yaml": 1774839898455.773,
     ".yggdrasil/model/app/responsibility.md": 1774839901724.833,
@@ -53,7 +55,7 @@
     ".yggdrasil/model/internal/config/interface.md": 1774882778854.3428,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
     ".yggdrasil/model/internal/ui/responsibility.md": 1774853820657.9028,
-    ".yggdrasil/model/internal/ui/interface.md": 1774943554745.8486,
+    ".yggdrasil/model/internal/ui/interface.md": 1774949267895.6846,
     ".yggdrasil/model/internal/audio/responsibility.md": 1774859625581.1982,
     ".yggdrasil/model/internal/audio/interface.md": 1774902090772.1118,
     ".yggdrasil/model/internal/mpris/responsibility.md": 1774843743933.6658,
@@ -62,10 +64,12 @@
     ".yggdrasil/model/internal/sources/local/interface.md": 1774935475766.5557,
     ".yggdrasil/model/internal/sources/responsibility.md": 1774848185791.962,
     ".yggdrasil/model/pkg/coverart/core/responsibility.md": 1774846540110.4302,
-    ".yggdrasil/model/pkg/coverart/core/interface.md": 1774945332181.7642,
+    ".yggdrasil/model/pkg/coverart/core/interface.md": 1774947123186.1218,
     ".yggdrasil/model/pkg/responsibility.md": 1774845840022.5544,
     ".yggdrasil/model/pkg/coverart/responsibility.md": 1774846504797.0327,
     ".yggdrasil/model/pkg/coverart/interface.md": 1774846540112.4302,
+    ".yggdrasil/model/pkg/lyrics/responsibility.md": 1774947893062.2065,
+    ".yggdrasil/model/pkg/lyrics/interface.md": 1774948240229.4365,
     ".yggdrasil/model/pkg/components/responsibility.md": 1774844282702.2576,
     ".yggdrasil/model/pkg/components/interface.md": 1774882778856.8198,
     ".yggdrasil/model/pkg/coverart/providers/local/responsibility.md": 1774846840960.8171,
@@ -78,6 +82,6 @@
     ".yggdrasil/flows/playback-control/description.md": 1774878372940.832,
     ".yggdrasil/flows/queue-management/yg-flow.yaml": 1774878371793.8545,
     ".yggdrasil/flows/queue-management/description.md": 1774880361834.21,
-    "main.go": 1774945571781.5579
+    "main.go": 1774948054711.9832
   }
 }

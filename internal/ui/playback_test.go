@@ -2,6 +2,7 @@ package ui
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/coverart"
+	"github.com/darkliquid/musicon/pkg/lyrics"
 )
 
 type playbackTestService struct {
@@ -93,14 +95,14 @@ func (p *artworkTestProvider) ArtworkObserved(_ coverart.Metadata, report func(A
 type lyricsTestProvider struct {
 	mu    sync.Mutex
 	calls int
-	lines []string
+	doc   *lyrics.Document
 }
 
-func (p *lyricsTestProvider) Lyrics(string) ([]string, error) {
+func (p *lyricsTestProvider) Lyrics(lyrics.Request) (*lyrics.Document, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.calls++
-	return append([]string(nil), p.lines...), nil
+	return p.doc, nil
 }
 
 type visualizationTestProvider struct {
@@ -378,12 +380,12 @@ func TestPlaybackArtworkOverlayHidesAfterSuccessfulLoad(t *testing.T) {
 }
 
 func TestPlaybackLyricsLookupIsCachedAcrossViews(t *testing.T) {
-	provider := &lyricsTestProvider{lines: []string{"line one", "line two"}}
+	provider := &lyricsTestProvider{doc: &lyrics.Document{PlainLyrics: "line one\nline two"}}
 	screen := newPlaybackScreen(Services{Lyrics: provider}, AlbumArtOptions{})
 	screen.pane = PaneLyrics
 	screen.SetSize(40, 20)
 	screen.snapshot = PlaybackSnapshot{
-		Track: &TrackInfo{ID: "track-1"},
+		Track: &TrackInfo{ID: "track-1", Title: "Song", Artist: "Artist"},
 	}
 
 	_ = screen.View()
@@ -394,6 +396,59 @@ func TestPlaybackLyricsLookupIsCachedAcrossViews(t *testing.T) {
 	provider.mu.Unlock()
 	if calls != 1 {
 		t.Fatalf("expected lyrics provider to be called once, got %d", calls)
+	}
+}
+
+func TestPlaybackLyricsPaneScrollsWithinViewport(t *testing.T) {
+	lines := make([]string, 18)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("line %02d", i+1)
+	}
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
+	screen.pane = PaneLyrics
+	screen.SetSize(40, 20)
+	screen.lyricsDoc = &lyrics.Document{PlainLyrics: strings.Join(lines, "\n")}
+
+	before := screen.lyricsViewportLines()
+	if len(before) == 0 {
+		t.Fatal("expected visible lyrics lines before scrolling")
+	}
+	if before[0] != "line 01" {
+		t.Fatalf("expected first visible line to be line 01, got %q", before[0])
+	}
+
+	status, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if cmd != nil {
+		t.Fatalf("expected no async command when scrolling lyrics, got %v", cmd)
+	}
+	start, end := screen.lyricsWindow(len(lines))
+	expectedStatus := fmt.Sprintf("Lyrics lines %d-%d of %d.", start+1, end, len(lines))
+	if status != expectedStatus {
+		t.Fatalf("unexpected scroll status: %q", status)
+	}
+
+	after := screen.lyricsViewportLines()
+	if len(after) == 0 {
+		t.Fatal("expected visible lyrics lines after scrolling")
+	}
+	if after[0] != "line 02" {
+		t.Fatalf("expected first visible line to advance to line 02, got %q", after[0])
+	}
+}
+
+func TestPlaybackLyricsScrollResetsForNewTrack(t *testing.T) {
+	screen := newPlaybackScreen(Services{Lyrics: &lyricsTestProvider{}}, AlbumArtOptions{})
+	screen.SetSize(40, 20)
+	screen.lyricsTrackKey = "old-track"
+	screen.lyricsScroll = 5
+	screen.snapshot = PlaybackSnapshot{
+		Track: &TrackInfo{ID: "track-1", Title: "Song", Artist: "Artist"},
+	}
+
+	screen.refreshLyrics(&TrackInfo{ID: "track-2", Title: "Other Song", Artist: "Artist"})
+
+	if screen.lyricsScroll != 0 {
+		t.Fatalf("expected lyrics scroll to reset for a new track, got %d", screen.lyricsScroll)
 	}
 }
 

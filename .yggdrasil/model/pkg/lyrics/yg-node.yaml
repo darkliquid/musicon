@@ -1,0 +1,6 @@
+name: LyricsResolution
+type: library
+description: "Reusable lyrics metadata, provider chain, LRC parsing, and cache-backed lookup contracts"
+mapping:
+  paths:
+    - pkg/lyrics/

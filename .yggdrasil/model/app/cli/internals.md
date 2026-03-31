@@ -15,6 +15,7 @@ The current implementation:
 - constructs the concrete audio runtime
 - injects queue and playback services from the runtime into `ui.Services` plus typed UI options derived from config, including the `[keybinds]` section and queue bindings for visible search-kind slot selection, search-kind cycling, and collection expansion
 - constructs the cover-art chain in local-first order, including a metadata-url fast path ahead of the heavier remote lookup providers, and wraps that resolver with an app-owned debug adapter when debug logging is enabled so each artwork request records normalized metadata, provider order, per-provider attempt counts, provider/cache attempt events, elapsed time, and final success or failure without pushing file-I/O concerns into `internal/ui` or `pkg/coverart`
+- constructs the lyrics chain in local-first order, using neighboring `.lrc` sidecars before a cached `lrclib.net` resolver rooted in the user cache directory, then adapts that reusable chain into the UI-facing lyrics service
 - calls `ui.Run(app)`
 - defers `engine.Close()` to release audio resources on exit
 - writes failures to stderr and exits with a non-zero status
@@ -34,3 +35,4 @@ It deliberately avoids accumulating view logic, component composition, or backen
 - Chose to expose image-renderer discovery as a parallel CLI flag because renderer capability depends on the current terminal and the user explicitly wanted the selected renderer to be inspectable without launching playback.
 - Chose to translate `[keybinds]` config into typed UI options in the CLI layer instead of letting `internal/ui` read TOML directly because startup policy still belongs in application wiring.
 - Chose to keep the new artwork debug-log sink in the CLI layer instead of `pkg/coverart` because selecting stderr vs file output is application policy, while the reusable cover-art package should stay transport-agnostic.
+- Chose to build the lyrics provider chain in the CLI layer instead of `internal/ui` because provider ordering, cache-root selection, and network-vs-local fallback policy are application wiring concerns rather than screen logic.

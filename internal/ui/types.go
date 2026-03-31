@@ -6,6 +6,7 @@ import (
 
 	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/coverart"
+	"github.com/darkliquid/musicon/pkg/lyrics"
 )
 
 // Mode identifies the active top-level Musicon screen.
@@ -240,6 +241,21 @@ func (t TrackInfo) CoverArtMetadata() coverart.Metadata {
 	})
 }
 
+// LyricsRequest merges resolved track fields into normalized reusable lyrics lookup metadata.
+func (t TrackInfo) LyricsRequest() lyrics.Request {
+	request := lyrics.Request{
+		Title:    t.Title,
+		Artist:   t.Artist,
+		Album:    t.Album,
+		Source:   t.Source,
+		Duration: t.Duration,
+	}
+	if local := t.CoverArtMetadata().Local; local != nil {
+		request.LocalAudioPath = local.AudioPath
+	}
+	return request.Normalize()
+}
+
 // ArtworkAttempt reports one observable step while artwork resolution runs.
 type ArtworkAttempt struct {
 	Provider string
@@ -291,7 +307,7 @@ type PlaybackService interface {
 
 // LyricsProvider supplies optional lyrics for the active track.
 type LyricsProvider interface {
-	Lyrics(trackID string) ([]string, error)
+	Lyrics(request lyrics.Request) (*lyrics.Document, error)
 }
 
 // ArtworkProvider supplies optional artwork for the active track.

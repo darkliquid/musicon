@@ -22,3 +22,7 @@ relations:
     type: uses
     consumes: [Metadata, Normalize]
     failure: "Treat missing or sparse cover-art metadata as a normal fallback condition instead of pushing provider-chain logic into the playback screen"
+  - target: pkg/lyrics
+    type: uses
+    consumes: [Request, Document, Normalize, DisplayLines]
+    failure: "Treat missing lyrics metadata or unresolved lyric lookups as normal empty-state conditions instead of blocking the playback UI"
