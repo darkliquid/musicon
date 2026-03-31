@@ -4,4 +4,5 @@ nodes:
   - app/cli
   - internal/ui
   - internal/sources/local
+  - internal/sources/radio
   - internal/sources/youtube

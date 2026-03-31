@@ -65,17 +65,19 @@ func (s *stubQueueService) Clear() error {
 }
 
 type stubPlaybackService struct {
-	snapshot PlaybackSnapshot
+	snapshot         PlaybackSnapshot
+	togglePauseCalls int
+	togglePauseErr   error
 }
 
-func (s stubPlaybackService) Snapshot() PlaybackSnapshot        { return s.snapshot }
-func (s stubPlaybackService) TogglePause() error                { return nil }
-func (s stubPlaybackService) Previous() error                   { return nil }
-func (s stubPlaybackService) Next() error                       { return nil }
-func (s stubPlaybackService) SeekTo(target time.Duration) error { _ = target; return nil }
-func (s stubPlaybackService) AdjustVolume(delta int) error      { return nil }
-func (s stubPlaybackService) SetRepeat(repeat bool) error       { return nil }
-func (s stubPlaybackService) SetStream(stream bool) error       { return nil }
+func (s *stubPlaybackService) Snapshot() PlaybackSnapshot        { return s.snapshot }
+func (s *stubPlaybackService) TogglePause() error                { s.togglePauseCalls++; return s.togglePauseErr }
+func (s *stubPlaybackService) Previous() error                   { return nil }
+func (s *stubPlaybackService) Next() error                       { return nil }
+func (s *stubPlaybackService) SeekTo(target time.Duration) error { _ = target; return nil }
+func (s *stubPlaybackService) AdjustVolume(delta int) error      { return nil }
+func (s *stubPlaybackService) SetRepeat(repeat bool) error       { return nil }
+func (s *stubPlaybackService) SetStream(stream bool) error       { return nil }
 
 func TestQueueBrowserShowsQueuedItemsBeforeSearchResults(t *testing.T) {
 	screen := newQueueScreen(Services{})
@@ -217,6 +219,54 @@ func TestQueueBrowserEnterTogglesSearchResultQueueMembership(t *testing.T) {
 	}
 }
 
+func TestQueueBrowserAutoStartsFirstQueuedStream(t *testing.T) {
+	queue := &stubQueueService{}
+	playback := &stubPlaybackService{}
+	screen := newQueueScreen(Services{Queue: queue, Playback: playback})
+	screen.resultData = []SearchResult{{ID: "radio:station-1:mp3:direct", Title: "Jazz FM", Source: "Internet radio", Kind: MediaStream}}
+	screen.rebuildBrowser()
+
+	got, cmd := screen.activateSelectedRow()
+	if !strings.Contains(got, `Starting playback.`) {
+		t.Fatalf("expected start-playback status, got %q", got)
+	}
+	if cmd == nil {
+		t.Fatal("expected async playback command for first queued stream")
+	}
+	if playback.togglePauseCalls != 0 {
+		t.Fatalf("expected playback not started until command runs, got %d calls", playback.togglePauseCalls)
+	}
+
+	msg := cmd()
+	got, _ = screen.Update(msg)
+	if !strings.Contains(got, `started playback`) {
+		t.Fatalf("expected playback-started status, got %q", got)
+	}
+	if playback.togglePauseCalls != 1 {
+		t.Fatalf("expected one toggle-pause call, got %d", playback.togglePauseCalls)
+	}
+}
+
+func TestQueueBrowserDoesNotAutoStartAdditionalQueuedStream(t *testing.T) {
+	queue := &stubQueueService{entries: []QueueEntry{{ID: "existing", Title: "Existing", Source: "Local files", Kind: MediaTrack}}}
+	playback := &stubPlaybackService{}
+	screen := newQueueScreen(Services{Queue: queue, Playback: playback})
+	screen.resultData = []SearchResult{{ID: "radio:station-1:mp3:direct", Title: "Jazz FM", Source: "Internet radio", Kind: MediaStream}}
+	screen.syncQueue()
+	screen.rebuildBrowser()
+
+	got, cmd := screen.activateSelectedRow()
+	if strings.Contains(got, `Starting playback.`) {
+		t.Fatalf("did not expect auto-start status, got %q", got)
+	}
+	if cmd != nil {
+		t.Fatalf("expected no playback command for non-empty queue, got %v", cmd)
+	}
+	if playback.togglePauseCalls != 0 {
+		t.Fatalf("expected no toggle-pause call, got %d", playback.togglePauseCalls)
+	}
+}
+
 func TestQueueBrowserMoveSelectedQueuedItem(t *testing.T) {
 	queue := &stubQueueService{entries: []QueueEntry{
 		{ID: "one", Title: "First"},
@@ -239,7 +289,7 @@ func TestQueueBrowserMoveSelectedQueuedItem(t *testing.T) {
 
 func TestQueueBrowserMarksNowPlayingQueuedItem(t *testing.T) {
 	screen := newQueueScreen(Services{
-		Playback: stubPlaybackService{
+		Playback: &stubPlaybackService{
 			snapshot: PlaybackSnapshot{
 				Track: &TrackInfo{ID: "queued-1", Title: "Queued track"},
 			},

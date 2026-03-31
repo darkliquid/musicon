@@ -15,6 +15,7 @@ import (
 	"github.com/darkliquid/musicon/internal/config"
 	"github.com/darkliquid/musicon/internal/mpris"
 	"github.com/darkliquid/musicon/internal/sources/local"
+	"github.com/darkliquid/musicon/internal/sources/radio"
 	"github.com/darkliquid/musicon/internal/sources/youtube"
 	"github.com/darkliquid/musicon/internal/ui"
 	"github.com/darkliquid/musicon/pkg/components"
@@ -85,9 +86,16 @@ func main() {
 		ExtraArgs:          loaded.Config.Sources.YouTube.ExtraArgs,
 		CacheDir:           loaded.Config.Sources.YouTube.CacheDir,
 	})
-	search := combinedSearch{providers: []ui.SearchService{library, ytmusic}}
+	internetRadio := radio.NewSource(radio.Options{
+		Enabled:    loaded.Config.Sources.Radio.Enabled,
+		MaxResults: loaded.Config.Sources.Radio.MaxResults,
+		BaseURL:    loaded.Config.Sources.Radio.BaseURL,
+		Logf:       debuglog,
+	})
+	search := combinedSearch{providers: []ui.SearchService{library, internetRadio, ytmusic}}
 	resolver := combinedResolver{
 		local:   library,
+		radio:   internetRadio,
 		youtube: ytmusic,
 	}
 
@@ -601,6 +609,7 @@ func (c combinedSearch) ExpandCollection(ctx context.Context, result ui.SearchRe
 
 type combinedResolver struct {
 	local   audio.Resolver
+	radio   audio.Resolver
 	youtube audio.Resolver
 }
 
@@ -611,6 +620,12 @@ func (c combinedResolver) Resolve(entry ui.QueueEntry) (audio.ResolvedTrack, err
 			return audio.ResolvedTrack{}, fmt.Errorf("no resolver configured for %q", entry.Source)
 		}
 		return c.youtube.Resolve(entry)
+	}
+	if radio.OwnsEntryID(entry.ID) {
+		if c.radio == nil {
+			return audio.ResolvedTrack{}, fmt.Errorf("no resolver configured for %q", entry.Source)
+		}
+		return c.radio.Resolve(entry)
 	}
 	if c.local == nil {
 		return audio.ResolvedTrack{}, fmt.Errorf("no resolver configured for %q", entry.Source)

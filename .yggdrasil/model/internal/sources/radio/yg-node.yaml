@@ -1,0 +1,23 @@
+name: InternetRadioSource
+type: service
+description: "Concrete Radio Browser-backed source for internet radio search and live stream resolution, including native HLS and AAC playback"
+relations:
+  - target: internal/ui
+    type: implements
+    consumes: [SearchService]
+    failure: "Surface Radio Browser search, filtering, and live-stream inspection failures through the UI search contract without embedding provider logic in the UI"
+  - target: internal/audio
+    type: implements
+    consumes: [Resolver]
+    failure: "Surface live stream open, decode, or native pipeline startup failures through the audio resolver contract"
+  - target: internal/config
+    type: uses
+    consumes: [Config]
+    failure: "Treat config as typed startup input rather than parsing configuration inside the source"
+  - target: pkg/coverart/core
+    type: uses
+    consumes: [Metadata]
+    failure: "Carry station favicon and stream metadata forward for downstream artwork resolution instead of resolving artwork inside the source"
+mapping:
+  paths:
+    - internal/sources/radio/

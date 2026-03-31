@@ -31,6 +31,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Queue mode must expose a dedicated search-focus toggle so users can type literal characters that may also be bound as queue shortcuts.
 - Queue mode must not block the Bubble Tea event loop on source-backed searches; slow or networked searches should resolve asynchronously so quit, mode switching, and navigation remain responsive.
 - Queue mode should debounce live search input and cancel superseded in-flight searches so remote providers do not spin up one request per keystroke.
+- When queue mode adds the first internet-radio stream to an otherwise empty queue and a playback service is present, it should start playback asynchronously instead of requiring an immediate mode switch plus extra play keypress.
 - The UI must accept typed, config-driven keybindings for global shell actions and per-screen controls instead of hardcoding Bubble Tea key strings inside each update loop.
 - Queue mode should clearly mark the currently playing queued item so users can tell which pinned row is active even while browsing or reordering the rest of the queue.
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.

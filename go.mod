@@ -15,14 +15,21 @@ require (
 )
 
 require (
+	github.com/abema/go-mp4 v1.5.0 // indirect
+	github.com/asticode/go-astikit v0.30.0 // indirect
+	github.com/asticode/go-astits v1.15.0 // indirect
 	github.com/bitly/go-simplejson v0.5.1 // indirect
+	github.com/bluenviron/gohlslib/v2 v2.2.9 // indirect
+	github.com/bluenviron/mediacommon/v2 v2.8.3 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dop251/goja v0.0.0-20250125213203-5ef83b82af17 // indirect
 	github.com/ebml-go/ebml v0.0.0-20160925193348-ca8851a10894 // indirect
 	github.com/ebml-go/webm v0.0.0-20260112103818-aede085bf6e5 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/google/pprof v0.0.0-20250208200701-d0013a598941 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/petar/GoLLRB v0.0.0-20130427215148-53be0d36a84c // indirect
+	github.com/skrashevich/go-aac v0.1.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 )

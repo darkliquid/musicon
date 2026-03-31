@@ -34,6 +34,15 @@ func TestDefaultProvidesExpectedTunables(t *testing.T) {
 	if cfg.Sources.YouTube.MaxResults != 20 {
 		t.Fatalf("expected default youtube max results, got %d", cfg.Sources.YouTube.MaxResults)
 	}
+	if !cfg.Sources.Radio.Enabled {
+		t.Fatal("expected radio source enabled by default")
+	}
+	if cfg.Sources.Radio.MaxResults != 20 {
+		t.Fatalf("expected default radio max results, got %d", cfg.Sources.Radio.MaxResults)
+	}
+	if cfg.Sources.Radio.BaseURL != "https://all.api.radio-browser.info" {
+		t.Fatalf("expected default radio base url, got %q", cfg.Sources.Radio.BaseURL)
+	}
 }
 
 func TestLoadOverlaysTOMLAndNormalizesValues(t *testing.T) {
@@ -72,6 +81,10 @@ cookies_file = "~/cookies.txt"
 cookies_from_browser = " firefox "
 extra_args = [" --extractor-args ", "youtube:player-client=web_music", ""]
 cache_dir = "~/yt-cache"
+
+[sources.radio]
+max_results = 40
+base_url = " https://de1.api.radio-browser.info/ "
 `), 0o644); err != nil {
 		t.Fatalf("write config failed: %v", err)
 	}
@@ -122,6 +135,12 @@ cache_dir = "~/yt-cache"
 	}
 	if !strings.HasSuffix(cfg.Sources.YouTube.CacheDir, "yt-cache") {
 		t.Fatalf("expected expanded youtube cache dir, got %q", cfg.Sources.YouTube.CacheDir)
+	}
+	if cfg.Sources.Radio.MaxResults != 40 {
+		t.Fatalf("expected radio max results, got %d", cfg.Sources.Radio.MaxResults)
+	}
+	if cfg.Sources.Radio.BaseURL != "https://de1.api.radio-browser.info" {
+		t.Fatalf("expected normalized radio base url, got %q", cfg.Sources.Radio.BaseURL)
 	}
 }
 

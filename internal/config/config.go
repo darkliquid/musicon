@@ -13,14 +13,16 @@ import (
 
 const (
 	// DefaultFileName is the conventional base name for Musicon configuration files.
-	DefaultFileName   = "musicon.toml"
-	defaultTheme      = "default"
-	defaultStartMode  = "queue"
-	defaultBackend    = "auto"
-	defaultFillMode   = "fill"
-	defaultProtocol   = "halfblocks"
-	defaultSourceName = "local"
-	defaultYTResults  = 20
+	DefaultFileName     = "musicon.toml"
+	defaultTheme        = "default"
+	defaultStartMode    = "queue"
+	defaultBackend      = "auto"
+	defaultFillMode     = "fill"
+	defaultProtocol     = "halfblocks"
+	defaultSourceName   = "local"
+	defaultYTResults    = 20
+	defaultRadioURL     = "https://all.api.radio-browser.info"
+	defaultRadioResults = 20
 )
 
 // Config describes the full TOML-backed Musicon configuration surface.
@@ -108,6 +110,7 @@ type AlbumArtConfig struct {
 type SourcesConfig struct {
 	Local   LocalSourceConfig   `toml:"local"`
 	YouTube YouTubeSourceConfig `toml:"youtube"`
+	Radio   RadioSourceConfig   `toml:"radio"`
 }
 
 // LocalSourceConfig configures local-library discovery roots.
@@ -123,6 +126,13 @@ type YouTubeSourceConfig struct {
 	CookiesFromBrowser string   `toml:"cookies_from_browser"`
 	ExtraArgs          []string `toml:"extra_args"`
 	CacheDir           string   `toml:"cache_dir"`
+}
+
+// RadioSourceConfig configures Radio Browser search and internet radio playback integration.
+type RadioSourceConfig struct {
+	Enabled    bool   `toml:"enabled"`
+	MaxResults int    `toml:"max_results"`
+	BaseURL    string `toml:"base_url"`
 }
 
 // LoadResult reports the loaded config plus the path or paths that produced it.
@@ -155,6 +165,11 @@ func Default() Config {
 				Enabled:    true,
 				MaxResults: defaultYTResults,
 				CacheDir:   defaultYouTubeCacheDir(),
+			},
+			Radio: RadioSourceConfig{
+				Enabled:    true,
+				MaxResults: defaultRadioResults,
+				BaseURL:    defaultRadioURL,
 			},
 		},
 	}
@@ -244,21 +259,20 @@ func (c *Config) normalize() {
 	c.Keybinds.normalize()
 	if len(c.Sources.Local.Dirs) == 0 {
 		c.Sources.Local.Dirs = defaultLocalDirs()
-		return
-	}
-
-	dirs := make([]string, 0, len(c.Sources.Local.Dirs))
-	for _, dir := range c.Sources.Local.Dirs {
-		dir = strings.TrimSpace(dir)
-		if dir == "" {
-			continue
+	} else {
+		dirs := make([]string, 0, len(c.Sources.Local.Dirs))
+		for _, dir := range c.Sources.Local.Dirs {
+			dir = strings.TrimSpace(dir)
+			if dir == "" {
+				continue
+			}
+			dirs = append(dirs, dir)
 		}
-		dirs = append(dirs, dir)
+		if len(dirs) == 0 {
+			dirs = defaultLocalDirs()
+		}
+		c.Sources.Local.Dirs = dirs
 	}
-	if len(dirs) == 0 {
-		dirs = defaultLocalDirs()
-	}
-	c.Sources.Local.Dirs = dirs
 
 	c.Sources.YouTube.CookiesFile = normalizePath(c.Sources.YouTube.CookiesFile)
 	c.Sources.YouTube.CookiesFromBrowser = strings.TrimSpace(c.Sources.YouTube.CookiesFromBrowser)
@@ -274,6 +288,14 @@ func (c *Config) normalize() {
 		}
 	}
 	c.Sources.YouTube.ExtraArgs = extraArgs
+
+	c.Sources.Radio.BaseURL = strings.TrimRight(strings.TrimSpace(c.Sources.Radio.BaseURL), "/")
+	if c.Sources.Radio.BaseURL == "" {
+		c.Sources.Radio.BaseURL = defaultRadioURL
+	}
+	if c.Sources.Radio.MaxResults <= 0 {
+		c.Sources.Radio.MaxResults = defaultRadioResults
+	}
 }
 
 func defaultKeybinds() KeybindsConfig {

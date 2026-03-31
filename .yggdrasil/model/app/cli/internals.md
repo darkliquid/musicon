@@ -8,6 +8,7 @@ The current implementation:
 - supports a startup flag that prints usable backend names for the current environment, marks the currently effective configured backend, and exits before normal startup; if discovery fails, it exits silently rather than mixing diagnostics into machine-readable output
 - supports a startup flag that prints usable image-renderer backends for the current terminal, marks the currently effective configured renderer, and exits before normal startup
 - supports debug logging to stderr and/or a caller-selected file, with the executable owning logger setup before runtime construction so later background work such as artwork lookup can emit trace lines safely from multiple goroutines
+- passes the same CLI-owned debug sink into the radio source so transport-level HLS diagnostics can be recorded without printing directly into the Bubble Tea viewport
 - imports `internal/audio` and `internal/ui`
 - constructs the concrete local-file source implementation from configured directories
 - constructs the yt-dlp-backed YouTube Music source from typed config, including cookie-based auth and cache settings

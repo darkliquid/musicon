@@ -1,11 +1,12 @@
 # Musicon
 
-Musicon is a terminal music player for local libraries and YouTube Music.
+Musicon is a terminal music player for local libraries, internet radio, and YouTube Music.
 
 It combines:
 
 - a Bubble Tea TUI with dedicated queue and playback modes
 - local-library search and playback
+- internet radio search and live playback through Radio Browser
 - YouTube Music search with `yt-dlp`-backed streaming playback
 - desktop media-key integration through MPRIS
 - configurable audio backends, image rendering, and keybindings
@@ -80,6 +81,20 @@ YouTube playback keeps a bounded PCM window in memory for cheap nearby seeks and
 uses shared file-backed range caching to support farther replacement-stream
 seeks without redownloading every previously visited block.
 
+### Internet radio
+
+Musicon can also search Radio Browser for live stations and play them through a
+mix of direct in-process decoding and native Go live-stream decoding when
+needed.
+
+The radio path is:
+
+1. search Radio Browser by station name and tags
+2. keep healthy stations in results, including HLS-backed entries
+3. resolve playback through Radio Browser's click-count endpoint
+4. decode direct MP3/Ogg/Vorbis/WAV streams in-process when possible
+5. decode HLS AAC / Opus streams through `gohlslib` and decode ADTS AAC streams through `go-aac` while preserving live non-seekable playback behavior
+
 ## Configuration
 
 Musicon loads TOML configuration from its default XDG search path, or from an
@@ -91,6 +106,7 @@ The config surface includes:
 - UI start mode and theme
 - album-art renderer / fill mode
 - local-library roots
+- Radio Browser source options such as API base URL and search result limits
 - YouTube source options such as cookies, cache directory, extra `yt-dlp` args,
   and search result limits
 - configurable global, queue, and playback keybindings

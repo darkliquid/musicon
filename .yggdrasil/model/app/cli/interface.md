@@ -6,6 +6,7 @@ This node does not expose a reusable library API, but it does define the executa
 - list usable audio backends through a CLI flag and mark the currently effective configured choice
 - list usable image renderers through a CLI flag and mark the currently effective choice after applying config plus env override precedence
 - mirror startup and artwork-resolution diagnostics to stderr and/or a caller-selected debug-log file through CLI flags
+- mirror radio HLS transport diagnostics through the same CLI-owned debug sink instead of allowing provider libraries to print directly into the TUI
 - construct the audio runtime with `audio.NewEngine(...)`
 - construct and compose the active source/search implementation(s)
 - construct and start the MPRIS bridge with `mpris.NewBridge(...)` and `Start()`

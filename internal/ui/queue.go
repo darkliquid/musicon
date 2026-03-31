@@ -83,6 +83,11 @@ type queueExpandResultsMsg struct {
 	err      error
 }
 
+type queuePlaybackStartedMsg struct {
+	status string
+	err    error
+}
+
 func newQueueScreen(services Services) *queueScreen {
 	return newQueueScreenWithKeyMap(services, normalizedKeyMap(KeybindOptions{}).Queue)
 }
@@ -193,6 +198,11 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 		q.expandedCollectionIDs[typed.resultID] = true
 		q.rebuildBrowser()
 		return "", nil
+	case queuePlaybackStartedMsg:
+		if typed.err != nil {
+			return typed.err.Error(), nil
+		}
+		return typed.status, nil
 	}
 
 	keypress, ok := msg.(tea.KeyPressMsg)
@@ -466,12 +476,12 @@ func (q *queueScreen) activateSearchResult(result SearchResult) (string, tea.Cmd
 	case MediaArtist:
 		return q.applyArtistFilter(result.ArtistFilter), q.refreshResultsCmd()
 	case MediaAlbum, MediaPlaylist:
-		return q.addSearchResult(result), nil
+		return q.addSearchResult(result)
 	default:
 		if entry, ok := q.findQueuedEntryByID(result.ID); ok {
 			return q.removeQueueEntry(entry), nil
 		}
-		return q.addSearchResult(result), nil
+		return q.addSearchResult(result)
 	}
 }
 
@@ -481,7 +491,8 @@ func (q *queueScreen) applyArtistFilter(filter SearchArtistFilter) string {
 	return fmt.Sprintf("Artist filter: %s", filter.Name)
 }
 
-func (q *queueScreen) addSearchResult(result SearchResult) string {
+func (q *queueScreen) addSearchResult(result SearchResult) (string, tea.Cmd) {
+	wasEmpty := len(q.queueData) == 0
 	if isCollectionResult(result) {
 		children := q.expandedCollections[result.ID]
 		if len(children) > 0 {
@@ -494,7 +505,7 @@ func (q *queueScreen) addSearchResult(result SearchResult) string {
 
 	if q.services.Queue != nil {
 		if err := q.services.Queue.Add(result); err != nil {
-			return err.Error()
+			return err.Error(), nil
 		}
 		q.syncQueue()
 	} else {
@@ -512,10 +523,26 @@ func (q *queueScreen) addSearchResult(result SearchResult) string {
 		q.queueData = append(q.queueData, entries...)
 		q.rebuildBrowser()
 	}
-	if isCollectionResult(result) {
-		return fmt.Sprintf("Added %q to the queue.", result.Title)
+	if wasEmpty && result.Kind == MediaStream && q.services.Playback != nil {
+		return fmt.Sprintf("Added %q to the queue. Starting playback.", result.Title), q.startQueuedPlaybackCmd(result.Title)
 	}
-	return fmt.Sprintf("Added %q to the queue.", result.Title)
+	if isCollectionResult(result) {
+		return fmt.Sprintf("Added %q to the queue.", result.Title), nil
+	}
+	return fmt.Sprintf("Added %q to the queue.", result.Title), nil
+}
+
+func (q *queueScreen) startQueuedPlaybackCmd(title string) tea.Cmd {
+	playback := q.services.Playback
+	if playback == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		if err := playback.TogglePause(); err != nil {
+			return queuePlaybackStartedMsg{err: fmt.Errorf("start playback for %q: %w", title, err)}
+		}
+		return queuePlaybackStartedMsg{status: fmt.Sprintf("Added %q to the queue and started playback.", title)}
+	}
 }
 
 func (q *queueScreen) removeSelectedQueueItem() string {

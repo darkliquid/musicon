@@ -6,6 +6,7 @@ nodes:
   - internal/audio
   - internal/mpris
   - internal/sources/local
+  - internal/sources/radio
   - internal/sources/youtube
   - pkg/coverart/core
   - pkg/coverart/providers/local
