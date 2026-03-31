@@ -21,6 +21,7 @@ func NewCoverArtProvider(resolver CoverArtResolver) ArtworkProvider {
 	return coverArtProvider{resolver: resolver}
 }
 
+// Artwork resolves cover art for the supplied metadata and adapts it to the UI image source contract.
 func (p coverArtProvider) Artwork(metadata coverart.Metadata) (*components.ImageSource, error) {
 	if p.resolver == nil {
 		return nil, nil

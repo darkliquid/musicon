@@ -41,6 +41,7 @@ func NewMusicBrainzProvider(userAgent string) *MusicBrainzProvider {
 	}
 }
 
+// Name returns the provider's stable identifier.
 func (p *MusicBrainzProvider) Name() string { return "musicbrainz" }
 
 // Lookup resolves cover art using explicit MusicBrainz IDs first, then search fallback.

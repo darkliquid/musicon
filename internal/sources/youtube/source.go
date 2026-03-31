@@ -105,6 +105,7 @@ func NewSource(options Options) *Source {
 	return source
 }
 
+// Sources reports the YouTube Music descriptor exposed to the UI.
 func (s *Source) Sources() []teaui.SourceDescriptor {
 	if s == nil || !s.enabled {
 		return nil

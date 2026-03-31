@@ -11,6 +11,8 @@ Its expected shape is:
 - attach local artwork metadata such as audio path and embedded-art bytes when available so the downstream local cover-art provider can discover sibling images next to the selected track
 - resolve queued local files to the matching `beep` decoder based on file extension
 
+The package source now also carries package-level and exported-symbol documentation so discovery, search, and resolve behavior remain readable from Go docs without re-deriving how the library bridges UI and playback contracts.
+
 ## Decisions
 
 - Chose a single local source type that implements both search and resolve contracts so queue discovery and playback refer to the same filesystem-backed library.

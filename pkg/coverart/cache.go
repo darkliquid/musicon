@@ -25,6 +25,7 @@ func NewDiskCache(dir string) *DiskCache {
 	return &DiskCache{Dir: dir}
 }
 
+// Get loads a cached image for key.
 func (c *DiskCache) Get(key string) (Image, error) {
 	if c == nil || c.Dir == "" {
 		return Image{}, ErrNotFound
@@ -46,6 +47,7 @@ func (c *DiskCache) Get(key string) (Image, error) {
 	return image, nil
 }
 
+// Put stores image in the cache under key.
 func (c *DiskCache) Put(key string, image Image) error {
 	if c == nil || c.Dir == "" {
 		return nil
@@ -80,6 +82,7 @@ func NewCachedProvider(provider Provider, cache Cache) Provider {
 	return CachedProvider{Provider: provider, Cache: cache}
 }
 
+// Name returns the wrapped provider's stable identifier.
 func (p CachedProvider) Name() string {
 	if p.Provider == nil {
 		return ""
@@ -87,6 +90,7 @@ func (p CachedProvider) Name() string {
 	return p.Provider.Name()
 }
 
+// Lookup consults the cache before delegating to the wrapped provider.
 func (p CachedProvider) Lookup(ctx context.Context, metadata Metadata) (Result, error) {
 	if p.Provider == nil {
 		return Result{}, ErrNotFound

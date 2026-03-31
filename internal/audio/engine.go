@@ -77,6 +77,7 @@ type replacementStreamPreparer interface {
 type queueService struct{ engine *Engine }
 type playbackService struct{ engine *Engine }
 
+// NewEngine constructs a playback engine with normalized defaults for buffering and backend selection.
 func NewEngine(options Options) *Engine {
 	rate := options.OutputRate
 	if rate <= 0 {
@@ -103,20 +104,24 @@ func NewEngine(options Options) *Engine {
 	}
 }
 
+// QueueService returns a UI-facing queue adapter backed by the engine.
 func (e *Engine) QueueService() teaui.QueueService {
 	return queueService{engine: e}
 }
 
+// PlaybackService returns a UI-facing playback adapter backed by the engine.
 func (e *Engine) PlaybackService() teaui.PlaybackService {
 	return playbackService{engine: e}
 }
 
+// QueueSnapshot returns a copy of the current queue state.
 func (e *Engine) QueueSnapshot() []teaui.QueueEntry {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return append([]teaui.QueueEntry(nil), e.queue...)
 }
 
+// AddToQueue appends a search result to the playback queue.
 func (e *Engine) AddToQueue(result teaui.SearchResult) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -147,6 +152,7 @@ func (e *Engine) AddToQueue(result teaui.SearchResult) error {
 	return nil
 }
 
+// RemoveFromQueue removes the queued entry with the supplied ID.
 func (e *Engine) RemoveFromQueue(id string) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -187,6 +193,7 @@ func (e *Engine) RemoveFromQueue(id string) error {
 	return nil
 }
 
+// MoveQueueEntry reorders a queued entry by the requested relative delta.
 func (e *Engine) MoveQueueEntry(id string, delta int) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -239,6 +246,7 @@ func (e *Engine) MoveQueueEntry(id string, delta int) error {
 	return nil
 }
 
+// ClearQueue stops playback and removes every queued entry.
 func (e *Engine) ClearQueue() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -251,6 +259,7 @@ func (e *Engine) ClearQueue() error {
 	return nil
 }
 
+// PlaybackSnapshot returns a UI-safe snapshot of the current playback state.
 func (e *Engine) PlaybackSnapshot() teaui.PlaybackSnapshot {
 	if !e.mu.TryLock() {
 		return e.lastSnapshot
@@ -285,6 +294,7 @@ func (e *Engine) playbackSnapshotLocked() teaui.PlaybackSnapshot {
 	return snapshot
 }
 
+// TogglePause starts playback if needed or toggles the active track between paused and playing.
 func (e *Engine) TogglePause() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -309,6 +319,7 @@ func (e *Engine) TogglePause() error {
 	return nil
 }
 
+// Previous switches playback to the previous queue entry.
 func (e *Engine) Previous() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -329,6 +340,7 @@ func (e *Engine) Previous() error {
 	return e.startCurrentLocked(false)
 }
 
+// Next switches playback to the next queue entry.
 func (e *Engine) Next() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -349,6 +361,7 @@ func (e *Engine) Next() error {
 	return e.startCurrentLocked(false)
 }
 
+// AdjustVolume changes playback volume by delta percentage points.
 func (e *Engine) AdjustVolume(delta int) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -373,6 +386,7 @@ func (e *Engine) AdjustVolume(delta int) error {
 	return nil
 }
 
+// SeekTo moves the active track to the requested absolute position.
 func (e *Engine) SeekTo(target time.Duration) error {
 	e.mu.Lock()
 	if e.closed {
@@ -431,6 +445,7 @@ func (e *Engine) SeekTo(target time.Duration) error {
 	return e.activateTrackLocked(current.entry, current.info, current.format, replacement, paused)
 }
 
+// SetRepeat updates repeat mode for queue playback.
 func (e *Engine) SetRepeat(repeat bool) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -441,6 +456,7 @@ func (e *Engine) SetRepeat(repeat bool) error {
 	return nil
 }
 
+// SetStream updates stream-continuation mode for playback.
 func (e *Engine) SetStream(stream bool) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -451,6 +467,7 @@ func (e *Engine) SetStream(stream bool) error {
 	return nil
 }
 
+// Close releases playback resources and prevents further use of the engine.
 func (e *Engine) Close() error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -630,16 +647,41 @@ func percentToLevel(percent int) (float64, bool) {
 	return float64(percent-100) / 50.0, false
 }
 
-func (s queueService) Snapshot() []teaui.QueueEntry         { return s.engine.QueueSnapshot() }
-func (s queueService) Add(result teaui.SearchResult) error  { return s.engine.AddToQueue(result) }
-func (s queueService) Move(id string, delta int) error      { return s.engine.MoveQueueEntry(id, delta) }
-func (s queueService) Remove(id string) error               { return s.engine.RemoveFromQueue(id) }
-func (s queueService) Clear() error                         { return s.engine.ClearQueue() }
-func (s playbackService) Snapshot() teaui.PlaybackSnapshot  { return s.engine.PlaybackSnapshot() }
-func (s playbackService) TogglePause() error                { return s.engine.TogglePause() }
-func (s playbackService) Previous() error                   { return s.engine.Previous() }
-func (s playbackService) Next() error                       { return s.engine.Next() }
+// Snapshot returns a copy of the queue state exposed through the UI adapter.
+func (s queueService) Snapshot() []teaui.QueueEntry { return s.engine.QueueSnapshot() }
+
+// Add appends a search result to the queue through the UI adapter.
+func (s queueService) Add(result teaui.SearchResult) error { return s.engine.AddToQueue(result) }
+
+// Move reorders a queued entry by delta positions through the UI adapter.
+func (s queueService) Move(id string, delta int) error { return s.engine.MoveQueueEntry(id, delta) }
+
+// Remove deletes a queued entry through the UI adapter.
+func (s queueService) Remove(id string) error { return s.engine.RemoveFromQueue(id) }
+
+// Clear removes all queued entries through the UI adapter.
+func (s queueService) Clear() error { return s.engine.ClearQueue() }
+
+// Snapshot returns the current playback state exposed through the UI adapter.
+func (s playbackService) Snapshot() teaui.PlaybackSnapshot { return s.engine.PlaybackSnapshot() }
+
+// TogglePause toggles paused playback through the UI adapter.
+func (s playbackService) TogglePause() error { return s.engine.TogglePause() }
+
+// Previous switches to the previous queued track through the UI adapter.
+func (s playbackService) Previous() error { return s.engine.Previous() }
+
+// Next switches to the next queued track through the UI adapter.
+func (s playbackService) Next() error { return s.engine.Next() }
+
+// SeekTo performs an absolute seek through the UI adapter.
 func (s playbackService) SeekTo(target time.Duration) error { return s.engine.SeekTo(target) }
-func (s playbackService) AdjustVolume(delta int) error      { return s.engine.AdjustVolume(delta) }
-func (s playbackService) SetRepeat(repeat bool) error       { return s.engine.SetRepeat(repeat) }
-func (s playbackService) SetStream(stream bool) error       { return s.engine.SetStream(stream) }
+
+// AdjustVolume changes playback volume through the UI adapter.
+func (s playbackService) AdjustVolume(delta int) error { return s.engine.AdjustVolume(delta) }
+
+// SetRepeat updates repeat mode through the UI adapter.
+func (s playbackService) SetRepeat(repeat bool) error { return s.engine.SetRepeat(repeat) }
+
+// SetStream updates stream-continuation mode through the UI adapter.
+func (s playbackService) SetStream(stream bool) error { return s.engine.SetStream(stream) }

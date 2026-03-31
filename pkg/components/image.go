@@ -63,6 +63,7 @@ type TerminalImage struct {
 	err       error
 }
 
+// TerminalImageSettings configures renderer protocol and scale behavior for TerminalImage.
 type TerminalImageSettings struct {
 	Protocol  string
 	ScaleMode string
@@ -269,10 +270,12 @@ func configuredImageProtocol() string {
 	return effectiveImageProtocol("")
 }
 
+// EffectiveImageRenderer reports the renderer that will be used after applying overrides.
 func EffectiveImageRenderer(explicit string) string {
 	return effectiveImageProtocol(explicit)
 }
 
+// CanonicalImageRenderer normalizes a renderer name to Musicon's supported labels.
 func CanonicalImageRenderer(raw string) string {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
 	case "", "halfblocks", "halfblock", "unicode", "symbols":
@@ -290,6 +293,7 @@ func CanonicalImageRenderer(raw string) string {
 	}
 }
 
+// ListUsableImageRenderers reports renderer labels supported by the current terminal.
 func ListUsableImageRenderers() []string {
 	renderers := []string{"auto"}
 	capabilities := detectTerminalImageCapabilities()
@@ -306,6 +310,7 @@ func ListUsableImageRenderers() []string {
 	return slices.Compact(renderers)
 }
 
+// TerminalCellWidthRatio returns the shared fallback terminal cell width-to-height ratio.
 func TerminalCellWidthRatio() float64 {
 	return defaultTerminalCellWidthRatio
 }

@@ -12,6 +12,7 @@ import (
 )
 
 const (
+	// DefaultFileName is the conventional base name for Musicon configuration files.
 	DefaultFileName   = "musicon.toml"
 	defaultTheme      = "default"
 	defaultStartMode  = "queue"
@@ -22,6 +23,7 @@ const (
 	defaultYTResults  = 20
 )
 
+// Config describes the full TOML-backed Musicon configuration surface.
 type Config struct {
 	Audio    AudioConfig    `toml:"audio"`
 	UI       UIConfig       `toml:"ui"`
@@ -29,18 +31,21 @@ type Config struct {
 	Sources  SourcesConfig  `toml:"sources"`
 }
 
+// KeybindsConfig groups configurable shortcuts for every screen.
 type KeybindsConfig struct {
 	Global   GlobalKeybindsConfig   `toml:"global"`
 	Queue    QueueKeybindsConfig    `toml:"queue"`
 	Playback PlaybackKeybindsConfig `toml:"playback"`
 }
 
+// GlobalKeybindsConfig declares bindings that are active in every UI mode.
 type GlobalKeybindsConfig struct {
 	Quit       []string `toml:"quit"`
 	ToggleMode []string `toml:"toggle_mode"`
 	ToggleHelp []string `toml:"toggle_help"`
 }
 
+// QueueKeybindsConfig declares shortcuts specific to queue mode.
 type QueueKeybindsConfig struct {
 	ToggleSearchFocus []string `toml:"toggle_search_focus"`
 	SourcePrev        []string `toml:"source_prev"`
@@ -61,6 +66,7 @@ type QueueKeybindsConfig struct {
 	BrowserPageDown   []string `toml:"browser_page_down"`
 }
 
+// PlaybackKeybindsConfig declares shortcuts specific to playback mode.
 type PlaybackKeybindsConfig struct {
 	CyclePane     []string `toml:"cycle_pane"`
 	ToggleInfo    []string `toml:"toggle_info"`
@@ -75,10 +81,12 @@ type PlaybackKeybindsConfig struct {
 	VolumeUp      []string `toml:"volume_up"`
 }
 
+// AudioConfig holds playback-runtime startup settings.
 type AudioConfig struct {
 	Backend string `toml:"backend"`
 }
 
+// UIConfig holds terminal UI startup settings.
 type UIConfig struct {
 	Theme          string         `toml:"theme"`
 	StartMode      string         `toml:"start_mode"`
@@ -86,21 +94,25 @@ type UIConfig struct {
 	AlbumArt       AlbumArtConfig `toml:"album_art"`
 }
 
+// AlbumArtConfig configures album-art rendering defaults.
 type AlbumArtConfig struct {
 	FillMode string `toml:"fill_mode"`
 	Backend  string `toml:"backend"`
 	Protocol string `toml:"protocol"`
 }
 
+// SourcesConfig groups source-specific startup settings.
 type SourcesConfig struct {
 	Local   LocalSourceConfig   `toml:"local"`
 	YouTube YouTubeSourceConfig `toml:"youtube"`
 }
 
+// LocalSourceConfig configures local-library discovery roots.
 type LocalSourceConfig struct {
 	Dirs []string `toml:"dirs"`
 }
 
+// YouTubeSourceConfig configures YouTube Music search and playback integration.
 type YouTubeSourceConfig struct {
 	Enabled            bool     `toml:"enabled"`
 	MaxResults         int      `toml:"max_results"`
@@ -110,11 +122,13 @@ type YouTubeSourceConfig struct {
 	CacheDir           string   `toml:"cache_dir"`
 }
 
+// LoadResult reports the loaded config plus the path or paths that produced it.
 type LoadResult struct {
 	Path   string
 	Config Config
 }
 
+// Default returns the built-in Musicon configuration defaults.
 func Default() Config {
 	return Config{
 		Audio: AudioConfig{
@@ -143,6 +157,7 @@ func Default() Config {
 	}
 }
 
+// Load reads configuration from an explicit TOML file path.
 func Load(path string) (Config, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -157,6 +172,7 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
+// LoadDefault loads the default layered config search path and reports which files were applied.
 func LoadDefault() (LoadResult, error) {
 	path, explicit, err := explicitPath()
 	if err != nil {
@@ -190,6 +206,7 @@ func LoadDefault() (LoadResult, error) {
 	}, nil
 }
 
+// ResolvedLocalDirs returns deduplicated, expanded local-library directories.
 func (c Config) ResolvedLocalDirs() []string {
 	dirs := make([]string, 0, len(c.Sources.Local.Dirs))
 	seen := make(map[string]struct{}, len(c.Sources.Local.Dirs))

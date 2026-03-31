@@ -8,13 +8,16 @@ import (
 	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
+// Mode identifies the active top-level Musicon screen.
 type Mode int
 
+// Mode values enumerate Musicon's dedicated fullscreen screens.
 const (
 	ModeQueue Mode = iota
 	ModePlayback
 )
 
+// String returns a user-facing label for the mode.
 func (m Mode) String() string {
 	switch m {
 	case ModePlayback:
@@ -24,8 +27,10 @@ func (m Mode) String() string {
 	}
 }
 
+// PlaybackPane identifies the center-pane content shown in playback mode.
 type PlaybackPane int
 
+// PlaybackPane values enumerate the playback-screen center panes.
 const (
 	PaneArtwork PlaybackPane = iota
 	PaneLyrics
@@ -33,6 +38,7 @@ const (
 	PaneVisualizer
 )
 
+// String returns a user-facing label for the playback pane.
 func (p PlaybackPane) String() string {
 	switch p {
 	case PaneLyrics:
@@ -46,14 +52,17 @@ func (p PlaybackPane) String() string {
 	}
 }
 
+// MediaKind classifies searchable items exposed by a source.
 type MediaKind string
 
+// MediaKind values classify queueable results.
 const (
 	MediaTrack    MediaKind = "track"
 	MediaStream   MediaKind = "stream"
 	MediaPlaylist MediaKind = "playlist"
 )
 
+// String returns a user-facing label for the media kind.
 func (k MediaKind) String() string {
 	switch k {
 	case MediaStream:
@@ -65,16 +74,19 @@ func (k MediaKind) String() string {
 	}
 }
 
+// SearchFilters declares which media kinds should be included in queue searches.
 type SearchFilters struct {
 	Tracks    bool
 	Streams   bool
 	Playlists bool
 }
 
+// DefaultSearchFilters enables every supported media kind.
 func DefaultSearchFilters() SearchFilters {
 	return SearchFilters{Tracks: true, Streams: true, Playlists: true}
 }
 
+// Toggle flips one media-kind filter while keeping at least one filter enabled.
 func (f *SearchFilters) Toggle(kind MediaKind) {
 	switch kind {
 	case MediaTrack:
@@ -92,6 +104,7 @@ func (f *SearchFilters) Toggle(kind MediaKind) {
 	}
 }
 
+// Matches reports whether the supplied media kind is currently enabled.
 func (f SearchFilters) Matches(kind MediaKind) bool {
 	switch kind {
 	case MediaStream:
@@ -103,18 +116,21 @@ func (f SearchFilters) Matches(kind MediaKind) bool {
 	}
 }
 
+// SourceDescriptor describes one searchable source exposed to the UI.
 type SourceDescriptor struct {
 	ID          string
 	Name        string
 	Description string
 }
 
+// SearchRequest captures one source-scoped search query from the UI.
 type SearchRequest struct {
 	SourceID string
 	Query    string
 	Filters  SearchFilters
 }
 
+// SearchResult describes one queueable item returned by a source search.
 type SearchResult struct {
 	ID        string
 	Title     string
@@ -126,6 +142,7 @@ type SearchResult struct {
 	Artwork   coverart.Metadata
 }
 
+// QueueEntry stores the metadata the playback queue needs for one item.
 type QueueEntry struct {
 	ID       string
 	Title    string
@@ -136,6 +153,7 @@ type QueueEntry struct {
 	Artwork  coverart.Metadata
 }
 
+// TrackInfo describes the currently resolved track for playback and artwork display.
 type TrackInfo struct {
 	ID       string
 	Title    string
@@ -146,6 +164,7 @@ type TrackInfo struct {
 	Artwork  coverart.Metadata
 }
 
+// CoverArtMetadata merges resolved track fields into normalized cover-art lookup metadata.
 func (t TrackInfo) CoverArtMetadata() coverart.Metadata {
 	return t.Artwork.Merge(coverart.Metadata{
 		Title:  t.Title,
@@ -154,6 +173,7 @@ func (t TrackInfo) CoverArtMetadata() coverart.Metadata {
 	})
 }
 
+// PlaybackSnapshot reports the current queue and playback state visible to the UI.
 type PlaybackSnapshot struct {
 	Track       *TrackInfo
 	Paused      bool
@@ -166,11 +186,13 @@ type PlaybackSnapshot struct {
 	QueueLength int
 }
 
+// SearchService provides source discovery and queue search results to the UI.
 type SearchService interface {
 	Sources() []SourceDescriptor
 	Search(context.Context, SearchRequest) ([]SearchResult, error)
 }
 
+// QueueService provides queue snapshots and queue mutations to the UI.
 type QueueService interface {
 	Snapshot() []QueueEntry
 	Add(SearchResult) error
@@ -179,6 +201,7 @@ type QueueService interface {
 	Clear() error
 }
 
+// PlaybackService provides transport controls and playback snapshots to the UI.
 type PlaybackService interface {
 	Snapshot() PlaybackSnapshot
 	TogglePause() error
@@ -190,18 +213,22 @@ type PlaybackService interface {
 	SetStream(stream bool) error
 }
 
+// LyricsProvider supplies optional lyrics for the active track.
 type LyricsProvider interface {
 	Lyrics(trackID string) ([]string, error)
 }
 
+// ArtworkProvider supplies optional artwork for the active track.
 type ArtworkProvider interface {
 	Artwork(metadata coverart.Metadata) (*components.ImageSource, error)
 }
 
+// VisualizationProvider supplies optional visualization placeholder content.
 type VisualizationProvider interface {
 	Placeholder(mode PlaybackPane, width, height int) (string, error)
 }
 
+// Services groups the backend-facing dependencies injected into the UI.
 type Services struct {
 	Search        SearchService
 	Queue         QueueService
@@ -211,6 +238,7 @@ type Services struct {
 	Visualization VisualizationProvider
 }
 
+// Options configures the root UI shell at startup.
 type Options struct {
 	StartMode      Mode
 	Theme          string
@@ -219,6 +247,7 @@ type Options struct {
 	Keybinds       KeybindOptions
 }
 
+// AlbumArtOptions configures playback artwork rendering defaults.
 type AlbumArtOptions struct {
 	FillMode string
 	Protocol string

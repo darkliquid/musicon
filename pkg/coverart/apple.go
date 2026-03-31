@@ -21,6 +21,7 @@ type AppleMusicProvider struct {
 	BaseURL        string
 }
 
+// Name returns the provider's stable identifier.
 func (p *AppleMusicProvider) Name() string { return "apple-music" }
 
 // Lookup resolves Apple Music artwork via album ID first, then metadata search fallback.

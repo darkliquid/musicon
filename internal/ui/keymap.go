@@ -7,18 +7,21 @@ import (
 	"github.com/darkliquid/musicon/pkg/components"
 )
 
+// KeybindOptions declares config-friendly key lists for every supported UI action.
 type KeybindOptions struct {
 	Global   GlobalKeybindOptions
 	Queue    QueueKeybindOptions
 	Playback PlaybackKeybindOptions
 }
 
+// GlobalKeybindOptions holds key lists that stay active in every mode.
 type GlobalKeybindOptions struct {
 	Quit       []string
 	ToggleMode []string
 	ToggleHelp []string
 }
 
+// QueueKeybindOptions holds key lists specific to queue mode.
 type QueueKeybindOptions struct {
 	ToggleSearchFocus []string
 	SourcePrev        []string
@@ -39,6 +42,7 @@ type QueueKeybindOptions struct {
 	BrowserPageDown   []string
 }
 
+// PlaybackKeybindOptions holds key lists specific to playback mode.
 type PlaybackKeybindOptions struct {
 	CyclePane     []string
 	ToggleInfo    []string
@@ -53,18 +57,21 @@ type PlaybackKeybindOptions struct {
 	VolumeUp      []string
 }
 
+// KeyMap stores normalized Bubble Tea bindings for every UI action.
 type KeyMap struct {
 	Global   GlobalKeyMap
 	Queue    QueueKeyMap
 	Playback PlaybackKeyMap
 }
 
+// GlobalKeyMap stores normalized global bindings.
 type GlobalKeyMap struct {
 	Quit       bubblekey.Binding
 	ToggleMode bubblekey.Binding
 	ToggleHelp bubblekey.Binding
 }
 
+// QueueKeyMap stores normalized queue-mode bindings.
 type QueueKeyMap struct {
 	ToggleSearchFocus bubblekey.Binding
 	SourcePrev        bubblekey.Binding
@@ -80,6 +87,7 @@ type QueueKeyMap struct {
 	Browser           components.ListKeyMap
 }
 
+// PlaybackKeyMap stores normalized playback-mode bindings.
 type PlaybackKeyMap struct {
 	CyclePane     bubblekey.Binding
 	ToggleInfo    bubblekey.Binding

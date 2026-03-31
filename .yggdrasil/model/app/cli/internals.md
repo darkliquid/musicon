@@ -17,6 +17,8 @@ The current implementation:
 - defers `engine.Close()` to release audio resources on exit
 - writes failures to stderr and exits with a non-zero status
 
+The package source now also carries package-level and exported-symbol documentation so CLI wiring, source aggregation, and resolver routing remain legible through Go tooling without tracing every startup path manually.
+
 It deliberately avoids accumulating view logic, component composition, or backend adapters.
 
 ## Decisions

@@ -40,6 +40,7 @@ func NewLocalFilesProvider() LocalFilesProvider {
 	}
 }
 
+// Name returns the provider's stable identifier.
 func (p LocalFilesProvider) Name() string { return "local-files" }
 
 // Lookup resolves artwork from an explicit sidecar path or common neighboring filenames.

@@ -244,6 +244,7 @@ type combinedSearch struct {
 	providers []ui.SearchService
 }
 
+// Sources returns the configured source descriptors, adding an aggregate option when multiple providers are available.
 func (c combinedSearch) Sources() []ui.SourceDescriptor {
 	descriptors := make([]ui.SourceDescriptor, 0, len(c.providers)+1)
 	seen := make(map[string]struct{}, len(c.providers)+1)
@@ -272,6 +273,7 @@ func (c combinedSearch) Sources() []ui.SourceDescriptor {
 	return descriptors
 }
 
+// Search queries each configured provider in order and deduplicates results by ID.
 func (c combinedSearch) Search(ctx context.Context, request ui.SearchRequest) ([]ui.SearchResult, error) {
 	results := make([]ui.SearchResult, 0, 64)
 	seen := make(map[string]struct{}, 64)
@@ -302,6 +304,7 @@ type combinedResolver struct {
 	youtube audio.Resolver
 }
 
+// Resolve routes queue entries to the resolver that owns the entry namespace.
 func (c combinedResolver) Resolve(entry ui.QueueEntry) (audio.ResolvedTrack, error) {
 	if youtube.OwnsEntryID(entry.ID) {
 		if c.youtube == nil {

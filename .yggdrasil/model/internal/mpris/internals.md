@@ -12,6 +12,8 @@ It should:
 - use property callbacks for writable controls like loop mode and volume so remote desktop changes reuse the same playback mutations as local key presses
 - route both relative `Seek` and absolute `SetPosition` requests through the same playback-service `SeekTo` API used by the TUI, so desktop media controls participate in the same debounced absolute-seek/runtime-swap model rather than inventing a second transport path
 
+The package source now also carries package-level and exported-symbol documentation so the MPRIS lifecycle and method mappings remain readable from Go tooling without replaying the D-Bus export sequence mentally.
+
 This node should own D-Bus-specific details so the audio runtime and UI remain focused on playback and presentation concerns.
 
 ## Decisions

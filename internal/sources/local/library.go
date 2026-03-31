@@ -53,6 +53,7 @@ type indexedTrack struct {
 	haystack string
 }
 
+// Options configures the local-library roots scanned by NewLibrary.
 type Options struct {
 	Roots []string
 }
@@ -65,6 +66,7 @@ func NewLibrary(options Options) *Library {
 	}
 }
 
+// Sources reports the local source descriptor exposed to the UI.
 func (l *Library) Sources() []teaui.SourceDescriptor {
 	return []teaui.SourceDescriptor{{
 		ID:          sourceID,
@@ -73,6 +75,7 @@ func (l *Library) Sources() []teaui.SourceDescriptor {
 	}}
 }
 
+// Search scans the indexed local library for matches to the supplied request.
 func (l *Library) Search(ctx context.Context, request teaui.SearchRequest) ([]teaui.SearchResult, error) {
 	if request.SourceID != "" && request.SourceID != "all" && request.SourceID != sourceID {
 		return nil, nil
@@ -108,6 +111,7 @@ func (l *Library) Search(ctx context.Context, request teaui.SearchRequest) ([]te
 	return results, nil
 }
 
+// Resolve opens and decodes the queued local file represented by entry.
 func (l *Library) Resolve(entry teaui.QueueEntry) (audio.ResolvedTrack, error) {
 	tracks, err := l.scan(context.Background())
 	if err != nil {

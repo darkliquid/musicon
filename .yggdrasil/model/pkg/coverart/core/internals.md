@@ -8,6 +8,8 @@
 - explicit not-found semantics
 - disk-backed caching wrappers
 
+The package source now also carries package-level and exported-symbol documentation so reusable metadata, cache, and chain contracts remain understandable from Go tooling without reopening every provider implementation.
+
 This node exists so other consumers can reuse the resolution primitives without inheriting every concrete provider implementation.
 
 ## Decisions

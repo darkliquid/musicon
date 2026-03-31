@@ -9,6 +9,8 @@
 
 Each provider is independently cacheable and reusable.
 
+The package source now also carries exported-symbol documentation so each remote provider's entry point remains clear from Go docs alongside the fallback-order notes captured here.
+
 ## Decisions
 
 - Split remote providers from local providers so the graph stays within node-size limits and the local-first policy remains explicit.

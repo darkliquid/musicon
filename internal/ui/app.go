@@ -22,6 +22,7 @@ var minimumViewportRequirements = components.SizeRequirements{
 	MinSquare: 20,
 }
 
+// App owns the Bubble Tea program used to run Musicon's terminal UI.
 type App struct {
 	program *tea.Program
 }
@@ -72,6 +73,7 @@ func Run(app *App) error {
 	return err
 }
 
+// Init requests the initial window size and starts the UI redraw tick.
 func (m *rootModel) Init() tea.Cmd {
 	return tea.Batch(
 		requestWindowSizeCmd(),
@@ -118,6 +120,7 @@ func parsePositiveEnvInt(key string) (int, bool) {
 	return value, true
 }
 
+// Update routes Bubble Tea messages through the active screen and root shell state.
 func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmdBatch []tea.Cmd
 
@@ -177,6 +180,7 @@ HandleMsg:
 	return m, tea.Batch(cmdBatch...)
 }
 
+// View renders the active square viewport or the current resize/loading state.
 func (m *rootModel) View() tea.View {
 	if m.width <= 0 || m.height <= 0 {
 		return m.makeView("loading terminal dimensions...", "Musicon - Starting")

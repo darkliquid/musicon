@@ -211,17 +211,30 @@ type mediaCloser struct {
 	prepareReplacement func(target int) (beep.StreamSeekCloser, error)
 }
 
+// Stream proxies decoded samples from the wrapped media stream.
 func (m *mediaCloser) Stream(samples [][2]float64) (int, bool) { return m.stream.Stream(samples) }
-func (m *mediaCloser) Err() error                              { return m.stream.Err() }
-func (m *mediaCloser) Len() int                                { return m.stream.Len() }
-func (m *mediaCloser) Position() int                           { return m.stream.Position() }
-func (m *mediaCloser) Seek(p int) error                        { return m.stream.Seek(p) }
+
+// Err reports the wrapped stream's terminal error state.
+func (m *mediaCloser) Err() error { return m.stream.Err() }
+
+// Len reports the total decoded sample length of the wrapped stream.
+func (m *mediaCloser) Len() int { return m.stream.Len() }
+
+// Position reports the current decoded sample position of the wrapped stream.
+func (m *mediaCloser) Position() int { return m.stream.Position() }
+
+// Seek forwards an absolute sample seek to the wrapped stream.
+func (m *mediaCloser) Seek(p int) error { return m.stream.Seek(p) }
+
+// PrepareReplacement creates a replacement stream positioned near target for deferred far seeks.
 func (m *mediaCloser) PrepareReplacement(target int) (beep.StreamSeekCloser, error) {
 	if m.prepareReplacement == nil {
 		return nil, errors.New("replacement seek is not supported")
 	}
 	return m.prepareReplacement(target)
 }
+
+// Close releases both the decoded stream and its underlying media transport.
 func (m *mediaCloser) Close() error {
 	var streamErr error
 	if m.stream != nil {
@@ -306,6 +319,7 @@ func newRangeReadSeeker(ctx context.Context, client *http.Client, rawURL string,
 	}, nil
 }
 
+// Clone returns a seeker that shares the same cached blocks but tracks its own position.
 func (r *rangeReadSeeker) Clone(ctx context.Context) *rangeReadSeeker {
 	if ctx == nil {
 		ctx = context.Background()
@@ -394,6 +408,7 @@ func (r *rangeReadSeeker) Seek(offset int64, whence int) (int64, error) {
 	return r.pos, nil
 }
 
+// Close releases the seeker and drops its shared block-cache reference.
 func (r *rangeReadSeeker) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -497,6 +512,7 @@ func (r *rangeReadSeeker) cachePath(start int64) string {
 	return filepath.Join(r.cache.dir(), fmt.Sprintf("%020d.block", start))
 }
 
+// Prime preloads the block covering offset without changing the current position.
 func (r *rangeReadSeeker) Prime(offset int64) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -509,6 +525,7 @@ func (r *rangeReadSeeker) Prime(offset int64) error {
 	return err
 }
 
+// KnownSize reports the best-known total media size in bytes.
 func (r *rangeReadSeeker) KnownSize() int64 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -584,6 +601,7 @@ type managedReadCloser struct {
 	onClose func()
 }
 
+// Close closes the wrapped reader once and runs the optional cleanup hook.
 func (m *managedReadCloser) Close() error {
 	var err error
 	m.once.Do(func() {

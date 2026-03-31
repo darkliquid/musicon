@@ -76,11 +76,13 @@ func newPlaybackScreenWithKeyMap(services Services, options AlbumArtOptions, key
 	return screen
 }
 
+// SetSize updates the playback screen's render bounds.
 func (p *playbackScreen) SetSize(width, height int) {
 	p.width = max(1, width)
 	p.height = max(1, height)
 }
 
+// Update handles playback-screen input, ticks, and async playback results.
 func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	switch typed := msg.(type) {
 	case playbackActionResult:
@@ -217,6 +219,7 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	}
 }
 
+// View renders the active playback pane plus its overlays.
 func (p *playbackScreen) View() string {
 	if p.width <= 0 || p.height <= 0 {
 		return ""
@@ -232,6 +235,7 @@ func (p *playbackScreen) View() string {
 	return body
 }
 
+// HelpView renders the playback-screen help overlay.
 func (p *playbackScreen) HelpView() string {
 	width := min(p.width, 68)
 	height := min(p.height, 13)

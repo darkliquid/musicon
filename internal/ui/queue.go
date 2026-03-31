@@ -109,6 +109,7 @@ func configuredSources(services Services) []SourceDescriptor {
 	return sources
 }
 
+// SetSize updates the queue screen's render bounds.
 func (q *queueScreen) SetSize(width, height int) {
 	q.width = max(1, width)
 	q.height = max(1, height)
@@ -121,6 +122,7 @@ func (q *queueScreen) resizeBrowser() {
 	q.browser.SetSize(max(6, q.width), listHeight)
 }
 
+// Update handles queue-screen input, debounced searches, and async search results.
 func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	switch typed := msg.(type) {
 	case queueStartSearchMsg:
@@ -243,6 +245,7 @@ func shouldEditSearch(keypress tea.KeyPressMsg) bool {
 	return keypress.Key().Text != ""
 }
 
+// View renders the queue screen inside the active square viewport.
 func (q *queueScreen) View() string {
 	if q.width <= 0 || q.height <= 0 {
 		return ""
@@ -260,6 +263,7 @@ func (q *queueScreen) View() string {
 	return lipgloss.NewStyle().Width(q.width).Height(q.height).Render(body)
 }
 
+// HelpView renders the queue-screen help overlay.
 func (q *queueScreen) HelpView() string {
 	width := min(q.width, 64)
 	height := min(q.height, 14)

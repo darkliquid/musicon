@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ListKeyMap defines the navigation bindings used by List.
 type ListKeyMap struct {
 	Up       bubblekey.Binding
 	Down     bubblekey.Binding
@@ -17,6 +18,7 @@ type ListKeyMap struct {
 	PageDown bubblekey.Binding
 }
 
+// DefaultListKeyMap returns the built-in navigation bindings for List.
 func DefaultListKeyMap() ListKeyMap {
 	return ListKeyMap{
 		Up:       bubblekey.NewBinding(bubblekey.WithKeys("up", "k"), bubblekey.WithHelp("up / k", "move up")),
@@ -48,6 +50,7 @@ type List struct {
 	emptyBody  string
 }
 
+// NewList constructs a selectable list with default sizing and empty-state messaging.
 func NewList() List {
 	return List{
 		width:      20,
@@ -58,6 +61,7 @@ func NewList() List {
 	}
 }
 
+// SetItems replaces the list contents while preserving a valid selection index.
 func (l *List) SetItems(items []ListItem) {
 	l.items = append([]ListItem(nil), items...)
 	if len(l.items) == 0 {
@@ -72,6 +76,7 @@ func (l *List) SetItems(items []ListItem) {
 	}
 }
 
+// SetSize updates the list's render bounds.
 func (l *List) SetSize(width, height int) {
 	if width < 1 {
 		width = 1
@@ -83,19 +88,23 @@ func (l *List) SetSize(width, height int) {
 	l.height = height
 }
 
+// SetFocused toggles focused-row styling.
 func (l *List) SetFocused(focused bool) {
 	l.focused = focused
 }
 
+// SetKeyMap replaces the navigation bindings used by Update.
 func (l *List) SetKeyMap(keymap ListKeyMap) {
 	l.keymap = keymap
 }
 
+// SetEmptyState configures the placeholder shown when the list has no items.
 func (l *List) SetEmptyState(title, body string) {
 	l.emptyTitle = title
 	l.emptyBody = body
 }
 
+// Update applies navigation input and reports whether selection changed.
 func (l *List) Update(msg tea.Msg) bool {
 	keypress, ok := msg.(tea.KeyPressMsg)
 	if !ok || len(l.items) == 0 {
@@ -126,6 +135,7 @@ func (l *List) Update(msg tea.Msg) bool {
 	}
 }
 
+// Move shifts the selected row by delta positions within bounds.
 func (l *List) Move(delta int) {
 	if len(l.items) == 0 {
 		return
@@ -139,10 +149,12 @@ func (l *List) Move(delta int) {
 	}
 }
 
+// SelectedIndex reports the currently selected row index.
 func (l List) SelectedIndex() int {
 	return l.selected
 }
 
+// SetSelectedIndex moves selection to index after clamping it into range.
 func (l *List) SetSelectedIndex(index int) {
 	if len(l.items) == 0 {
 		l.selected = 0
@@ -157,6 +169,7 @@ func (l *List) SetSelectedIndex(index int) {
 	l.selected = index
 }
 
+// View renders the visible portion of the list or its empty state.
 func (l List) View() string {
 	if l.width <= 0 || l.height <= 0 {
 		return ""

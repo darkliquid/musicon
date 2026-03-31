@@ -31,6 +31,8 @@ The same image code now exposes canonical renderer naming and terminal-aware ren
 
 Renderer scaling keeps the existing config surface (`fill`, `stretch`, `fit`, `auto`, `none`) but now maps it onto Chafa geometry rules plus a small pre-crop step for fill-style behavior. When users do not pin `ui.cell_width_ratio`, the shared helper now returns the fixed `0.5` fallback instead of trying to infer font metrics from the terminal.
 
+The package source now also carries package-level and exported-symbol documentation so shared widget contracts remain visible through Go docs alongside the existing implementation-level notes.
+
 ## Decisions
 
 - Chose `pkg/components` for reusable widgets because the user explicitly requested that generic UI components live outside `internal/ui`.

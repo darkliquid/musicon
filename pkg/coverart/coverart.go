@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// ErrNotFound reports that a provider could not locate cover art for the supplied metadata.
 var ErrNotFound = errors.New("cover art not found")
 
 // IDs groups external service identifiers that can improve cover-art lookup.

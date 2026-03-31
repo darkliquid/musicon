@@ -32,6 +32,7 @@ type SpotifyProvider struct {
 	expiresAt   time.Time
 }
 
+// Name returns the provider's stable identifier.
 func (p *SpotifyProvider) Name() string { return "spotify" }
 
 // Lookup resolves Spotify artwork via album ID first, then search fallback.

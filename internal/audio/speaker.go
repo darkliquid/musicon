@@ -38,6 +38,7 @@ func newRuntimeSpeaker(backends []mago.Backend) *runtimeSpeaker {
 	return &runtimeSpeaker{backends: append([]mago.Backend(nil), backends...)}
 }
 
+// Init opens the runtime speaker for the requested sample rate and buffer size.
 func (s *runtimeSpeaker) Init(sampleRate beep.SampleRate, bufferSize int) error {
 	if sampleRate <= 0 {
 		return errors.New("speaker: sample rate must be positive")
@@ -120,6 +121,7 @@ func (s *runtimeSpeaker) Init(sampleRate beep.SampleRate, bufferSize int) error 
 	return nil
 }
 
+// Close shuts down the active speaker device and clears mixer state.
 func (s *runtimeSpeaker) Close() {
 	s.mu.Lock()
 	state := s.current
@@ -133,20 +135,24 @@ func (s *runtimeSpeaker) Close() {
 	}
 }
 
+// Lock serializes direct mixer mutations with the audio callback.
 func (s *runtimeSpeaker) Lock() {
 	s.mu.Lock()
 }
 
+// Unlock releases a speaker lock acquired with Lock.
 func (s *runtimeSpeaker) Unlock() {
 	s.mu.Unlock()
 }
 
+// Play adds one or more streamers to the active mixer.
 func (s *runtimeSpeaker) Play(streamers ...beep.Streamer) {
 	s.mu.Lock()
 	s.mixer.Add(streamers...)
 	s.mu.Unlock()
 }
 
+// Clear removes every streamer from the active mixer.
 func (s *runtimeSpeaker) Clear() {
 	s.mu.Lock()
 	s.mixer.Clear()
@@ -264,6 +270,7 @@ func ListUsableBackends() ([]string, error) {
 	return slices.Compact(names), nil
 }
 
+// CanonicalBackendName normalizes backend aliases to the config-compatible names Musicon accepts.
 func CanonicalBackendName(raw string) string {
 	switch strings.TrimSpace(strings.ToLower(raw)) {
 	case "", "auto":

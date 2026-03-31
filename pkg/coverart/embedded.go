@@ -11,6 +11,7 @@ import (
 // EmbeddedProvider resolves artwork from embedded local metadata.
 type EmbeddedProvider struct{}
 
+// Name returns the provider's stable identifier.
 func (EmbeddedProvider) Name() string { return "embedded" }
 
 // Lookup returns already-supplied embedded artwork when present, then falls back

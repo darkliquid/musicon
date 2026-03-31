@@ -20,6 +20,8 @@ The expected shape is:
 - seek now exposes an absolute `SeekTo(time.Duration)` runtime surface: it first tries an in-place `StreamSeekCloser.Seek`, and if the active stream reports that the target is outside its cheap local seek window, the runtime asks that stream to prepare a replacement in the background, then atomically swaps the replacement stream in while preserving the prior paused/playing state
 - replacement-stream activation still flows through the runtime's normal controller/volume wiring, so seek swaps reuse the same queue metadata, now-playing callbacks, volume state, and cleanup rules as an ordinary track activation instead of introducing a special speaker path
 
+The package source now also carries package-level and exported-symbol documentation so the engine, adapters, and speaker helpers can be understood from Go docs without reopening every runtime implementation detail.
+
 This node should own concurrency, lifecycle, and cleanup concerns so `internal/ui` stays presentation-focused.
 
 ## Decisions

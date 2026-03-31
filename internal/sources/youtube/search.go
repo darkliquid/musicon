@@ -330,6 +330,7 @@ func (r musicRuns) FirstText() string {
 	return ""
 }
 
+// ArtistsText extracts a comma-separated artist list from YouTube Music text runs.
 func (r musicRuns) ArtistsText() string {
 	names := make([]string, 0, len(r.Runs))
 	seen := make(map[string]struct{})
@@ -351,6 +352,7 @@ func (r musicRuns) ArtistsText() string {
 	return strings.Join(names, ", ")
 }
 
+// AlbumText extracts the album label from YouTube Music text runs.
 func (r musicRuns) AlbumText() string {
 	for _, run := range r.Runs {
 		pageType := run.NavigationEndpoint.BrowseEndpoint.BrowseEndpointContextSupportedConfigs.BrowseEndpointContextMusicConfig.PageType
@@ -361,6 +363,7 @@ func (r musicRuns) AlbumText() string {
 	return ""
 }
 
+// Duration parses the first clock-style duration found in the text runs.
 func (r musicRuns) Duration() time.Duration {
 	for _, run := range r.Runs {
 		if run.NavigationEndpoint.BrowseEndpoint.BrowseID != "" {

@@ -375,6 +375,7 @@ func (s *cueSeekableOpusStream) finish(err error) {
 	s.cond.Broadcast()
 }
 
+// Stream satisfies beep.Streamer by decoding or replaying buffered Opus samples.
 func (s *cueSeekableOpusStream) Stream(samples [][2]float64) (int, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -421,12 +422,14 @@ func (s *cueSeekableOpusStream) Stream(samples [][2]float64) (int, bool) {
 	}
 }
 
+// Err reports the first decode or transport error encountered by the stream.
 func (s *cueSeekableOpusStream) Err() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.err
 }
 
+// Len reports the total sample count when the stream duration is known.
 func (s *cueSeekableOpusStream) Len() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -436,12 +439,14 @@ func (s *cueSeekableOpusStream) Len() int {
 	return s.windowEnd
 }
 
+// Position reports the current sample position within the stream.
 func (s *cueSeekableOpusStream) Position() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.pos
 }
 
+// Seek moves playback to the requested absolute sample position when possible.
 func (s *cueSeekableOpusStream) Seek(p int) error {
 	s.mu.Lock()
 	if p < 0 {
@@ -473,6 +478,7 @@ func zeroStereo(samples [][2]float64) {
 	}
 }
 
+// Close releases the cue-seekable stream and its decode resources.
 func (s *cueSeekableOpusStream) Close() error {
 	s.mu.Lock()
 	if s.closed {
@@ -618,6 +624,7 @@ func (s *bufferedPCMStreamer) waitForBuffer(ctx context.Context, frames int) err
 	}
 }
 
+// Stream satisfies beep.Streamer by draining buffered PCM samples.
 func (s *bufferedPCMStreamer) Stream(samples [][2]float64) (int, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -646,12 +653,14 @@ func (s *bufferedPCMStreamer) Stream(samples [][2]float64) (int, bool) {
 	}
 }
 
+// Err reports any buffered decode error.
 func (s *bufferedPCMStreamer) Err() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.err
 }
 
+// Len reports the total sample length advertised by the buffered stream.
 func (s *bufferedPCMStreamer) Len() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -661,12 +670,14 @@ func (s *bufferedPCMStreamer) Len() int {
 	return len(s.samples) / 2
 }
 
+// Position reports the current sample offset within the buffered stream.
 func (s *bufferedPCMStreamer) Position() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.pos
 }
 
+// Seek repositions the buffered stream to the requested absolute sample offset.
 func (s *bufferedPCMStreamer) Seek(p int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -681,6 +692,7 @@ func (s *bufferedPCMStreamer) Seek(p int) error {
 	return nil
 }
 
+// Close releases buffered streamer resources.
 func (s *bufferedPCMStreamer) Close() error {
 	s.mu.Lock()
 	alreadyClosed := s.closed
@@ -704,6 +716,7 @@ func shouldIgnoreStreamErr(err error) bool {
 		errors.Is(err, os.ErrClosed)
 }
 
+// HandleMasterBegin implements mkvparse.Handler for the start of master elements.
 func (d *webmOpusDecoder) HandleMasterBegin(id mkvparse.ElementID, info mkvparse.ElementInfo) (bool, error) {
 	switch id {
 	case mkvparse.TrackEntryElement:
@@ -717,6 +730,7 @@ func (d *webmOpusDecoder) HandleMasterBegin(id mkvparse.ElementID, info mkvparse
 	return true, nil
 }
 
+// HandleMasterEnd implements mkvparse.Handler for the end of master elements.
 func (d *webmOpusDecoder) HandleMasterEnd(id mkvparse.ElementID, info mkvparse.ElementInfo) error {
 	switch id {
 	case mkvparse.TrackEntryElement:
@@ -741,6 +755,7 @@ func (d *webmOpusDecoder) HandleMasterEnd(id mkvparse.ElementID, info mkvparse.E
 	return nil
 }
 
+// HandleString implements mkvparse.Handler for string-valued elements.
 func (d *webmOpusDecoder) HandleString(id mkvparse.ElementID, value string, info mkvparse.ElementInfo) error {
 	if d.inTrackEntry && id == mkvparse.CodecIDElement {
 		d.currentTrack.codecID = strings.TrimSpace(value)
@@ -748,6 +763,7 @@ func (d *webmOpusDecoder) HandleString(id mkvparse.ElementID, value string, info
 	return nil
 }
 
+// HandleInteger implements mkvparse.Handler for integer-valued elements.
 func (d *webmOpusDecoder) HandleInteger(id mkvparse.ElementID, value int64, info mkvparse.ElementInfo) error {
 	switch {
 	case d.inTrackEntry && id == mkvparse.TrackNumberElement:
@@ -760,14 +776,17 @@ func (d *webmOpusDecoder) HandleInteger(id mkvparse.ElementID, value int64, info
 	return nil
 }
 
+// HandleFloat implements mkvparse.Handler for float-valued elements.
 func (d *webmOpusDecoder) HandleFloat(id mkvparse.ElementID, value float64, info mkvparse.ElementInfo) error {
 	return nil
 }
 
+// HandleDate implements mkvparse.Handler for date-valued elements.
 func (d *webmOpusDecoder) HandleDate(id mkvparse.ElementID, value time.Time, info mkvparse.ElementInfo) error {
 	return nil
 }
 
+// HandleBinary implements mkvparse.Handler for binary-valued elements.
 func (d *webmOpusDecoder) HandleBinary(id mkvparse.ElementID, value []byte, info mkvparse.ElementInfo) error {
 	if d.inTrackEntry && id == mkvparse.CodecPrivateElement {
 		d.currentTrack.private = append([]byte(nil), value...)
@@ -1010,6 +1029,7 @@ func sliceFrames(data []byte, sizes []int) ([][]byte, error) {
 	return frames, nil
 }
 
+// Stream copies buffered PCM samples into the caller's output slice.
 func (s *pcmBufferStreamer) Stream(samples [][2]float64) (int, bool) {
 	if s.closed {
 		return 0, false
@@ -1030,9 +1050,16 @@ func (s *pcmBufferStreamer) Stream(samples [][2]float64) (int, bool) {
 	return frames, true
 }
 
-func (s *pcmBufferStreamer) Err() error    { return nil }
-func (s *pcmBufferStreamer) Len() int      { return len(s.samples) / 2 }
+// Err reports the buffered PCM streamer error state.
+func (s *pcmBufferStreamer) Err() error { return nil }
+
+// Len reports the total number of stereo samples held in the PCM buffer.
+func (s *pcmBufferStreamer) Len() int { return len(s.samples) / 2 }
+
+// Position reports the current sample offset within the PCM buffer.
 func (s *pcmBufferStreamer) Position() int { return s.pos }
+
+// Seek moves the PCM buffer streamer to the requested sample offset.
 func (s *pcmBufferStreamer) Seek(p int) error {
 	if p < 0 {
 		p = 0
@@ -1043,4 +1070,6 @@ func (s *pcmBufferStreamer) Seek(p int) error {
 	s.pos = p
 	return nil
 }
+
+// Close marks the PCM buffer streamer as closed.
 func (s *pcmBufferStreamer) Close() error { s.closed = true; return nil }

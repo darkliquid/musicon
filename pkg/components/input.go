@@ -15,10 +15,12 @@ type Input struct {
 	focused     bool
 }
 
+// NewInput constructs a single-line input with the supplied placeholder.
 func NewInput(placeholder string) Input {
 	return Input{placeholder: placeholder, width: 20}
 }
 
+// SetSize updates the rendered width of the input field.
 func (i *Input) SetSize(width int) {
 	if width < 1 {
 		width = 1
@@ -26,18 +28,22 @@ func (i *Input) SetSize(width int) {
 	i.width = width
 }
 
+// SetFocused toggles the input cursor and focus styling.
 func (i *Input) SetFocused(focused bool) {
 	i.focused = focused
 }
 
+// SetValue replaces the current input text.
 func (i *Input) SetValue(value string) {
 	i.value = value
 }
 
+// Value returns the current input text.
 func (i Input) Value() string {
 	return i.value
 }
 
+// Update handles single-line editing keys and reports whether the value changed.
 func (i *Input) Update(msg tea.Msg) bool {
 	keypress, ok := msg.(tea.KeyPressMsg)
 	if !ok {
@@ -74,6 +80,7 @@ func (i *Input) Update(msg tea.Msg) bool {
 	return true
 }
 
+// View renders the input field within its configured width.
 func (i Input) View() string {
 	content := i.value
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))

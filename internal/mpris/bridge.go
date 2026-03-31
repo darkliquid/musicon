@@ -20,6 +20,7 @@ const (
 	trackPrefix     = "/org/mpris/MediaPlayer2/track/"
 )
 
+// Bridge projects Musicon playback state onto the MPRIS D-Bus interfaces.
 type Bridge struct {
 	mu sync.Mutex
 
@@ -31,10 +32,12 @@ type Bridge struct {
 	wg    sync.WaitGroup
 }
 
+// NewBridge constructs an MPRIS bridge around the supplied playback service.
 func NewBridge(playback ui.PlaybackService) *Bridge {
 	return &Bridge{playback: playback}
 }
 
+// Start claims the Musicon MPRIS bus name and begins exporting properties.
 func (b *Bridge) Start() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -106,6 +109,7 @@ func (b *Bridge) Start() error {
 	return nil
 }
 
+// Close stops background refresh work and releases the D-Bus connection.
 func (b *Bridge) Close() error {
 	b.mu.Lock()
 	if b.conn == nil {
@@ -124,13 +128,22 @@ func (b *Bridge) Close() error {
 	return conn.Close()
 }
 
+// Raise implements the MPRIS root Raise method and currently no-ops because Musicon has no GUI window.
 func (b *Bridge) Raise() *dbus.Error { return nil }
 
+// Quit implements the MPRIS root Quit method and currently no-ops because process shutdown stays CLI-owned.
 func (b *Bridge) Quit() *dbus.Error { return nil }
 
-func (b *Bridge) Next() *dbus.Error      { return b.call(b.playback.Next) }
-func (b *Bridge) Previous() *dbus.Error  { return b.call(b.playback.Previous) }
+// Next implements the MPRIS Next transport method.
+func (b *Bridge) Next() *dbus.Error { return b.call(b.playback.Next) }
+
+// Previous implements the MPRIS Previous transport method.
+func (b *Bridge) Previous() *dbus.Error { return b.call(b.playback.Previous) }
+
+// PlayPause implements the MPRIS PlayPause transport method.
 func (b *Bridge) PlayPause() *dbus.Error { return b.call(b.playback.TogglePause) }
+
+// Seek implements the MPRIS relative-seek transport method.
 func (b *Bridge) Seek(offset int64) *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track == nil {
@@ -140,6 +153,7 @@ func (b *Bridge) Seek(offset int64) *dbus.Error {
 	return b.call(func() error { return b.playback.SeekTo(target) })
 }
 
+// Pause implements the MPRIS Pause transport method.
 func (b *Bridge) Pause() *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track == nil || snapshot.Paused {
@@ -148,6 +162,7 @@ func (b *Bridge) Pause() *dbus.Error {
 	return b.call(b.playback.TogglePause)
 }
 
+// Play implements the MPRIS Play transport method.
 func (b *Bridge) Play() *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track != nil && !snapshot.Paused {
@@ -156,6 +171,7 @@ func (b *Bridge) Play() *dbus.Error {
 	return b.call(b.playback.TogglePause)
 }
 
+// Stop implements the MPRIS Stop transport method.
 func (b *Bridge) Stop() *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track == nil {
@@ -172,6 +188,7 @@ func (b *Bridge) Stop() *dbus.Error {
 	return nil
 }
 
+// SetPosition implements the MPRIS absolute-seek transport method.
 func (b *Bridge) SetPosition(trackID dbus.ObjectPath, position int64) *dbus.Error {
 	snapshot := b.snapshot()
 	if snapshot.Track == nil {
@@ -184,6 +201,7 @@ func (b *Bridge) SetPosition(trackID dbus.ObjectPath, position int64) *dbus.Erro
 	return b.call(func() error { return b.playback.SeekTo(target) })
 }
 
+// OpenUri implements the MPRIS OpenUri method and currently no-ops because Musicon does not open external URIs directly.
 func (b *Bridge) OpenUri(uri string) *dbus.Error {
 	_ = uri
 	return nil

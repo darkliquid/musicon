@@ -1,8 +1,9 @@
 {
-  "hash": "b0a2bf514adb8f370224a2985e6ea8f4dd16672dacbf7a2ad96c265677c15241",
+  "hash": "2861d03979f6c49e944f47c54b24071c7356c213ba0a064958c9335f925a45d8",
   "files": {
     ".yggdrasil/model/internal/sources/youtube/yg-node.yaml": "3262d1c5c134b63f00c41c97931df30731261f9089b23897befd23d0a9c2a051",
     ".yggdrasil/model/internal/sources/youtube/interface.md": "9a5dad534a4f2bb0e775022630e2fb2cb307a0e3f85e55318bd9d805c97a6eb6",
+    ".yggdrasil/model/internal/sources/youtube/internals.md": "8ad4c7027e59a01eaa6c92dde9522c18a8c4edc6483edee8e09113db23f3f81f",
     ".yggdrasil/model/internal/sources/youtube/responsibility.md": "1999ae4d67d20355c3cac2693a7236c6196dee7d4cc4132fc77db3c27be842fc",
     ".yggdrasil/model/internal/yg-node.yaml": "c15c09ee704d84db6ab9d46f43837aeba2d3fcc8cef65ec7918fd970bac90223",
     ".yggdrasil/model/internal/responsibility.md": "90fa17d80db7c3265833b84cf53518ceac4f367db6fef86dd3ea8b4adf3ddee7",
@@ -23,17 +24,16 @@
     ".yggdrasil/flows/playback-control/description.md": "bb98b04756342cbd0bdf68daac097a616a32ae5ca08997dc828ff9a36cf83f17",
     ".yggdrasil/flows/queue-management/yg-flow.yaml": "5b8ec5a9d543137cc4e0db0a736508939a2b2e2e6df0a2d86889283d79508af6",
     ".yggdrasil/flows/queue-management/description.md": "4115d56bbcfcd33f2683a931edbc5e7e46e4c20cd06efc7d9ba623bf10729123",
-    "internal/sources/youtube/search.go": "b555614b76fa6dc2d6b03b1659f1f921ae59f1891c0a55b6c3586db3f421f679",
-    "internal/sources/youtube/source.go": "eb29eefcb729720c50081bc797b5bdd7681652e04d8152bcdbebb65fcf02e0ae",
-    "internal/sources/youtube/stream.go": "50ed09064d3b620ffd4e68dd4bc0fe9425e032f7ca8142971c566aecf3556cc9",
-    ".yggdrasil/model/internal/sources/youtube/internals.md": "b794ae752abcf44a6a9e2bce6f3a2e1fc56b2c296439e4eddce53d530c004eb9",
-    "internal/sources/youtube/media.go": "f13fa88c13ae9b8a120f96ed3c8f45a264b2acd72093b0485126923cce36e82b",
-    "internal/sources/youtube/source_test.go": "2bc5b67d05b9b0d44229137fa5dac0fccfdba42156b3a5b4003681a225e773c5"
+    "internal/sources/youtube/media.go": "fe57ddfa5a1557b99d53b67d1b898d4f1ccb092ff7d68ed7744986bdc840eed8",
+    "internal/sources/youtube/search.go": "7dc2bef521597d0db4e4bf6cd184d22443982b008b1f3d00ba0af9441801bf48",
+    "internal/sources/youtube/source.go": "15006bc0d47624394e836c7b0660ba401d916705092fab8fdb3df09320464fda",
+    "internal/sources/youtube/source_test.go": "2bc5b67d05b9b0d44229137fa5dac0fccfdba42156b3a5b4003681a225e773c5",
+    "internal/sources/youtube/stream.go": "0128078ccdfc201e2df7786a062d39e00064b68ea07034e7e36390cd31d94e51"
   },
   "mtimes": {
     ".yggdrasil/model/internal/sources/youtube/yg-node.yaml": 1774892107940.2957,
     ".yggdrasil/model/internal/sources/youtube/interface.md": 1774901501719.8665,
-    ".yggdrasil/model/internal/sources/youtube/internals.md": 1774910992838.4863,
+    ".yggdrasil/model/internal/sources/youtube/internals.md": 1774923664540.7168,
     ".yggdrasil/model/internal/sources/youtube/responsibility.md": 1774892107940.2957,
     ".yggdrasil/model/internal/yg-node.yaml": 1774839903015.8567,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
@@ -54,10 +54,10 @@
     ".yggdrasil/flows/playback-control/description.md": 1774878372940.832,
     ".yggdrasil/flows/queue-management/yg-flow.yaml": 1774878371793.8545,
     ".yggdrasil/flows/queue-management/description.md": 1774880361834.21,
-    "internal/sources/youtube/media.go": 1774910968763.1057,
-    "internal/sources/youtube/search.go": 1774904164659.3,
-    "internal/sources/youtube/source.go": 1774904164658.3,
+    "internal/sources/youtube/media.go": 1774923600134.4863,
+    "internal/sources/youtube/search.go": 1774923453691.823,
+    "internal/sources/youtube/source.go": 1774923453691.6567,
     "internal/sources/youtube/source_test.go": 1774910953220.0696,
-    "internal/sources/youtube/stream.go": 1774909427020.691
+    "internal/sources/youtube/stream.go": 1774923548866.8618
   }
 }

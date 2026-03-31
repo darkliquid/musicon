@@ -19,6 +19,7 @@ type LastFMProvider struct {
 	BaseURL string
 }
 
+// Name returns the provider's stable identifier.
 func (p *LastFMProvider) Name() string { return "lastfm" }
 
 // Lookup resolves Last.fm artwork by MusicBrainz album ID when available, then
