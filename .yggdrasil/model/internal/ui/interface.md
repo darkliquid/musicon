@@ -36,6 +36,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - When queue mode adds the first internet-radio stream to an otherwise empty queue and a playback service is present, it should start playback asynchronously instead of requiring an immediate mode switch plus extra play keypress.
 - The UI must accept typed, config-driven keybindings for global shell actions and per-screen controls instead of hardcoding Bubble Tea key strings inside each update loop.
 - Queue mode should clearly mark the currently playing queued item so users can tell which pinned row is active even while browsing or reordering the rest of the queue.
+- Queue mode should pass source labels such as `radio:` or `youtube:` to the shared list as anchored leading prefixes instead of baking them into the scrolling title text, so focused marquee rendering can expose long names without moving the source identity marker.
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
 - Playback mode owns pane switching, transport key routing, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
 - Playback mode should accept album-art rendering preferences from UI startup options so fill mode and protocol selection no longer depend on each screen reading env directly.

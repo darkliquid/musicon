@@ -3,10 +3,13 @@ package components
 import (
 	"fmt"
 	"io"
+	"strings"
+	"time"
+	"unicode/utf8"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -66,13 +69,15 @@ func (d *listDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	it := entry.item
 	width := m.Width()
 
-	label := it.Title
+	anchoredPrefix := ""
 	if it.Leading != "" {
-		label = it.Leading + " " + label
+		anchoredPrefix = it.Leading + " "
 	}
+	scrollLabel := it.Title
 	if it.Subtitle != "" {
-		label += " — " + it.Subtitle
+		scrollLabel += " — " + it.Subtitle
 	}
+	label := anchoredPrefix + scrollLabel
 
 	const prefixWidth = 2
 	metaWidth := lipgloss.Width(it.Meta)
@@ -84,14 +89,18 @@ func (d *listDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 		leftWidth = 1
 	}
 
-	left := lipgloss.NewStyle().Width(leftWidth).Render(truncate(label, leftWidth))
+	selected := index == m.Index()
+	leftLabel := truncate(label, leftWidth)
+	if selected && d.focused && lipgloss.Width(label) > leftWidth {
+		leftLabel = anchoredMarquee(anchoredPrefix, scrollLabel, leftWidth, marqueeStep())
+	}
+	left := lipgloss.NewStyle().Width(leftWidth).Render(leftLabel)
 	row := left
 	if metaWidth > 0 {
 		meta := lipgloss.NewStyle().Width(metaWidth).Align(lipgloss.Right).Foreground(lipgloss.Color("246")).Render(it.Meta)
 		row = lipgloss.JoinHorizontal(lipgloss.Left, left, " ", meta)
 	}
 
-	selected := index == m.Index()
 	prefix := "  "
 	style := lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
 	if selected {
@@ -254,4 +263,59 @@ func truncate(value string, width int) string {
 		return "…"
 	}
 	return ansi.Truncate(value, width-1, "…")
+}
+
+func marqueeStep() int {
+	return int(time.Now().UnixMilli() / 250)
+}
+
+func marquee(value string, width, step int) string {
+	if width <= 0 {
+		return ""
+	}
+	if lipgloss.Width(value) <= width {
+		return value
+	}
+
+	base := []rune(value)
+	gap := []rune("   ")
+	loop := append(append(append([]rune(nil), base...), gap...), base...)
+	if len(loop) == 0 {
+		return ""
+	}
+
+	offset := step % (len(base) + len(gap))
+	var b strings.Builder
+	remaining := width
+	for i := offset; i < len(loop) && remaining > 0; i++ {
+		r := loop[i]
+		rw := runeWidth(r)
+		if rw > remaining {
+			break
+		}
+		b.WriteRune(r)
+		remaining -= rw
+	}
+	return lipgloss.NewStyle().Width(width).Render(b.String())
+}
+
+func anchoredMarquee(prefix, value string, width, step int) string {
+	prefixWidth := lipgloss.Width(prefix)
+	if prefixWidth >= width {
+		return truncate(prefix, width)
+	}
+	if lipgloss.Width(prefix)+lipgloss.Width(value) <= width {
+		return prefix + value
+	}
+	return prefix + marquee(value, width-prefixWidth, step)
+}
+
+func runeWidth(r rune) int {
+	if r == 0 || r == '\n' {
+		return 0
+	}
+	if r < utf8.RuneSelf {
+		return 1
+	}
+	return lipgloss.Width(string(r))
 }

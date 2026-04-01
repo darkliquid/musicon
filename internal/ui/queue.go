@@ -521,10 +521,21 @@ func queueSourceLabel(raw string) string {
 }
 
 func queueRowTitle(source, title string) string {
-	if label := queueSourceLabel(source); label != "" {
-		return label + ": " + title
-	}
 	return title
+}
+
+func queueRowLeading(source string, leading ...string) string {
+	parts := make([]string, 0, len(leading)+1)
+	for _, value := range leading {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		parts = append(parts, value)
+	}
+	if label := queueSourceLabel(source); label != "" {
+		parts = append(parts, label+":")
+	}
+	return strings.Join(parts, " ")
 }
 
 func (q *queueScreen) activateSelectedRow() (string, tea.Cmd) {
@@ -786,7 +797,7 @@ func (q *queueScreen) rebuildBrowser() {
 				seenGroups[entry.GroupID] = struct{}{}
 				rows = append(rows, queueBrowserRow{kind: queueRowQueueGroup, groupID: entry.GroupID})
 				items = append(items, components.ListItem{
-					Leading:  "◆",
+					Leading:  queueRowLeading(entry.Source, "◆"),
 					Title:    queueRowTitle(entry.Source, entry.GroupTitle),
 					Subtitle: strings.ToLower(entry.GroupKind.String()) + " collection",
 					Meta:     fmt.Sprintf("%d songs", entry.GroupSize),
@@ -807,7 +818,12 @@ func (q *queueScreen) rebuildBrowser() {
 		if entry.GroupID != "" {
 			meta = fmt.Sprintf("%d/%d · %s", entry.GroupIndex+1, entry.GroupSize, meta)
 		}
-		items = append(items, components.ListItem{Leading: leading, Title: queueRowTitle(entry.Source, entry.Title), Subtitle: entry.Subtitle, Meta: meta})
+		items = append(items, components.ListItem{
+			Leading:  queueRowLeading(entry.Source, leading),
+			Title:    queueRowTitle(entry.Source, entry.Title),
+			Subtitle: entry.Subtitle,
+			Meta:     meta,
+		})
 	}
 
 	for _, result := range q.resultData {
@@ -819,7 +835,12 @@ func (q *queueScreen) rebuildBrowser() {
 		if isCollectionResult(result) {
 			meta = collectionMeta(result, q.expandingCollectionID == result.ID, q.expandedCollectionIDs[result.ID], q.keymap)
 		}
-		items = append(items, components.ListItem{Title: queueRowTitle(result.Source, result.Title), Subtitle: result.Subtitle, Meta: meta})
+		items = append(items, components.ListItem{
+			Leading:  queueRowLeading(result.Source),
+			Title:    queueRowTitle(result.Source, result.Title),
+			Subtitle: result.Subtitle,
+			Meta:     meta,
+		})
 
 		if q.expandedCollectionIDs[result.ID] {
 			for _, child := range q.expandedCollections[result.ID] {
@@ -828,7 +849,12 @@ func (q *queueScreen) rebuildBrowser() {
 				if child.Duration > 0 {
 					meta += " · " + formatDuration(child.Duration)
 				}
-				items = append(items, components.ListItem{Leading: "↳", Title: queueRowTitle(child.Source, child.Title), Subtitle: child.Subtitle, Meta: meta})
+				items = append(items, components.ListItem{
+					Leading:  queueRowLeading(child.Source, "↳"),
+					Title:    queueRowTitle(child.Source, child.Title),
+					Subtitle: child.Subtitle,
+					Meta:     meta,
+				})
 			}
 		}
 	}

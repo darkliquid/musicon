@@ -315,6 +315,15 @@ func TestQueueBrowserMarksNowPlayingQueuedItem(t *testing.T) {
 	}
 }
 
+func TestQueueRowLeadingSeparatesSourcePrefixFromTitle(t *testing.T) {
+	if got := queueRowLeading("Radio", "▶"); got != "▶ radio:" {
+		t.Fatalf("expected anchored source prefix in leading field, got %q", got)
+	}
+	if got := queueRowTitle("Radio", "Jazz FM"); got != "Jazz FM" {
+		t.Fatalf("expected queue row title without source prefix, got %q", got)
+	}
+}
+
 func (r queueBrowserRow) resultMatchesID(id string) bool {
 	return r.kind == queueRowSearchResult && r.result.ID == id
 }
