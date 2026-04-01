@@ -348,10 +348,7 @@ func (e *Engine) MoveQueueEntry(id string, delta int) error {
 		return fmt.Errorf("queue item %q not found", id)
 	}
 
-	target := index + delta
-	if target < 0 {
-		target = 0
-	}
+	target := max(index+delta, 0)
 	if target >= len(e.queue) {
 		target = len(e.queue) - 1
 	}
@@ -854,10 +851,7 @@ func (e *Engine) restorePlaybackSnapshotLocked(snapshot teaui.PlaybackSnapshot) 
 	if duration <= 0 && track != nil {
 		duration = track.Duration
 	}
-	position := snapshot.Position
-	if position < 0 {
-		position = 0
-	}
+	position := max(snapshot.Position, 0)
 	if duration > 0 && position > duration {
 		position = duration
 	}
@@ -880,10 +874,7 @@ func (e *Engine) seekCurrentLocked(target time.Duration) error {
 		return errors.New("no active track")
 	}
 	current := e.current
-	targetSample := current.format.SampleRate.N(target)
-	if targetSample < 0 {
-		targetSample = 0
-	}
+	targetSample := max(current.format.SampleRate.N(target), 0)
 	if length := current.stream.Len(); length > 0 && targetSample > length {
 		targetSample = length
 	}

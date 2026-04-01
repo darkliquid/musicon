@@ -63,7 +63,7 @@ func TestArtworkDebugResolverLogsAttemptsAndOutcome(t *testing.T) {
 				{Provider: "musicbrainz", Status: coverart.AttemptSuccess, Message: "artwork found"},
 			},
 		},
-		logf: func(format string, args ...interface{}) {
+		logf: func(format string, args ...any) {
 			fmt.Fprintf(&log, format+"\n", args...)
 		},
 	}

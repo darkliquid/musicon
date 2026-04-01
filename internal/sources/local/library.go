@@ -381,7 +381,7 @@ func readTagMetadata(path string) (coverart.Metadata, error) {
 	return metadata.Normalize(), nil
 }
 
-func idsFromRawTags(raw map[string]interface{}) coverart.IDs {
+func idsFromRawTags(raw map[string]any) coverart.IDs {
 	var ids coverart.IDs
 	for key, value := range raw {
 		normalized := normalizeTagKey(key)
@@ -434,7 +434,7 @@ func normalizeTagKey(key string) string {
 	return builder.String()
 }
 
-func stringifyTagValue(value interface{}) string {
+func stringifyTagValue(value any) string {
 	switch v := value.(type) {
 	case string:
 		return v
@@ -553,13 +553,6 @@ func decodeFile(path string, file *os.File) (beep.StreamSeekCloser, beep.Format,
 	default:
 		return nil, beep.Format{}, fmt.Errorf("unsupported local audio format %q", ext)
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 var _ teaui.SearchService = (*Library)(nil)

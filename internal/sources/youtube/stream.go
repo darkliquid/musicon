@@ -126,10 +126,7 @@ func newSeekableWebMOpusStream(ctx context.Context, media io.ReadSeeker, duratio
 	if sampleRate <= 0 {
 		sampleRate = beep.SampleRate(opusogg.OpusSampleRateHz)
 	}
-	windowFrames := initialPCMBufferBytes / 4
-	if windowFrames < sampleRate.N(initialBufferDuration)*2 {
-		windowFrames = sampleRate.N(initialBufferDuration) * 2
-	}
+	windowFrames := max(initialPCMBufferBytes/4, sampleRate.N(initialBufferDuration)*2)
 	stream := &cueSeekableOpusStream{
 		buffer:       make([]int16, windowFrames*2),
 		windowFrames: windowFrames,
@@ -282,20 +279,14 @@ func (s *cueSeekableOpusStream) appendFrames(startSample int, stereo []int16) {
 		frames = s.windowFrames
 	}
 	endSample := startSample + frames
-	minStart := endSample - s.windowFrames
-	if minStart < 0 {
-		minStart = 0
-	}
+	minStart := max(endSample-s.windowFrames, 0)
 	if s.windowStart < minStart {
 		s.windowStart = minStart
 	}
 	if startSample > s.windowEnd {
 		// If decode resumes after a gap, zero-fill the skipped region so stale
 		// samples are never replayed out of the reused ring slots.
-		gap := startSample - s.windowEnd
-		if gap > s.windowFrames {
-			gap = s.windowFrames
-		}
+		gap := min(startSample-s.windowEnd, s.windowFrames)
 		for i := 0; i < gap; i++ {
 			dst := ((s.windowEnd + i) % s.windowFrames) * 2
 			s.buffer[dst] = 0
@@ -395,10 +386,7 @@ func (s *cueSeekableOpusStream) Stream(samples [][2]float64) (int, bool) {
 		}
 		available := s.windowEnd - s.pos
 		if available > 0 {
-			frames := available
-			if frames > len(samples) {
-				frames = len(samples)
-			}
+			frames := min(available, len(samples))
 			for i := 0; i < frames; i++ {
 				src := ((s.pos + i) % s.windowFrames) * 2
 				samples[i][0] = float64(s.buffer[src]) / 32768
@@ -634,10 +622,7 @@ func (s *bufferedPCMStreamer) Stream(samples [][2]float64) (int, bool) {
 		}
 		available := len(s.samples)/2 - s.pos
 		if available > 0 {
-			frames := available
-			if frames > len(samples) {
-				frames = len(samples)
-			}
+			frames := min(available, len(samples))
 			for i := 0; i < frames; i++ {
 				base := (s.pos + i) * 2
 				samples[i][0] = float64(s.samples[base]) / 32768
@@ -842,7 +827,7 @@ func interleavedToStereo(samples []int16, channels int) []int16 {
 	}
 	frames := len(samples) / channels
 	stereo := make([]int16, 0, frames*2)
-	for frame := 0; frame < frames; frame++ {
+	for frame := range frames {
 		base := frame * channels
 		left := samples[base]
 		right := left

@@ -633,6 +633,20 @@ func (s *artworkLookupState) snapshot() ([]ArtworkAttempt, *components.ImageSour
 	return append([]ArtworkAttempt(nil), s.attempts...), s.source, s.err, s.done
 }
 
+func (s *lyricsLookupState) complete(document *lyrics.Document, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.document = document
+	s.err = err
+	s.done = true
+}
+
+func (s *lyricsLookupState) snapshot() (*lyrics.Document, error, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.document, s.err, s.done
+}
+
 func (p *playbackScreen) refreshLyrics(track *TrackInfo) {
 	p.consumeLyricsLookup()
 	if p.services.Lyrics == nil || track == nil {
@@ -768,14 +782,14 @@ func (p *playbackScreen) renderLyricsView(width, height int) string {
 
 	topInset, bottomInset := p.lyricsInsets()
 	canvas := make([]string, 0, height)
-	for i := 0; i < topInset; i++ {
+	for range topInset {
 		canvas = append(canvas, "")
 	}
 	canvas = append(canvas, lines...)
 	for len(canvas)+bottomInset < height {
 		canvas = append(canvas, "")
 	}
-	for i := 0; i < bottomInset; i++ {
+	for range bottomInset {
 		canvas = append(canvas, "")
 	}
 	if len(canvas) > height {
@@ -880,20 +894,6 @@ func (p *playbackScreen) lyricsInsets() (int, int) {
 	}
 	bottomInset := lipgloss.Height(p.controlsOverlay())
 	return topInset, bottomInset
-}
-
-func (s *lyricsLookupState) complete(document *lyrics.Document, err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.document = document
-	s.err = err
-	s.done = true
-}
-
-func (s *lyricsLookupState) snapshot() (*lyrics.Document, error, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.document, s.err, s.done
 }
 
 func (p *playbackScreen) refreshVisualization(width, height int) {

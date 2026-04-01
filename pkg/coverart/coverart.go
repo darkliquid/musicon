@@ -433,10 +433,7 @@ func rasterizeDimensions(viewWidth, viewHeight float64) (int, int, bool) {
 		return 0, 0, false
 	}
 
-	largest := width
-	if height > largest {
-		largest = height
-	}
+	largest := max(height, width)
 	if largest > maxDimension {
 		width = (width * maxDimension) / largest
 		height = (height * maxDimension) / largest

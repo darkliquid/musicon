@@ -3,6 +3,7 @@ package components
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 )
 
@@ -195,13 +196,7 @@ func TestListUsableImageRenderersIncludesAutoAndHalfblocks(t *testing.T) {
 	if len(renderers) == 0 || renderers[0] != "auto" {
 		t.Fatalf("expected auto first, got %#v", renderers)
 	}
-	foundHalfblocks := false
-	for _, renderer := range renderers {
-		if renderer == "halfblocks" {
-			foundHalfblocks = true
-			break
-		}
-	}
+	foundHalfblocks := slices.Contains(renderers, "halfblocks")
 	if !foundHalfblocks {
 		t.Fatalf("expected halfblocks fallback in %#v", renderers)
 	}

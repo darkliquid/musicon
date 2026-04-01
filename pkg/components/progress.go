@@ -30,10 +30,7 @@ func RenderProgress(width int, ratio float64, label string, theme Theme) string 
 		labelWidth = 0
 	}
 
-	filled := int(ratio * float64(barWidth))
-	if filled > barWidth {
-		filled = barWidth
-	}
+	filled := min(int(ratio*float64(barWidth)), barWidth)
 	bar := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render(strings.Repeat("█", filled))
 	empty := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.SurfaceVariant)).Render(strings.Repeat("░", barWidth-filled))
 

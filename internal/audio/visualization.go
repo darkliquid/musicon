@@ -276,7 +276,7 @@ func fft(real, imag []float64) {
 			wReal := 1.0
 			wImag := 0.0
 			half := length / 2
-			for j := 0; j < half; j++ {
+			for j := range half {
 				uReal := real[i+j]
 				uImag := imag[i+j]
 				vIndex := i + j + half
@@ -393,14 +393,14 @@ func clampInt(value, lower, upper int) int {
 
 func renderBrailleGrid(width, height int, active func(px, py int) bool, colorForRow func(cellRow, totalRows int) string) string {
 	lines := make([]string, height)
-	for cellRow := 0; cellRow < height; cellRow++ {
+	for cellRow := range height {
 		style := lipgloss.NewStyle().Foreground(lipgloss.Color(colorForRow(cellRow, height)))
 		var line strings.Builder
 		line.Grow(width * 12)
-		for cellCol := 0; cellCol < width; cellCol++ {
+		for cellCol := range width {
 			mask := 0
-			for localY := 0; localY < 4; localY++ {
-				for localX := 0; localX < 2; localX++ {
+			for localY := range 4 {
+				for localX := range 2 {
 					px := cellCol*2 + localX
 					py := cellRow*4 + localY
 					if active(px, py) {

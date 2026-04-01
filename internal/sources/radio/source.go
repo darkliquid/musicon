@@ -42,7 +42,7 @@ type Options struct {
 	Enabled    bool
 	MaxResults int
 	BaseURL    string
-	Logf       func(string, ...interface{})
+	Logf       func(string, ...any)
 }
 
 // Source searches Radio Browser for live stations and resolves them into playable streams.
@@ -52,7 +52,7 @@ type Source struct {
 	baseURL    string
 	userAgent  string
 	httpClient *http.Client
-	logf       func(string, ...interface{})
+	logf       func(string, ...any)
 
 	decodeMP3    func(io.ReadCloser) (beep.StreamSeekCloser, beep.Format, error)
 	decodeVorbis func(io.ReadCloser) (beep.StreamSeekCloser, beep.Format, error)
@@ -527,7 +527,7 @@ func (s *Source) openFallbackStream(ctx context.Context, streamURL string) (beep
 	return stream, format, nil
 }
 
-func (s *Source) debugf(format string, args ...interface{}) {
+func (s *Source) debugf(format string, args ...any) {
 	if s == nil || s.logf == nil {
 		return
 	}

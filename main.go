@@ -371,7 +371,7 @@ func printSelectedOptions(out io.Writer, selected string, list func() ([]string,
 	return nil
 }
 
-func debuglog(format string, args ...interface{}) {
+func debuglog(format string, args ...any) {
 	debugOutput.logf(format, args...)
 }
 
@@ -436,7 +436,7 @@ func (s *debugSink) enabled() bool {
 	return s.out != nil
 }
 
-func (s *debugSink) logf(format string, args ...interface{}) {
+func (s *debugSink) logf(format string, args ...any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -464,7 +464,7 @@ type artworkDebugResolver struct {
 	next interface {
 		Resolve(context.Context, coverart.Metadata) (coverart.Result, error)
 	}
-	logf func(string, ...interface{})
+	logf func(string, ...any)
 }
 
 func (r artworkDebugResolver) Resolve(ctx context.Context, metadata coverart.Metadata) (coverart.Result, error) {
@@ -525,7 +525,7 @@ func (r artworkDebugResolver) logOutcome(result coverart.Result, err error, elap
 	}
 }
 
-func (r artworkDebugResolver) log(format string, args ...interface{}) {
+func (r artworkDebugResolver) log(format string, args ...any) {
 	if r.logf == nil {
 		return
 	}

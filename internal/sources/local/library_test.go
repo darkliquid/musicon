@@ -192,7 +192,7 @@ func TestLibrarySearchSpansMultipleConfiguredRoots(t *testing.T) {
 }
 
 func TestIDsFromRawTagsExtractsKnownExternalIDs(t *testing.T) {
-	ids := idsFromRawTags(map[string]interface{}{
+	ids := idsFromRawTags(map[string]any{
 		"MUSICBRAINZ_ALBUMID":          "mb-release",
 		"MusicBrainz Release Group Id": "mb-group",
 		"musicbrainz_trackid":          "mb-recording",

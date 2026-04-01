@@ -240,8 +240,8 @@ func TestChainResolveRasterizesSVGArtwork(t *testing.T) {
 func mustPNG(t *testing.T, width, height int) []byte {
 	t.Helper()
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
+	for y := range height {
+		for x := range width {
 			img.Set(x, y, color.NRGBA{R: 0x33, G: 0x66, B: 0x99, A: 0xff})
 		}
 	}

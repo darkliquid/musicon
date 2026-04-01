@@ -213,7 +213,7 @@ func streamToFloat32(streamer beep.Streamer, scratch *[][2]float64, out []float3
 	for i := n; i < frames; i++ {
 		samples[i] = [2]float64{}
 	}
-	for i := 0; i < frames; i++ {
+	for i := range frames {
 		out[i*speakerChannelCount] = clampSample(samples[i][0])
 		out[i*speakerChannelCount+1] = clampSample(samples[i][1])
 	}

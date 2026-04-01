@@ -136,13 +136,7 @@ func (r SizeRequirements) CheckWithCellWidthRatio(width, height int, cellWidthRa
 
 // Inner returns the content area inside a border of the given thickness.
 func (v SquareViewport) Inner(border int) (int, int) {
-	innerWidth := v.Width - border*2
-	if innerWidth < 0 {
-		innerWidth = 0
-	}
-	innerHeight := v.Height - border*2
-	if innerHeight < 0 {
-		innerHeight = 0
-	}
+	innerWidth := max(v.Width-border*2, 0)
+	innerHeight := max(v.Height-border*2, 0)
 	return innerWidth, innerHeight
 }

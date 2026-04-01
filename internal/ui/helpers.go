@@ -9,20 +9,6 @@ import (
 	"github.com/darkliquid/musicon/pkg/components"
 )
 
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 func clamp(value, low, high int) int {
 	if value < low {
 		return low
@@ -84,7 +70,7 @@ func overlayRows(base, overlay string, width, height int) string {
 	baseLines := strings.Split(lipgloss.NewStyle().Width(width).Height(height).Render(base), "\n")
 	overlayLines := strings.Split(lipgloss.NewStyle().Width(width).Height(height).Render(overlay), "\n")
 	limit := min(len(baseLines), len(overlayLines))
-	for index := 0; index < limit; index++ {
+	for index := range limit {
 		if strings.TrimSpace(overlayLines[index]) == "" {
 			continue
 		}

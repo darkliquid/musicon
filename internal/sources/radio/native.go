@@ -191,10 +191,7 @@ func (s *Source) openHLSTSAACStream(ctx context.Context, streamURL string) (beep
 	})
 	seen := make(map[int]struct{})
 
-	start := len(media.Segments) - 2
-	if start < 0 {
-		start = 0
-	}
+	start := max(len(media.Segments)-2, 0)
 	if err := s.processHLSTSAACSegments(lifetimeCtx, playlistURL, media, start, seen, state, streamer); err != nil {
 		cancel()
 		return nil, beep.Format{}, err
@@ -230,10 +227,7 @@ func (s *Source) runHLSTSAACLoop(
 ) {
 	delay := time.Second
 	if targetDuration > 0 {
-		delay = time.Duration(targetDuration) * time.Second / 2
-		if delay < time.Second {
-			delay = time.Second
-		}
+		delay = max(time.Duration(targetDuration)*time.Second/2, time.Second)
 	}
 	ticker := time.NewTicker(delay)
 	defer ticker.Stop()
@@ -793,7 +787,7 @@ func float32ToStereoPCM(samples []float32, channels int) ([]int16, error) {
 
 	frames := len(samples) / channels
 	pcm := make([]int16, frames*2)
-	for frame := 0; frame < frames; frame++ {
+	for frame := range frames {
 		base := frame * channels
 		left := samples[base]
 		right := left
@@ -816,7 +810,7 @@ func int16ToStereoPCM(samples []int16, channels int) ([]int16, error) {
 
 	frames := len(samples) / channels
 	pcm := make([]int16, frames*2)
-	for frame := 0; frame < frames; frame++ {
+	for frame := range frames {
 		base := frame * channels
 		pcm[frame*2] = samples[base]
 		pcm[frame*2+1] = samples[base]
@@ -834,10 +828,7 @@ func clampPCMFloat(sample float32) int16 {
 	case sample < -1:
 		sample = -1
 	}
-	value := int(sample * 32767)
-	if value < -32768 {
-		value = -32768
-	}
+	value := max(int(sample*32767), -32768)
 	if value > 32767 {
 		value = 32767
 	}
@@ -947,10 +938,7 @@ func (s *bufferedLivePCMStreamer) Stream(samples [][2]float64) (int, bool) {
 
 		available := len(s.samples)/2 - s.pos
 		if available > 0 {
-			frames := available
-			if frames > len(samples) {
-				frames = len(samples)
-			}
+			frames := min(available, len(samples))
 			for i := 0; i < frames; i++ {
 				base := (s.pos + i) * 2
 				samples[i][0] = float64(s.samples[base]) / 32768

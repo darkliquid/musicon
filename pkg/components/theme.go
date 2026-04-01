@@ -132,8 +132,8 @@ func validateThemeColor(role, value string) error {
 	if value == "" {
 		return fmt.Errorf("theme color %q is empty", role)
 	}
-	if strings.HasPrefix(value, "#") {
-		hex := strings.TrimPrefix(value, "#")
+	if after, ok := strings.CutPrefix(value, "#"); ok {
+		hex := after
 		if len(hex) != 3 && len(hex) != 6 {
 			return fmt.Errorf("theme color %q must use #rgb or #rrggbb syntax, got %q", role, value)
 		}

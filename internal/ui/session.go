@@ -26,7 +26,7 @@ type SessionSnapshot struct {
 type QueueSessionState struct {
 	SourceID              string                    `json:"source_id,omitempty"`
 	SearchMode            SearchMode                `json:"search_mode,omitempty"`
-	ArtistFilter          SearchArtistFilter        `json:"artist_filter,omitempty"`
+	ArtistFilter          SearchArtistFilter        `json:"artist_filter"`
 	Query                 string                    `json:"query,omitempty"`
 	Focus                 string                    `json:"focus,omitempty"`
 	SelectedRowKey        string                    `json:"selected_row_key,omitempty"`

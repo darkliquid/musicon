@@ -42,10 +42,7 @@ func RenderPanel(opts PanelOptions, body string) string {
 		title = lipgloss.JoinHorizontal(lipgloss.Left, title, "  ", subtitleStyle.Render(opts.Subtitle))
 	}
 
-	bodyHeight := innerHeight - 1
-	if bodyHeight < 0 {
-		bodyHeight = 0
-	}
+	bodyHeight := max(innerHeight-1, 0)
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
