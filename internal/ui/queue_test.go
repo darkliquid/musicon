@@ -176,7 +176,7 @@ func TestQueueBrowserBackspaceReturnsFocusToSearchAndClearsQuery(t *testing.T) {
 	}
 }
 
-func TestQueueBrowserArrowKeysBrowseWhileSearchRemainsActive(t *testing.T) {
+func TestQueueArrowKeysMoveFocusIntoBrowserBeforeBrowsing(t *testing.T) {
 	screen := newQueueScreen(Services{})
 	screen.resultData = []SearchResult{
 		{ID: "result-1", Title: "First", Source: "Local files", Kind: MediaTrack},
@@ -185,15 +185,23 @@ func TestQueueBrowserArrowKeysBrowseWhileSearchRemainsActive(t *testing.T) {
 	screen.rebuildBrowser()
 
 	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if screen.focus != focusBrowser {
+		t.Fatalf("expected down from search to focus browser, got %v", screen.focus)
+	}
+	if screen.browser.SelectedIndex() != 0 {
+		t.Fatalf("expected first down to keep current browser row selected, got %d", screen.browser.SelectedIndex())
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
 	got := screen.browser.SelectedIndex()
 	if got != 1 {
-		t.Fatalf("expected browser selection to move down, got %d", got)
+		t.Fatalf("expected second down to move browser selection, got %d", got)
 	}
 	if !screen.browserData[got].resultMatchesID("result-2") {
 		t.Fatalf("expected second result selected, got %#v", screen.browserData[got])
 	}
 	if screen.searchInput.Value() != "" {
-		t.Fatalf("expected search input to remain editable, got %q", screen.searchInput.Value())
+		t.Fatalf("expected search input value unchanged, got %q", screen.searchInput.Value())
 	}
 }
 
@@ -558,19 +566,19 @@ func TestQueueSearchFocusToggleAllowsLiteralReservedCharacters(t *testing.T) {
 	screen.searchInput.SetValue("mix")
 
 	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
-	if !strings.Contains(status, "Search unfocused") {
-		t.Fatalf("expected search unfocused status, got %q", status)
+	if !strings.Contains(status, "Browser focused") {
+		t.Fatalf("expected browser focused status, got %q", status)
 	}
-	if screen.searchFocused {
-		t.Fatal("expected search to be unfocused")
+	if screen.focus != focusBrowser {
+		t.Fatalf("expected browser focus, got %v", screen.focus)
 	}
 
 	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'f', Mod: tea.ModCtrl}))
 	if !strings.Contains(status, "Search focused") {
 		t.Fatalf("expected search focused status, got %q", status)
 	}
-	if !screen.searchFocused {
-		t.Fatal("expected search to be focused")
+	if screen.focus != focusSearch {
+		t.Fatalf("expected search focus, got %v", screen.focus)
 	}
 
 	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Text: "]"}))
@@ -604,6 +612,141 @@ func TestQueueSourceHotkeysRequireUnfocusedSearch(t *testing.T) {
 	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Text: "]"}))
 	if status != "Active source: YouTube Music" {
 		t.Fatalf("expected source switch once search is unfocused, got %q", status)
+	}
+}
+
+func TestQueueArrowKeysMoveFocusAcrossZones(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{
+				{
+					ID:   "local",
+					Name: "Local files",
+					SearchModes: []SearchModeDescriptor{
+						{ID: SearchModeSongs, Name: "Songs"},
+						{ID: SearchModeAlbums, Name: "Albums"},
+					},
+					DefaultMode: SearchModeSongs,
+				},
+				{
+					ID:   "youtube-music",
+					Name: "YouTube Music",
+					SearchModes: []SearchModeDescriptor{
+						{ID: SearchModeSongs, Name: "Songs"},
+						{ID: SearchModeAlbums, Name: "Albums"},
+					},
+					DefaultMode: SearchModeSongs,
+				},
+			},
+		},
+	})
+	screen.resultData = []SearchResult{
+		{ID: "result-1", Title: "First", Source: "Local files", Kind: MediaTrack},
+		{ID: "result-2", Title: "Second", Source: "Local files", Kind: MediaTrack},
+	}
+	screen.rebuildBrowser()
+
+	if screen.focus != focusSearch {
+		t.Fatalf("expected initial search focus, got %v", screen.focus)
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if screen.focus != focusModes {
+		t.Fatalf("expected up from search to focus modes, got %v", screen.focus)
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if screen.focus != focusSources {
+		t.Fatalf("expected up from modes to focus sources, got %v", screen.focus)
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if screen.focus != focusModes {
+		t.Fatalf("expected down from sources to focus modes, got %v", screen.focus)
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if screen.focus != focusSearch {
+		t.Fatalf("expected down from modes to focus search, got %v", screen.focus)
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if screen.focus != focusBrowser {
+		t.Fatalf("expected down from search to focus browser, got %v", screen.focus)
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if screen.focus != focusSearch {
+		t.Fatalf("expected up at browser top to focus search, got %v", screen.focus)
+	}
+}
+
+func TestQueueFocusedChipsUseLeftRightNavigation(t *testing.T) {
+	screen := newQueueScreen(Services{
+		Search: multiSourceSearchService{
+			sources: []SourceDescriptor{
+				{
+					ID:   "local",
+					Name: "Local files",
+					SearchModes: []SearchModeDescriptor{
+						{ID: SearchModeSongs, Name: "Songs"},
+						{ID: SearchModeAlbums, Name: "Albums"},
+					},
+					DefaultMode: SearchModeSongs,
+				},
+				{
+					ID:   "youtube-music",
+					Name: "YouTube Music",
+					SearchModes: []SearchModeDescriptor{
+						{ID: SearchModeSongs, Name: "Songs"},
+						{ID: SearchModeAlbums, Name: "Albums"},
+					},
+					DefaultMode: SearchModeSongs,
+				},
+			},
+		},
+	})
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if screen.focus != focusModes {
+		t.Fatalf("expected modes focus, got %v", screen.focus)
+	}
+
+	status, _ := screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyRight}))
+	if status != "Search mode: Albums" {
+		t.Fatalf("expected right to advance search mode, got %q", status)
+	}
+	if screen.activeSearchMode() != SearchModeAlbums {
+		t.Fatalf("expected albums mode after right key, got %q", screen.activeSearchMode())
+	}
+
+	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyLeft}))
+	if status != "Search mode: Songs" {
+		t.Fatalf("expected left to move search mode backward, got %q", status)
+	}
+	if screen.activeSearchMode() != SearchModeSongs {
+		t.Fatalf("expected songs mode after left key, got %q", screen.activeSearchMode())
+	}
+
+	_, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyUp}))
+	if screen.focus != focusSources {
+		t.Fatalf("expected sources focus, got %v", screen.focus)
+	}
+
+	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyRight}))
+	if status != "Active source: YouTube Music" {
+		t.Fatalf("expected right to advance source, got %q", status)
+	}
+	if screen.activeSource().ID != "youtube-music" {
+		t.Fatalf("expected source to change on right key, got %#v", screen.activeSource())
+	}
+
+	status, _ = screen.Update(tea.KeyPressMsg(tea.Key{Code: tea.KeyLeft}))
+	if status != "Active source: Local files" {
+		t.Fatalf("expected left to move source backward, got %q", status)
+	}
+	if screen.activeSource().ID != "local" {
+		t.Fatalf("expected source to change back on left key, got %#v", screen.activeSource())
 	}
 }
 

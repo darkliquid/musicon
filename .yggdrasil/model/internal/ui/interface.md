@@ -27,8 +27,10 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - The root model must render only the centered square itself during normal operation; persistent outer chrome such as tab bars, footer bars, or mode banners should not live outside the square.
 - Help stays in the active mode instead of replacing it with a separate screen: the root model overlays the current mode's help card inside the square viewport.
 - Queue mode owns source cycling, query input, filter toggles, and a single merged browser list where queued items remain pinned before the current search results.
-- Queue mode must keep query editing and browser navigation live at the same time: when search is focused, typing and deletion refresh the active search while non-printing navigation keys continue to change the selected row; when search is unfocused, queue-management shortcuts such as source switching, filter toggles, removal, and reorder actions become active again.
-- Queue mode must expose a dedicated search-focus toggle so users can type literal characters that may also be bound as queue shortcuts.
+- Queue mode must let users move focus naturally with up/down across the visible control stack: source chips, search-kind chips, search input, and the merged browser list.
+- When the source-chip or search-kind rows are focused, left/right should cycle the active source or active search kind without requiring separate focus-toggle shortcuts.
+- When search is focused, printable input edits the active query; when any non-search zone is focused, queue-management shortcuts such as source switching, filter toggles, removal, and reorder actions become active again.
+- Queue mode may keep a dedicated search shortcut as a convenience, but search entry must not depend on that shortcut being available.
 - Queue mode must not block the Bubble Tea event loop on source-backed searches; slow or networked searches should resolve asynchronously so quit, mode switching, and navigation remain responsive.
 - Queue mode should debounce live search input and cancel superseded in-flight searches so remote providers do not spin up one request per keystroke.
 - When queue mode adds the first internet-radio stream to an otherwise empty queue and a playback service is present, it should start playback asynchronously instead of requiring an immediate mode switch plus extra play keypress.

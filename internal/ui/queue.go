@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 )
@@ -33,6 +33,15 @@ type queueBrowserRow struct {
 	childOf string
 }
 
+type queueFocus int
+
+const (
+	focusSources queueFocus = iota
+	focusModes
+	focusSearch
+	focusBrowser
+)
+
 type queueScreen struct {
 	services              Services
 	width                 int
@@ -44,7 +53,7 @@ type queueScreen struct {
 	artistFilter          SearchArtistFilter
 	searchInput           components.Input
 	browser               components.List
-	searchFocused         bool
+	focus                 queueFocus
 	browserData           []queueBrowserRow
 	resultData            []SearchResult
 	queueData             []QueueEntry
@@ -106,9 +115,9 @@ func newQueueScreenWithKeyMap(services Services, keymap QueueKeyMap) *queueScree
 		keymap:                keymap,
 		searchInput:           searchInput,
 		browser:               browser,
-		searchFocused:         true,
+		focus:                 focusSearch,
 		sources:               configuredSources(services),
-		status:                "Queue mode ready. Focus search to type, unfocus it to use queue shortcuts.",
+		status:                "Queue mode ready. Use arrow keys to navigate between zones.",
 		searchDelay:           defaultQueueSearchDebounce,
 		expandedCollections:   make(map[string][]SearchResult),
 		expandedCollectionIDs: make(map[string]bool),
@@ -208,15 +217,56 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	keypress, ok := msg.(tea.KeyPressMsg)
 	if ok {
 		if key.Matches(keypress, q.keymap.ToggleSearchFocus) {
-			q.searchFocused = !q.searchFocused
-			q.syncFocus()
-			if q.searchFocused {
-				return fmt.Sprintf("Search focused. Type freely; %s returns to queue shortcuts.", bindingLabel(q.keymap.ToggleSearchFocus)), nil
+			if q.focus == focusSearch {
+				q.setFocus(focusBrowser)
+				return "Browser focused. Use up/down to return to search.", nil
 			}
-			return "Search unfocused. Queue shortcuts are active again.", nil
+			q.setFocus(focusSearch)
+			return fmt.Sprintf("Search focused. Type freely; %s jumps back to the browser.", bindingLabel(q.keymap.ToggleSearchFocus)), nil
 		}
 
-		if q.searchFocused {
+		switch q.focus {
+		case focusSources:
+			switch keypress.String() {
+			case "left":
+				return q.changeSource(-1), q.refreshResultsCmd()
+			case "right":
+				return q.changeSource(1), q.refreshResultsCmd()
+			case "down":
+				if q.hasFocusedSearchModes() {
+					q.setFocus(focusModes)
+				} else {
+					q.setFocus(focusSearch)
+				}
+				return "", nil
+			}
+		case focusModes:
+			switch keypress.String() {
+			case "left":
+				return q.cycleSearchModeBackward(), q.refreshResultsCmd()
+			case "right":
+				return q.cycleSearchMode(), q.refreshResultsCmd()
+			case "up":
+				q.setFocus(focusSources)
+				return "", nil
+			case "down":
+				q.setFocus(focusSearch)
+				return "", nil
+			}
+		case focusSearch:
+			switch keypress.String() {
+			case "up":
+				if q.hasFocusedSearchModes() {
+					q.setFocus(focusModes)
+				} else {
+					q.setFocus(focusSources)
+				}
+				return "", nil
+			case "down":
+				q.setFocus(focusBrowser)
+				return "", nil
+			}
+
 			if q.searchInput.Update(msg) {
 				cmd := q.refreshResultsCmd()
 				if strings.TrimSpace(q.searchInput.Value()) == "" {
@@ -229,21 +279,19 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			if isTextInputKey(keypress) {
 				return "", nil
 			}
+		case focusBrowser:
+			if keypress.String() == "up" && q.browser.SelectedIndex() == 0 {
+				q.setFocus(focusSearch)
+				return "", nil
+			}
 		}
 
-		if !q.searchFocused {
+		if q.focus != focusSearch {
 			switch {
 			case key.Matches(keypress, q.keymap.SourcePrev):
-				q.sourceIndex--
-				if q.sourceIndex < 0 {
-					q.sourceIndex = len(q.sources) - 1
-				}
-				q.resetSourceScopedState()
-				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
+				return q.changeSource(-1), q.refreshResultsCmd()
 			case key.Matches(keypress, q.keymap.SourceNext):
-				q.sourceIndex = (q.sourceIndex + 1) % len(q.sources)
-				q.resetSourceScopedState()
-				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
+				return q.changeSource(1), q.refreshResultsCmd()
 			case q.hasFocusedSearchModes() && key.Matches(keypress, q.keymap.ModeSongs):
 				return q.selectVisibleSearchMode(0), q.refreshResultsCmd()
 			case q.hasFocusedSearchModes() && key.Matches(keypress, q.keymap.ModeArtists):
@@ -272,7 +320,7 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 		}
 	}
 
-	if ok && !(q.searchFocused && keypress.Key().Text != "") {
+	if ok && q.focus == focusBrowser {
 		q.browser.Update(msg)
 	}
 
@@ -306,8 +354,8 @@ func (q *queueScreen) View() string {
 	q.resizeBrowser()
 
 	body := joinLines(
-		renderSourceChips(q.sources, q.sourceIndex),
-		renderSearchModeChips(q.visibleSearchModes(), q.activeSearchMode(), q.keymap),
+		renderSourceChips(q.sources, q.sourceIndex, q.focus == focusSources),
+		renderSearchModeChips(q.visibleSearchModes(), q.activeSearchMode(), q.keymap, q.focus == focusModes),
 		renderArtistFilterChip(q.artistFilter),
 		q.searchInput.View(),
 		q.browser.View(),
@@ -321,24 +369,34 @@ func (q *queueScreen) HelpView() string {
 	width := min(q.width, 72)
 	height := min(q.height, 16)
 	lines := []string{
-		helpLine(q.keymap.ToggleSearchFocus, "focus or unfocus the search input"),
+		helpLine(q.keymap.ToggleSearchFocus, "jump between search and browser"),
+		"up/down            move focus between sources, modes, search, and results",
+		"left/right         switch source or search mode when those chips are focused",
 		"type text          update the search query while search is focused",
-		helpLinePair(q.keymap.SourcePrev, q.keymap.SourceNext, "switch active source when search is unfocused"),
-		helpLine(q.keymap.CycleSearchMode, "cycle the visible search-kind chips"),
+		helpLinePair(q.keymap.SourcePrev, q.keymap.SourceNext, "switch active source from any non-search focus"),
+		helpLine(q.keymap.CycleSearchMode, "cycle the visible search-kind chips from any non-search focus"),
 		helpLinePair(q.keymap.ModeSongs, q.keymap.ModeArtists, "select the first or second visible search kind"),
 		helpLinePair(q.keymap.ModeAlbums, q.keymap.ModePlaylists, "select the third or fourth visible search kind"),
 		helpLine(q.keymap.ExpandSelected, "expand or collapse the selected album or playlist"),
-		helpLinePair(q.keymap.Browser.Up, q.keymap.Browser.Down, "move through queued items and search results"),
+		helpLinePair(q.keymap.Browser.Up, q.keymap.Browser.Down, "move through queued items and search results when the browser is focused"),
 		helpLinePair(q.keymap.MoveSelectedUp, q.keymap.MoveSelectedDown, "move the selected queued item up or down"),
 		helpLine(q.keymap.ActivateSelected, "queue, unqueue, filter by artist, or add a whole collection"),
 		helpLinePair(q.keymap.RemoveSelected, q.keymap.ClearQueue, "remove selected queued item or clear the queue"),
 	}
-	return components.RenderPanel(components.PanelOptions{Title: "Queue help", Subtitle: "focus search to type, unfocus it for queue shortcuts", Width: width, Height: height, Focused: true}, strings.Join(lines, "\n"))
+	return components.RenderPanel(components.PanelOptions{Title: "Queue help", Subtitle: "arrow keys move focus; search stays ready without a required shortcut", Width: width, Height: height, Focused: true}, strings.Join(lines, "\n"))
 }
 
 func (q *queueScreen) syncFocus() {
-	q.searchInput.SetFocused(q.searchFocused)
-	q.browser.SetFocused(true)
+	q.searchInput.SetFocused(q.focus == focusSearch)
+	q.browser.SetFocused(q.focus == focusBrowser)
+}
+
+func (q *queueScreen) setFocus(focus queueFocus) {
+	if focus == focusModes && !q.hasFocusedSearchModes() {
+		focus = focusSources
+	}
+	q.focus = focus
+	q.syncFocus()
 }
 
 func (q *queueScreen) activeSource() SourceDescriptor {
@@ -852,15 +910,19 @@ func (q *queueScreen) selectedQueueEntry(row queueBrowserRow) (QueueEntry, bool)
 	}
 }
 
-func renderSourceChips(sources []SourceDescriptor, active int) string {
+func renderSourceChips(sources []SourceDescriptor, active int, focused bool) string {
 	chips := make([]string, 0, len(sources))
 	for idx, source := range sources {
 		chips = append(chips, pill(source.Name, idx == active))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Left, chips...)
+	indicator := "  "
+	if focused {
+		indicator = "▸ "
+	}
+	return indicator + lipgloss.JoinHorizontal(lipgloss.Left, chips...)
 }
 
-func renderSearchModeChips(modes []SearchModeDescriptor, active SearchMode, keymap QueueKeyMap) string {
+func renderSearchModeChips(modes []SearchModeDescriptor, active SearchMode, keymap QueueKeyMap, focused bool) string {
 	if len(modes) == 0 {
 		return ""
 	}
@@ -868,7 +930,11 @@ func renderSearchModeChips(modes []SearchModeDescriptor, active SearchMode, keym
 	for index, mode := range modes {
 		chips = append(chips, pill(searchModeChipLabel(index, mode.Name, keymap), mode.ID == active))
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Left, chips...)
+	indicator := "  "
+	if focused {
+		indicator = "▸ "
+	}
+	return indicator + lipgloss.JoinHorizontal(lipgloss.Left, chips...)
 }
 
 func renderArtistFilterChip(filter SearchArtistFilter) string {
@@ -909,6 +975,14 @@ func (r queueBrowserRow) key() string {
 }
 
 func (q *queueScreen) cycleSearchMode() string {
+	return q.cycleSearchModeBy(1)
+}
+
+func (q *queueScreen) cycleSearchModeBackward() string {
+	return q.cycleSearchModeBy(-1)
+}
+
+func (q *queueScreen) cycleSearchModeBy(delta int) string {
 	modes := q.visibleSearchModes()
 	if len(modes) == 0 {
 		return "Active source uses a single search mode."
@@ -916,16 +990,20 @@ func (q *queueScreen) cycleSearchMode() string {
 	current := q.activeSearchMode()
 	for index, mode := range modes {
 		if mode.ID == current {
-			next := modes[(index+1)%len(modes)]
-			q.searchMode = next.ID
-			if next.ID != SearchModeSongs {
-				q.artistFilter = SearchArtistFilter{}
-			}
-			return fmt.Sprintf("Search mode: %s", next.Name)
+			next := modes[(index+delta+len(modes))%len(modes)]
+			return q.setSearchMode(next.ID)
 		}
 	}
-	q.searchMode = modes[0].ID
-	return fmt.Sprintf("Search mode: %s", modes[0].Name)
+	return q.setSearchMode(modes[0].ID)
+}
+
+func (q *queueScreen) changeSource(delta int) string {
+	if len(q.sources) == 0 {
+		return "No sources are available."
+	}
+	q.sourceIndex = (q.sourceIndex + delta + len(q.sources)) % len(q.sources)
+	q.resetSourceScopedState()
+	return fmt.Sprintf("Active source: %s", q.activeSource().Name)
 }
 
 func (q *queueScreen) selectVisibleSearchMode(index int) string {
