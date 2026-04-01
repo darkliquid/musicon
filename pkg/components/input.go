@@ -1,23 +1,31 @@
 package components
 
 import (
-	"strings"
-
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textinput"
 )
 
-// Input is a small reusable single-line text input widget.
+// Input is a single-line text input widget backed by the Bubbles textinput.
 type Input struct {
-	placeholder string
-	value       string
-	width       int
-	focused     bool
+	model textinput.Model
 }
 
 // NewInput constructs a single-line input with the supplied placeholder.
 func NewInput(placeholder string) Input {
-	return Input{placeholder: placeholder, width: 20}
+	m := textinput.New()
+	m.Placeholder = placeholder
+	m.Prompt = "› "
+
+	// Disable suggestion-related bindings that conflict with host screen
+	// navigation (tab, up/down arrows).
+	km := m.KeyMap
+	km.AcceptSuggestion = key.NewBinding()
+	km.NextSuggestion = key.NewBinding()
+	km.PrevSuggestion = key.NewBinding()
+	m.KeyMap = km
+
+	return Input{model: m}
 }
 
 // SetSize updates the rendered width of the input field.
@@ -25,100 +33,36 @@ func (i *Input) SetSize(width int) {
 	if width < 1 {
 		width = 1
 	}
-	i.width = width
+	i.model.SetWidth(width)
 }
 
 // SetFocused toggles the input cursor and focus styling.
 func (i *Input) SetFocused(focused bool) {
-	i.focused = focused
+	if focused {
+		i.model.Focus()
+	} else {
+		i.model.Blur()
+	}
 }
 
 // SetValue replaces the current input text.
 func (i *Input) SetValue(value string) {
-	i.value = value
+	i.model.SetValue(value)
 }
 
 // Value returns the current input text.
 func (i Input) Value() string {
-	return i.value
+	return i.model.Value()
 }
 
-// Update handles single-line editing keys and reports whether the value changed.
+// Update handles text editing and reports whether the value changed.
 func (i *Input) Update(msg tea.Msg) bool {
-	keypress, ok := msg.(tea.KeyPressMsg)
-	if !ok {
-		return false
-	}
-
-	switch keypress.String() {
-	case "backspace":
-		if i.value == "" {
-			return false
-		}
-		runes := []rune(i.value)
-		i.value = string(runes[:len(runes)-1])
-		return true
-	case "ctrl+w":
-		trimmed := strings.TrimRight(i.value, " ")
-		idx := strings.LastIndex(trimmed, " ")
-		if idx == -1 {
-			i.value = ""
-		} else {
-			i.value = strings.TrimRight(trimmed[:idx], " ")
-		}
-		return true
-	case "enter", "tab", "shift+tab", "up", "down", "left", "right", "esc":
-		return false
-	}
-
-	text := keypress.Key().Text
-	if text == "" {
-		return false
-	}
-
-	i.value += text
-	return true
+	old := i.model.Value()
+	i.model, _ = i.model.Update(msg)
+	return i.model.Value() != old
 }
 
-// View renders the input field within its configured width.
+// View renders the input field.
 func (i Input) View() string {
-	content := i.value
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	if content == "" {
-		content = i.placeholder
-		style = style.Faint(true)
-	}
-
-	cursor := ""
-	cursorWidth := 0
-	if i.focused {
-		cursor = lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Render("█")
-		cursorWidth = 1
-	}
-
-	prefix := lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Render("› ")
-	textWidth := i.width - lipgloss.Width(prefix) - cursorWidth
-	if textWidth < 1 {
-		textWidth = 1
-	}
-
-	line := prefix + style.Width(textWidth).Render(trimToWidth(content, textWidth)) + cursor
-	return lipgloss.NewStyle().Width(i.width).Render(line)
-}
-
-func trimToWidth(value string, width int) string {
-	if width <= 0 {
-		return ""
-	}
-	if lipgloss.Width(value) <= width {
-		return value
-	}
-	runes := []rune(value)
-	if width == 1 {
-		return "…"
-	}
-	if len(runes) >= width {
-		return string(runes[:width-1]) + "…"
-	}
-	return value
+	return i.model.View()
 }

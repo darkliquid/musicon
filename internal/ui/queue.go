@@ -216,12 +216,19 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			return "Search unfocused. Queue shortcuts are active again.", nil
 		}
 
-		if q.searchFocused && shouldEditSearch(keypress) && q.searchInput.Update(msg) {
-			cmd := q.refreshResultsCmd()
-			if strings.TrimSpace(q.searchInput.Value()) == "" {
-				return "Search cleared.", cmd
+		if q.searchFocused {
+			if q.searchInput.Update(msg) {
+				cmd := q.refreshResultsCmd()
+				if strings.TrimSpace(q.searchInput.Value()) == "" {
+					return "Search cleared.", cmd
+				}
+				return fmt.Sprintf("Searching %s for %q.", q.activeSource().Name, q.searchInput.Value()), cmd
 			}
-			return fmt.Sprintf("Searching %s for %q.", q.activeSource().Name, q.searchInput.Value()), cmd
+			// If the textinput consumed the key (text editing or cursor
+			// movement), stop here so the browser doesn't also act on it.
+			if isTextInputKey(keypress) {
+				return "", nil
+			}
 		}
 
 		if !q.searchFocused {
@@ -272,9 +279,19 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	return "", nil
 }
 
-func shouldEditSearch(keypress tea.KeyPressMsg) bool {
+// isTextInputKey reports whether a keypress is handled by the textinput
+// widget (text entry, deletion, or cursor movement) so the queue screen
+// can prevent it from also reaching the browser list.
+func isTextInputKey(keypress tea.KeyPressMsg) bool {
 	switch keypress.String() {
-	case "backspace", "ctrl+w":
+	case "backspace", "ctrl+h", "delete", "ctrl+d",
+		"ctrl+w", "alt+backspace", "alt+delete", "alt+d",
+		"ctrl+k", "ctrl+u",
+		"left", "right", "home", "end",
+		"ctrl+f", "ctrl+b", "ctrl+a", "ctrl+e",
+		"alt+left", "alt+right", "ctrl+left", "ctrl+right",
+		"alt+f", "alt+b",
+		"ctrl+v":
 		return true
 	}
 	return keypress.Key().Text != ""

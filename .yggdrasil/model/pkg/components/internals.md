@@ -11,7 +11,7 @@
 
 These primitives are intentionally Bubble Tea-friendly but Musicon-agnostic, so `internal/ui` can compose them into queue and playback screens without embedding domain logic into the shared package.
 
-The reusable `Input` widget now budgets its focused cursor inside the configured width instead of appending it past the edge of the line. This keeps parent layouts stable when a focused input sits inside a strictly sized square viewport.
+The reusable `Input` widget is backed by the Bubbles `textinput` component (`charm.land/bubbles/v2/textinput`), providing cursor movement, word-level deletion, paste support, and standard Emacs-style editing shortcuts. The widget disables suggestion-related keybindings (tab, up/down) at construction time to avoid conflicting with host screen navigation. The wrapper preserves the same `bool`-returning `Update` API so callers only need to know whether the value changed, while the textinput's cursor blink commands are discarded because the queue screen's View chain returns strings rather than `tea.View` structs.
 
 The square viewport helpers now support visually square layouts under non-square terminal cells. Callers can supply a cell width-to-height ratio so a font whose cells are taller than they are wide produces a wider-in-columns, shorter-in-rows viewport that still looks like a square on screen.
 
@@ -45,7 +45,7 @@ The package source now also carries package-level and exported-symbol documentat
 - Chose to keep `MUSICON_IMAGE_PROTOCOL` and `MUSICON_IMAGE_SCALE` as highest-precedence runtime overrides even after adding config-backed settings because the app already treats `MUSICON_CELL_WIDTH_RATIO` the same way and ad hoc terminal debugging remains valuable.
 - Chose to keep renderer canonicalization and capability listing alongside the reusable image component over reimplementing that logic in `main.go` because the widget and CLI must agree on the same renderer vocabulary and availability rules.
 - Chose to fall back to a fixed `0.5` cell-width ratio when config does not set one because the user explicitly asked to keep configured values only when set and otherwise use a stable default fallback during the Chafa migration.
-- Chose to reserve cursor width inside the reusable input field instead of letting the focused cursor overflow because a one-column spill from a shared widget can visibly break square-constrained parent layouts.
+- Chose the Bubbles `textinput` component over the hand-rolled input because the user requested it and it provides cursor movement, word-level operations, and paste support out of the box. Suggestion-related keybindings (tab, up/down) are disabled at construction to avoid conflicts with host screen navigation. The wrapper discards cursor blink commands because the queue screen's View chain uses strings, not `tea.View` structs, so virtual cursor state is not propagated.
 - Chose an explicit cell width ratio input for square viewport math instead of assuming terminal cells are square because the user observed the visual frame distortion caused by tall terminal glyphs.
 - Chose a generic leading marker field on list items instead of hard-coding queue icons into the widget because callers may need lightweight row state cues without turning the shared list into a Musicon-specific queue component.
 - Chose an explicit `SetSelectedIndex` hook on the shared list instead of forcing every caller to infer selection through synthetic key events because identity-preserving rebuilds are generic widget behavior, not queue-specific logic.
