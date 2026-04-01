@@ -25,6 +25,7 @@ The expected shape is:
 - visualization output is intentionally derived from the existing playback stream instead of a second decoder or subprocess, so the EQ pane stays aligned with the active track while keeping memory and CPU overhead bounded to one recent sample buffer plus infrequent FFT work
 - the EQ and mirrored visualizer renderers now rasterize the smoothed band levels into a 2×4 subcell grid and emit Unicode braille characters, letting each terminal cell carry eight addressable dots instead of a single block ramp step while still coloring rows through the existing gradient palette
 - the mirrored visualizer still maps color symmetrically from the playback centerline outward, but its shape is now represented through the braille raster instead of separate upper/lower block-orientation rules
+- tests that exercise real speaker initialization should pin the `null` backend so CI can verify resume/seek behavior without depending on ALSA or another host audio device being available
 
 The package source now also carries package-level and exported-symbol documentation so the engine, adapters, and speaker helpers can be understood from Go docs without reopening every runtime implementation detail.
 
@@ -46,3 +47,4 @@ Session restore now uses the runtime as the playback-state source of truth even 
 - Chose row-based gradient coloring plus a braille raster over block glyph ramps because the user wanted smoother EQ/visualizer visuals and braille gives each cell a native 2×4 resolution without changing the analyzer pipeline.
 - Reused the same braille-and-gradient strategy for the mirrored visualizer instead of inventing a second renderer so both visualization panes stay visually coherent and the renderer stays simple to maintain.
 - Chose neutral empty visualization/artwork backgrounds over explanatory placeholder copy because the user wanted the playback panes to feel like real surfaces even before providers or content are available.
+- Chose the `null` output backend in speaker-initializing tests over the platform default because CI must cover pause/resume restoration logic even when the runner has no usable audio device.

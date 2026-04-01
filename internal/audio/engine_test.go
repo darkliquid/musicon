@@ -263,7 +263,10 @@ func TestEngineRestoreStateSeedsQueueAndPlaybackSnapshot(t *testing.T) {
 
 func TestEngineTogglePauseResumesRestoredTrackFromSavedPosition(t *testing.T) {
 	stream := &stubStream{length: defaultSampleRate.N(3 * time.Minute)}
-	engine := NewEngine(Options{Resolver: restoreTestResolver{stream: stream}})
+	engine := NewEngine(Options{
+		Resolver: restoreTestResolver{stream: stream},
+		Backend:  "null",
+	})
 	defer engine.Close()
 
 	if err := engine.RestoreState(RestoreState{
