@@ -984,7 +984,7 @@ func (s *bufferedLivePCMStreamer) Position() int {
 }
 
 func (s *bufferedLivePCMStreamer) Seek(int) error {
-	return errors.New("internet radio streams do not support seeking")
+	return errors.New("radio streams do not support seeking")
 }
 
 func (s *bufferedLivePCMStreamer) Close() error {

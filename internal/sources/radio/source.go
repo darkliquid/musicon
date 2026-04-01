@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	sourceID              = "internet-radio"
-	sourceName            = "Internet radio"
+	sourceID              = "radio"
+	sourceName            = "Radio"
 	entryIDPrefix         = "radio:"
 	defaultBaseURL        = "https://all.api.radio-browser.info"
 	defaultUserAgent      = "musicon/0.1 (+https://github.com/darkliquid/musicon)"
@@ -35,7 +35,7 @@ const (
 	searchSlackFactor     = 4
 )
 
-var errUnsupportedCodec = errors.New("internet radio stream codec is unsupported")
+var errUnsupportedCodec = errors.New("radio stream codec is unsupported")
 
 // Options configures the Radio Browser source.
 type Options struct {
@@ -188,11 +188,11 @@ func (s *Source) ExpandCollection(context.Context, teaui.SearchResult) ([]teaui.
 // Resolve turns a queued station entry into a playable live stream.
 func (s *Source) Resolve(entry teaui.QueueEntry) (audio.ResolvedTrack, error) {
 	if s == nil || !s.enabled {
-		return audio.ResolvedTrack{}, errors.New("internet radio source is disabled")
+		return audio.ResolvedTrack{}, errors.New("radio source is disabled")
 	}
 	uuid, codecHint, mode, ok := parseEntryID(entry.ID)
 	if !ok {
-		return audio.ResolvedTrack{}, fmt.Errorf("internet radio source cannot resolve %q", entry.ID)
+		return audio.ResolvedTrack{}, fmt.Errorf("radio source cannot resolve %q", entry.ID)
 	}
 
 	clickCtx, cancel := context.WithTimeout(context.Background(), defaultResolveTimeout)
@@ -562,7 +562,7 @@ func (s *liveStream) Len() int { return 0 }
 func (s *liveStream) Position() int { return s.pos }
 
 func (s *liveStream) Seek(int) error {
-	return errors.New("internet radio streams do not support seeking")
+	return errors.New("radio streams do not support seeking")
 }
 
 func (s *liveStream) Close() error {

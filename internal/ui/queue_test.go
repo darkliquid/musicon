@@ -223,7 +223,7 @@ func TestQueueBrowserAutoStartsFirstQueuedStream(t *testing.T) {
 	queue := &stubQueueService{}
 	playback := &stubPlaybackService{}
 	screen := newQueueScreen(Services{Queue: queue, Playback: playback})
-	screen.resultData = []SearchResult{{ID: "radio:station-1:mp3:direct", Title: "Jazz FM", Source: "Internet radio", Kind: MediaStream}}
+	screen.resultData = []SearchResult{{ID: "radio:station-1:mp3:direct", Title: "Jazz FM", Source: "Radio", Kind: MediaStream}}
 	screen.rebuildBrowser()
 
 	got, cmd := screen.activateSelectedRow()
@@ -251,7 +251,7 @@ func TestQueueBrowserDoesNotAutoStartAdditionalQueuedStream(t *testing.T) {
 	queue := &stubQueueService{entries: []QueueEntry{{ID: "existing", Title: "Existing", Source: "Local files", Kind: MediaTrack}}}
 	playback := &stubPlaybackService{}
 	screen := newQueueScreen(Services{Queue: queue, Playback: playback})
-	screen.resultData = []SearchResult{{ID: "radio:station-1:mp3:direct", Title: "Jazz FM", Source: "Internet radio", Kind: MediaStream}}
+	screen.resultData = []SearchResult{{ID: "radio:station-1:mp3:direct", Title: "Jazz FM", Source: "Radio", Kind: MediaStream}}
 	screen.syncQueue()
 	screen.rebuildBrowser()
 
