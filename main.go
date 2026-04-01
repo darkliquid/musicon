@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -109,6 +111,23 @@ func main() {
 	debuglog("Creating Playback Service...")
 	playback := engine.PlaybackService()
 
+	sessionStatePath, err := sessionSnapshotPath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "musicon: resolve session state path: %v\n", err)
+	}
+	restoredSession, err := loadSessionSnapshot(sessionStatePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "musicon: load session state: %v\n", err)
+	} else if restoredSession != nil {
+		if err := engine.RestoreState(audio.RestoreState{
+			Queue:    restoredSession.QueueEntries,
+			Playback: restoredSession.PlaybackSnapshot,
+		}); err != nil {
+			fmt.Fprintf(os.Stderr, "musicon: restore session state: %v\n", err)
+			restoredSession = nil
+		}
+	}
+
 	debuglog("Connecting MPRIS...")
 	bridge := mpris.NewBridge(playback)
 	if err := bridge.Start(); err != nil {
@@ -174,6 +193,8 @@ func main() {
 				VolumeUp:      loaded.Config.Keybinds.Playback.VolumeUp,
 			},
 		},
+		Restore:      restoredSession,
+		SessionStore: sessionFileStore{path: sessionStatePath},
 	})
 
 	debuglog("Booting Musicon...")
@@ -266,6 +287,72 @@ func modeFromConfig(raw string) ui.Mode {
 		return ui.ModePlayback
 	}
 	return ui.ModeQueue
+}
+
+type storedSessionSnapshot struct {
+	Version int                `json:"version"`
+	Session ui.SessionSnapshot `json:"session"`
+}
+
+type sessionFileStore struct {
+	path string
+}
+
+func (s sessionFileStore) Save(snapshot ui.SessionSnapshot) error {
+	if strings.TrimSpace(s.path) == "" {
+		return nil
+	}
+	payload, err := json.Marshal(storedSessionSnapshot{
+		Version: 1,
+		Session: snapshot,
+	})
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
+		return err
+	}
+	tempPath := s.path + ".tmp"
+	if err := os.WriteFile(tempPath, payload, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tempPath, s.path)
+}
+
+func loadSessionSnapshot(path string) (*ui.SessionSnapshot, error) {
+	if strings.TrimSpace(path) == "" {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var stored storedSessionSnapshot
+	if err := json.Unmarshal(data, &stored); err != nil {
+		return nil, err
+	}
+	if stored.Version != 1 {
+		return nil, fmt.Errorf("unsupported session state version %d", stored.Version)
+	}
+	snapshot := stored.Session
+	return &snapshot, nil
+}
+
+func sessionSnapshotPath() (string, error) {
+	if root := strings.TrimSpace(os.Getenv("XDG_STATE_HOME")); root != "" {
+		return filepath.Join(root, "musicon", "session.json"), nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	if strings.TrimSpace(home) == "" {
+		return "", errors.New("user home directory is empty")
+	}
+	return filepath.Join(home, ".local", "state", "musicon", "session.json"), nil
 }
 
 func printSelectedOptions(out io.Writer, selected string, list func() ([]string, error)) error {

@@ -39,6 +39,12 @@ type Options struct {
 	Backend        string
 }
 
+// RestoreState captures the restorable queue and playback context for startup recovery.
+type RestoreState struct {
+	Queue    []teaui.QueueEntry
+	Playback teaui.PlaybackSnapshot
+}
+
 // Engine owns queue state, active playback state, and the mago/beep runtime.
 type Engine struct {
 	mu sync.Mutex
@@ -46,9 +52,12 @@ type Engine struct {
 	resolver Resolver
 	visual   *visualizationState
 
-	queue        []teaui.QueueEntry
-	currentIndex int
-	current      *activeTrack
+	queue            []teaui.QueueEntry
+	currentIndex     int
+	current          *activeTrack
+	restoredTrack    *teaui.TrackInfo
+	restoredPosition time.Duration
+	restoredDuration time.Duration
 
 	repeat bool
 	stream bool
@@ -127,6 +136,39 @@ func (e *Engine) QueueSnapshot() []teaui.QueueEntry {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return append([]teaui.QueueEntry(nil), e.queue...)
+}
+
+// RestoreState seeds the runtime with a previously persisted queue and playback snapshot.
+func (e *Engine) RestoreState(state RestoreState) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
+		return errors.New("audio runtime is closed")
+	}
+
+	e.stopCurrentLocked(false)
+	e.queue = append([]teaui.QueueEntry(nil), state.Queue...)
+	e.normalizeQueueGroupsLocked()
+	e.repeat = state.Playback.Repeat
+	e.stream = state.Playback.Stream
+	e.volume = clampInt(state.Playback.Volume, 0, 100)
+
+	if len(e.queue) == 0 {
+		e.currentIndex = -1
+		e.clearRestoredPlaybackLocked()
+		e.lastSnapshot = teaui.PlaybackSnapshot{
+			Repeat:     e.repeat,
+			Stream:     e.stream,
+			Volume:     e.volume,
+			QueueIndex: -1,
+		}
+		return nil
+	}
+
+	e.currentIndex = clampInt(state.Playback.QueueIndex, 0, len(e.queue)-1)
+	e.restorePlaybackSnapshotLocked(state.Playback)
+	e.lastSnapshot = e.playbackSnapshotLocked()
+	return nil
 }
 
 // AddToQueue appends a search result to the playback queue.
@@ -371,6 +413,12 @@ func (e *Engine) playbackSnapshotLocked() teaui.PlaybackSnapshot {
 		snapshot.QueueIndex = 0
 	}
 	if e.current == nil {
+		snapshot.Track = cloneTrackInfo(e.restoredTrack)
+		snapshot.Position = e.restoredPosition
+		snapshot.Duration = e.restoredDuration
+		if snapshot.Track != nil {
+			snapshot.Paused = true
+		}
 		return snapshot
 	}
 
@@ -396,7 +444,23 @@ func (e *Engine) TogglePause() error {
 		if e.currentIndex < 0 {
 			e.currentIndex = 0
 		}
-		return e.startCurrentLocked(false)
+		restorePosition := e.restoredPosition
+		if err := e.startCurrentLocked(true); err != nil {
+			return err
+		}
+		if restorePosition > 0 {
+			if err := e.seekCurrentLocked(restorePosition); err != nil {
+				return err
+			}
+		}
+		e.clearRestoredPlaybackLocked()
+		if e.current.controller == nil {
+			return errors.New("current track is not controllable")
+		}
+		e.withSpeakerLock(func() {
+			e.current.controller.Paused = false
+		})
+		return nil
 	}
 	if e.current.controller == nil {
 		return errors.New("current track is not controllable")
@@ -485,52 +549,9 @@ func (e *Engine) SeekTo(target time.Duration) error {
 		e.mu.Unlock()
 		return errors.New("no active track")
 	}
-	current := e.current
-	targetSample := current.format.SampleRate.N(target)
-	if targetSample < 0 {
-		targetSample = 0
-	}
-	if length := current.stream.Len(); length > 0 && targetSample > length {
-		targetSample = length
-	}
+	err := e.seekCurrentLocked(target)
 	e.mu.Unlock()
-
-	var seekErr error
-	e.withSpeakerLock(func() {
-		seekErr = current.stream.Seek(targetSample)
-	})
-	if seekErr == nil {
-		return nil
-	}
-
-	preparer, ok := current.stream.(replacementStreamPreparer)
-	if !ok {
-		return seekErr
-	}
-	replacement, err := preparer.PrepareReplacement(targetSample)
-	if err != nil {
-		return err
-	}
-
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	if e.closed {
-		_ = replacement.Close()
-		return errors.New("audio runtime is closed")
-	}
-	if e.current != current {
-		_ = replacement.Close()
-		return errors.New("active track changed during seek")
-	}
-	paused := current.controller != nil && current.controller.Paused
-	if e.speakerReady {
-		e.speaker.Clear()
-	}
-	if current.stream != nil {
-		_ = current.stream.Close()
-	}
-	e.current = nil
-	return e.activateTrackLocked(current.entry, current.info, current.format, replacement, paused)
+	return err
 }
 
 // SetRepeat updates repeat mode for queue playback.
@@ -628,6 +649,7 @@ func (e *Engine) activateTrackLocked(entry teaui.QueueEntry, info teaui.TrackInf
 		controller: controller,
 		volumeFx:   volumeFx,
 	}
+	e.clearRestoredPlaybackLocked()
 	return nil
 }
 
@@ -814,6 +836,99 @@ func (e *Engine) normalizeQueueGroupsLocked() {
 		entry.GroupSize = size
 		groupOffsets[entry.GroupID]++
 	}
+}
+
+func (e *Engine) restorePlaybackSnapshotLocked(snapshot teaui.PlaybackSnapshot) {
+	track := cloneTrackInfo(snapshot.Track)
+	if track == nil {
+		entry := e.queue[e.currentIndex]
+		track = &teaui.TrackInfo{
+			ID:       entry.ID,
+			Title:    entry.Title,
+			Source:   entry.Source,
+			Duration: entry.Duration,
+			Artwork:  entry.Artwork,
+		}
+	}
+	duration := snapshot.Duration
+	if duration <= 0 && track != nil {
+		duration = track.Duration
+	}
+	position := snapshot.Position
+	if position < 0 {
+		position = 0
+	}
+	if duration > 0 && position > duration {
+		position = duration
+	}
+	if duration < 0 {
+		duration = 0
+	}
+	e.restoredTrack = track
+	e.restoredPosition = position
+	e.restoredDuration = duration
+}
+
+func (e *Engine) clearRestoredPlaybackLocked() {
+	e.restoredTrack = nil
+	e.restoredPosition = 0
+	e.restoredDuration = 0
+}
+
+func (e *Engine) seekCurrentLocked(target time.Duration) error {
+	if e.current == nil || e.current.stream == nil {
+		return errors.New("no active track")
+	}
+	current := e.current
+	targetSample := current.format.SampleRate.N(target)
+	if targetSample < 0 {
+		targetSample = 0
+	}
+	if length := current.stream.Len(); length > 0 && targetSample > length {
+		targetSample = length
+	}
+
+	var seekErr error
+	e.withSpeakerLock(func() {
+		seekErr = current.stream.Seek(targetSample)
+	})
+	if seekErr == nil {
+		return nil
+	}
+
+	preparer, ok := current.stream.(replacementStreamPreparer)
+	if !ok {
+		return seekErr
+	}
+	replacement, err := preparer.PrepareReplacement(targetSample)
+	if err != nil {
+		return err
+	}
+	if e.closed {
+		_ = replacement.Close()
+		return errors.New("audio runtime is closed")
+	}
+	if e.current != current {
+		_ = replacement.Close()
+		return errors.New("active track changed during seek")
+	}
+	paused := current.controller != nil && current.controller.Paused
+	if e.speakerReady {
+		e.speaker.Clear()
+	}
+	if current.stream != nil {
+		_ = current.stream.Close()
+	}
+	e.current = nil
+	return e.activateTrackLocked(current.entry, current.info, current.format, replacement, paused)
+}
+
+func cloneTrackInfo(track *teaui.TrackInfo) *teaui.TrackInfo {
+	if track == nil {
+		return nil
+	}
+	cloned := *track
+	return &cloned
 }
 
 // Snapshot returns the current playback state exposed through the UI adapter.

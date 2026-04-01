@@ -338,6 +338,8 @@ type Options struct {
 	CellWidthRatio float64
 	AlbumArt       AlbumArtOptions
 	Keybinds       KeybindOptions
+	Restore        *SessionSnapshot
+	SessionStore   SessionStore
 }
 
 // AlbumArtOptions configures playback artwork rendering defaults.

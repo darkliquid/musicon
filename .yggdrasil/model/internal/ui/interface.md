@@ -11,7 +11,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - `QueueService` for queue snapshots and mutation
 - `PlaybackService` for transport, volume, and playback snapshots
 - `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with lyrics providers receiving reusable metadata requests and returning reusable lyrics documents, artwork providers receiving reusable cover-art metadata, optionally reporting provider-attempt progress, and visualization providers returning live pane-sized EQ/visualizer content that is safe to request during ordinary redraws
-- `Options` for startup mode, theme selection, cell-width ratio, and playback artwork rendering preferences
+- `Options` for startup mode, theme selection, cell-width ratio, playback artwork rendering preferences, an optional restored session snapshot, and an app-owned session store used for persistence
 
 # Contracts
 
@@ -22,11 +22,13 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - `NewApp` seeds the Bubble Tea program with a best-effort initial terminal size so the first frame can render even when the terminal does not deliver an immediate startup resize event.
 - `NewApp` should accept typed startup options from the application layer, including the initial mode and terminal cell width ratio, while still allowing an env override and a shared fixed fallback for legacy/default operation.
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
+- The root model should capture restorable UI state through an app-owned session-store contract instead of writing files itself, so app wiring can choose where the session snapshot lives.
 - The root model also publishes terminal window titles derived from mode, help state, and current playback snapshot through Bubble Tea's `View.WindowTitle` field.
 - The root model also enforces the minimum supported terminal size and suppresses normal mode interaction until the viewport is large enough.
 - The root model must render only the centered square itself during normal operation; persistent outer chrome such as tab bars, footer bars, or mode banners should not live outside the square.
 - Help stays in the active mode instead of replacing it with a separate screen: the root model overlays the current mode's help card inside the square viewport.
 - Queue mode owns source cycling, query input, filter toggles, and a single merged browser list where queued items remain pinned before the current search results.
+- Queue mode should be able to restore its last source, query, current search results, expanded collections, focus zone, and selected browser row from a session snapshot when the app relaunches with compatible sources.
 - Queue mode must let users move focus naturally with up/down across the visible control stack: source chips, search-kind chips, search input, and the merged browser list.
 - When the source-chip or search-kind rows are focused, left/right should cycle the active source or active search kind without requiring separate focus-toggle shortcuts.
 - When search is focused, printable input edits the active query; when any non-search zone is focused, queue-management shortcuts such as source switching, filter toggles, removal, and reorder actions become active again.
@@ -39,6 +41,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Queue mode should pass source labels such as `radio:` or `youtube:` to the shared list as anchored leading prefixes instead of baking them into the scrolling title text, so focused marquee rendering can expose long names without moving the source identity marker.
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
 - Playback mode owns pane switching, transport key routing, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
+- Playback mode should be able to restore its last pane, track-info overlay visibility, lyrics scroll position, and caller-supplied playback snapshot so reopening the app feels seamless even though audio does not auto-start.
 - Playback mode should accept album-art rendering preferences from UI startup options so fill mode and protocol selection no longer depend on each screen reading env directly.
 - Playback mode should treat the active artwork/lyrics/eq/visualizer pane as the base layer and place pane labels, transport controls, and optional track metadata as overlays within that same square instead of stacking separate panels below it.
 - When rendered artwork does not occupy the full playback pane, the remaining pane area should use a muted filler pattern so the image bounds remain legible without overwhelming the artwork itself.

@@ -15,6 +15,7 @@ The expected shape is:
 - thin queue/playback adapter wrappers expose the UI contracts over one shared engine state object
 - queue mutation includes relative move operations so queue mode can reorder entries while the engine remains the single source of truth for playback order
 - queue mutation can now add grouped album/playlist collections and remove those groups as one unit, while still storing the playable queue as ordinary child track entries
+- startup restore can seed the linear queue, selected queue index, repeat/stream flags, volume, and a restorable playback snapshot without activating a live stream until the user explicitly resumes playback
 - queue-carried artwork metadata is merged with resolver-provided track info so the UI artwork path keeps local paths, embedded-art hints, and external IDs even when different layers know different parts of the metadata
 - resolved track info can carry richer cover-art metadata forward to the UI artwork path without forcing the runtime itself to fetch or render artwork
 - snapshot reads should remain fast even while the runtime is busy resolving or swapping tracks, so UI polling can fall back to the last published playback snapshot instead of blocking the Bubble Tea render loop on the engine mutex
@@ -27,7 +28,9 @@ The expected shape is:
 
 The package source now also carries package-level and exported-symbol documentation so the engine, adapters, and speaker helpers can be understood from Go docs without reopening every runtime implementation detail.
 
-This node should own concurrency, lifecycle, and cleanup concerns so `internal/ui` stays presentation-focused.
+This node should own concurrency, lifecycle, cleanup concerns, and restorable playback context so `internal/ui` stays presentation-focused.
+
+Session restore now uses the runtime as the playback-state source of truth even before any stream is active. The engine can reopen with a restored queue and a paused snapshot representing the previously active track and position; `PlaybackSnapshot()` returns that restorable track context while no live stream exists yet, and the next play/resume request uses the saved queue index and seeks to the saved position before unpausing when the resolver supports it.
 
 ## Decisions
 
@@ -38,6 +41,7 @@ This node should own concurrency, lifecycle, and cleanup concerns so `internal/u
 - Chose to serve playback snapshot polling from the latest published snapshot when the engine mutex is already busy because the user reported rapid playback key input appearing to lock the input thread, and stale-but-fast UI state is safer than blocking the render loop behind slow resolver work.
 - Chose replacement-stream swapping over forcing all providers to implement far seeks in place because the user explicitly wanted seek preparation to happen away from the UI/input path while the old audio continues until the new stream is ready.
 - Chose flat child-track queue storage plus group metadata over introducing a second nested runtime queue model because playback still needs a linear play order even when the UI exposes whole-collection removal.
+- Chose runtime-owned queue/playback restoration over making `internal/ui` fake the current track after restart because the user wanted reopen behavior to feel seamless while transport state still needs one authoritative owner.
 - Chose a built-in FFT-based analyzer over `cava`/`cavacore` because the user prioritized compatibility with the existing Go audio/rendering pipeline plus low CPU/memory overhead, and a tapped in-process analyzer avoids subprocess orchestration, IPC, and duplicated decoding work.
 - Chose row-based gradient coloring plus a braille raster over block glyph ramps because the user wanted smoother EQ/visualizer visuals and braille gives each cell a native 2×4 resolution without changing the analyzer pipeline.
 - Reused the same braille-and-gradient strategy for the mirrored visualizer instead of inventing a second renderer so both visualization panes stay visually coherent and the renderer stays simple to maintain.

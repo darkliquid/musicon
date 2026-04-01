@@ -9,6 +9,7 @@ It is responsible for:
 - square viewport layout rules
 - in-square help and playback overlay composition
 - keymaps, focus, and mode transitions
+- capturing and restoring restorable UI session state such as active mode, queue search context, browser selection, and playback pane overlays through app-owned persistence hooks
 - frontend-facing interfaces for queue data, source search, playback snapshots, normalized artwork lookup metadata, lyrics, and visualization placeholders
 
 # Boundaries

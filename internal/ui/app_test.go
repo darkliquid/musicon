@@ -4,9 +4,45 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 )
+
+type appTestQueueService struct {
+	entries []QueueEntry
+}
+
+func (s *appTestQueueService) Snapshot() []QueueEntry { return append([]QueueEntry(nil), s.entries...) }
+func (s *appTestQueueService) Add(SearchResult) error { return nil }
+func (s *appTestQueueService) Move(string, int) error { return nil }
+func (s *appTestQueueService) Remove(string) error    { return nil }
+func (s *appTestQueueService) RemoveGroup(string) error {
+	return nil
+}
+func (s *appTestQueueService) Clear() error { return nil }
+
+type appTestPlaybackService struct {
+	snapshot PlaybackSnapshot
+}
+
+func (s *appTestPlaybackService) Snapshot() PlaybackSnapshot { return s.snapshot }
+func (s *appTestPlaybackService) TogglePause() error         { return nil }
+func (s *appTestPlaybackService) Previous() error            { return nil }
+func (s *appTestPlaybackService) Next() error                { return nil }
+func (s *appTestPlaybackService) SeekTo(time.Duration) error { return nil }
+func (s *appTestPlaybackService) AdjustVolume(int) error     { return nil }
+func (s *appTestPlaybackService) SetRepeat(bool) error       { return nil }
+func (s *appTestPlaybackService) SetStream(bool) error       { return nil }
+
+type appTestSessionStore struct {
+	snapshots []SessionSnapshot
+}
+
+func (s *appTestSessionStore) Save(snapshot SessionSnapshot) error {
+	s.snapshots = append(s.snapshots, snapshot)
+	return nil
+}
 
 func TestRequestWindowSizeCmdReturnsWindowSizeRequest(t *testing.T) {
 	msg := requestWindowSizeCmd()()
@@ -235,5 +271,123 @@ func TestRootViewOverlaysHelpInsideSquare(t *testing.T) {
 	view := model.View().Content
 	if !strings.Contains(view, "Queue help") {
 		t.Fatalf("expected queue help overlay, got %q", view)
+	}
+}
+
+func TestApplyRestoredSessionRestoresQueueAndPlaybackState(t *testing.T) {
+	queue := &appTestQueueService{
+		entries: []QueueEntry{{ID: "queued-1", Title: "Queued", Source: "local"}},
+	}
+	playback := &appTestPlaybackService{
+		snapshot: PlaybackSnapshot{
+			Track:       &TrackInfo{ID: "queued-1", Title: "Queued", Source: "local"},
+			Paused:      true,
+			Position:    42 * time.Second,
+			Duration:    3 * time.Minute,
+			QueueIndex:  0,
+			QueueLength: 1,
+		},
+	}
+	model := &rootModel{
+		services: Services{Queue: queue, Playback: playback},
+		mode:     ModeQueue,
+		queue:    newQueueScreen(Services{Queue: queue, Playback: playback}),
+		playback: newPlaybackScreen(Services{Playback: playback}, AlbumArtOptions{}),
+	}
+
+	model.applyRestoredSession(&SessionSnapshot{
+		Mode:     ModePlayback,
+		ShowHelp: true,
+		Queue: QueueSessionState{
+			SourceID:       "all",
+			SearchMode:     SearchModeTracks,
+			Query:          "boards of canada",
+			Focus:          "browser",
+			SelectedRowKey: "result:result-2",
+			SearchResults: []SearchResult{
+				{ID: "result-1", Title: "Dayvan Cowboy", Source: "local", Kind: MediaTrack},
+				{ID: "result-2", Title: "Roygbiv", Source: "local", Kind: MediaTrack},
+			},
+		},
+		Playback: PlaybackSessionState{
+			Pane:         PaneLyrics,
+			ShowInfo:     true,
+			LyricsScroll: 3,
+		},
+		PlaybackSnapshot: playback.snapshot,
+	})
+
+	if model.mode != ModePlayback || !model.showHelp {
+		t.Fatalf("expected playback mode with help restored, got mode=%v help=%t", model.mode, model.showHelp)
+	}
+	if got := model.queue.searchInput.Value(); got != "boards of canada" {
+		t.Fatalf("expected restored query, got %q", got)
+	}
+	if model.queue.focus != focusBrowser {
+		t.Fatalf("expected browser focus, got %v", model.queue.focus)
+	}
+	if got := model.queue.browser.SelectedIndex(); got != 2 {
+		t.Fatalf("expected restored selection on second result, got %d", got)
+	}
+	if model.playback.pane != PaneLyrics || !model.playback.showInfo || model.playback.lyricsScroll != 3 {
+		t.Fatalf("expected playback pane/info/scroll restored, got pane=%v info=%t scroll=%d", model.playback.pane, model.playback.showInfo, model.playback.lyricsScroll)
+	}
+	if model.status != "Restored previous session." {
+		t.Fatalf("expected restored status, got %q", model.status)
+	}
+}
+
+func TestPersistSessionSavesQueueAndPlaybackContext(t *testing.T) {
+	queue := &appTestQueueService{
+		entries: []QueueEntry{{ID: "queued-1", Title: "Queued", Source: "local"}},
+	}
+	playback := &appTestPlaybackService{
+		snapshot: PlaybackSnapshot{
+			Track:       &TrackInfo{ID: "queued-1", Title: "Queued", Source: "local"},
+			Paused:      true,
+			Position:    90 * time.Second,
+			Duration:    3 * time.Minute,
+			QueueIndex:  0,
+			QueueLength: 1,
+			Volume:      55,
+		},
+	}
+	store := &appTestSessionStore{}
+	model := &rootModel{
+		services:     Services{Queue: queue, Playback: playback},
+		sessionStore: store,
+		mode:         ModePlayback,
+		showHelp:     true,
+		queue:        newQueueScreen(Services{Queue: queue, Playback: playback}),
+		playback:     newPlaybackScreen(Services{Playback: playback}, AlbumArtOptions{}),
+	}
+	model.queue.searchInput.SetValue("aphex twin")
+	model.queue.resultData = []SearchResult{{ID: "result-1", Title: "Xtal", Source: "local", Kind: MediaTrack}}
+	model.queue.rebuildBrowser()
+	model.playback.pane = PaneVisualizer
+	model.playback.showInfo = true
+	model.playback.snapshot = playback.snapshot
+
+	if err := model.persistSession(true, false); err != nil {
+		t.Fatalf("persist session failed: %v", err)
+	}
+	if len(store.snapshots) != 1 {
+		t.Fatalf("expected one persisted snapshot, got %d", len(store.snapshots))
+	}
+	snapshot := store.snapshots[0]
+	if snapshot.Mode != ModePlayback || !snapshot.ShowHelp {
+		t.Fatalf("expected mode/help persisted, got %#v", snapshot)
+	}
+	if snapshot.Queue.Query != "aphex twin" || len(snapshot.Queue.SearchResults) != 1 {
+		t.Fatalf("expected queue search persisted, got %#v", snapshot.Queue)
+	}
+	if len(snapshot.QueueEntries) != 1 || snapshot.QueueEntries[0].ID != "queued-1" {
+		t.Fatalf("expected queue entries persisted, got %#v", snapshot.QueueEntries)
+	}
+	if snapshot.Playback.Pane != PaneVisualizer || !snapshot.Playback.ShowInfo {
+		t.Fatalf("expected playback UI persisted, got %#v", snapshot.Playback)
+	}
+	if snapshot.PlaybackSnapshot.Track == nil || snapshot.PlaybackSnapshot.Track.ID != "queued-1" || snapshot.PlaybackSnapshot.Volume != 55 {
+		t.Fatalf("expected playback snapshot persisted, got %#v", snapshot.PlaybackSnapshot)
 	}
 }

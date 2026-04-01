@@ -52,6 +52,30 @@ func (s *replacementStubStream) PrepareReplacement(target int) (beep.StreamSeekC
 	return s.replacement, nil
 }
 
+type restoreTestResolver struct {
+	stream *stubStream
+}
+
+func (r restoreTestResolver) Resolve(entry teaui.QueueEntry) (ResolvedTrack, error) {
+	stream := r.stream
+	if stream == nil {
+		stream = &stubStream{length: defaultSampleRate.N(3 * time.Minute)}
+	}
+	return ResolvedTrack{
+		Info: teaui.TrackInfo{
+			ID:       entry.ID,
+			Title:    entry.Title,
+			Artist:   "Artist",
+			Album:    "Album",
+			Source:   entry.Source,
+			Duration: 3 * time.Minute,
+			Artwork:  entry.Artwork,
+		},
+		Format: beep.Format{SampleRate: defaultSampleRate, NumChannels: 2, Precision: 2},
+		Stream: stream,
+	}, nil
+}
+
 func TestEngineQueueSnapshot(t *testing.T) {
 	engine := NewEngine(Options{})
 	defer engine.Close()
@@ -189,6 +213,86 @@ func TestEngineToggleFlags(t *testing.T) {
 	}
 	if snapshot.Volume != 45 {
 		t.Fatalf("expected volume 45, got %d", snapshot.Volume)
+	}
+}
+
+func TestEngineRestoreStateSeedsQueueAndPlaybackSnapshot(t *testing.T) {
+	engine := NewEngine(Options{})
+	defer engine.Close()
+
+	restore := RestoreState{
+		Queue: []teaui.QueueEntry{
+			{ID: "one", Title: "First", Source: "local", Duration: 3 * time.Minute},
+			{ID: "two", Title: "Second", Source: "local", Duration: 2 * time.Minute},
+		},
+		Playback: teaui.PlaybackSnapshot{
+			Track: &teaui.TrackInfo{
+				ID:       "two",
+				Title:    "Second",
+				Artist:   "Artist",
+				Album:    "Album",
+				Source:   "local",
+				Duration: 2 * time.Minute,
+			},
+			Position:   95 * time.Second,
+			Duration:   2 * time.Minute,
+			QueueIndex: 1,
+			Repeat:     true,
+			Stream:     true,
+			Volume:     33,
+		},
+	}
+	if err := engine.RestoreState(restore); err != nil {
+		t.Fatalf("restore state failed: %v", err)
+	}
+
+	snapshot := engine.PlaybackSnapshot()
+	if snapshot.Track == nil || snapshot.Track.ID != "two" {
+		t.Fatalf("expected restored track, got %#v", snapshot.Track)
+	}
+	if !snapshot.Paused {
+		t.Fatal("expected restored snapshot to stay paused until resumed")
+	}
+	if snapshot.Position != 95*time.Second || snapshot.Duration != 2*time.Minute {
+		t.Fatalf("expected restored timing, got position=%s duration=%s", snapshot.Position, snapshot.Duration)
+	}
+	if !snapshot.Repeat || !snapshot.Stream || snapshot.Volume != 33 || snapshot.QueueIndex != 1 || snapshot.QueueLength != 2 {
+		t.Fatalf("expected restored flags and queue index, got %#v", snapshot)
+	}
+}
+
+func TestEngineTogglePauseResumesRestoredTrackFromSavedPosition(t *testing.T) {
+	stream := &stubStream{length: defaultSampleRate.N(3 * time.Minute)}
+	engine := NewEngine(Options{Resolver: restoreTestResolver{stream: stream}})
+	defer engine.Close()
+
+	if err := engine.RestoreState(RestoreState{
+		Queue: []teaui.QueueEntry{
+			{ID: "one", Title: "First", Source: "local", Duration: 3 * time.Minute},
+		},
+		Playback: teaui.PlaybackSnapshot{
+			Track:      &teaui.TrackInfo{ID: "one", Title: "First", Source: "local", Duration: 3 * time.Minute},
+			Position:   70 * time.Second,
+			Duration:   3 * time.Minute,
+			QueueIndex: 0,
+		},
+	}); err != nil {
+		t.Fatalf("restore state failed: %v", err)
+	}
+
+	if err := engine.TogglePause(); err != nil {
+		t.Fatalf("toggle pause failed: %v", err)
+	}
+
+	snapshot := engine.PlaybackSnapshot()
+	if snapshot.Track == nil || snapshot.Track.ID != "one" {
+		t.Fatalf("expected active restored track after resume, got %#v", snapshot.Track)
+	}
+	if snapshot.Paused {
+		t.Fatal("expected restored track to resume playing after toggle")
+	}
+	if got := stream.position; got != defaultSampleRate.N(70*time.Second) {
+		t.Fatalf("expected restored stream to seek to saved position, got %d", got)
 	}
 }
 

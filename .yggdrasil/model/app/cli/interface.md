@@ -8,6 +8,7 @@ This node does not expose a reusable library API, but it does define the executa
 - mirror startup and artwork-resolution diagnostics to stderr and/or a caller-selected debug-log file through CLI flags
 - mirror radio HLS transport diagnostics through the same CLI-owned debug sink instead of allowing provider libraries to print directly into the TUI
 - construct the audio runtime with `audio.NewEngine(...)`
+- resolve the durable session-state file path, load any previously saved session snapshot, restore the runtime queue/playback context, and inject a session-store implementation into `ui.NewApp(...)`
 - construct and compose the active source/search implementation(s)
 - construct and start the MPRIS bridge with `mpris.NewBridge(...)` and `Start()`
 - construct the reusable cover-art provider chain and adapt it into the UI artwork service
@@ -31,3 +32,4 @@ This node does not expose a reusable library API, but it does define the executa
 - If optional artwork-provider credentials or cache directories are unavailable, startup should degrade to lower-priority providers or no-art fallback rather than preventing the TUI from running.
 - If optional lyrics cache directories are unavailable or a remote lyrics provider is temporarily unreachable, startup should still succeed and the Lyrics pane should degrade to empty-state behavior on demand.
 - If the Bubble Tea program returns an error, the process must print the error and exit instead of swallowing it.
+- If the saved session-state file is unreadable or invalid, startup should surface that explicitly but still continue with a fresh session rather than preventing the TUI from opening.

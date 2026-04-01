@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/bubbles/v2/key"
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 	"golang.org/x/term"
@@ -30,18 +30,21 @@ type App struct {
 type tickMsg time.Time
 
 type rootModel struct {
-	services       Services
-	options        Options
-	width          int
-	height         int
-	cellWidthRatio float64
-	mode           Mode
-	showHelp       bool
-	status         string
-	keymap         KeyMap
-	queue          *queueScreen
-	playback       *playbackScreen
-	viewport       components.SquareViewport
+	services          Services
+	options           Options
+	sessionStore      SessionStore
+	width             int
+	height            int
+	cellWidthRatio    float64
+	mode              Mode
+	showHelp          bool
+	status            string
+	keymap            KeyMap
+	queue             *queueScreen
+	playback          *playbackScreen
+	viewport          components.SquareViewport
+	lastPersistedJSON string
+	lastPersistAt     time.Time
 }
 
 // NewApp constructs the Bubble Tea application shell with injected UI-facing services.
@@ -50,6 +53,7 @@ func NewApp(services Services, options Options) *App {
 	model := &rootModel{
 		services:       services,
 		options:        options,
+		sessionStore:   options.SessionStore,
 		cellWidthRatio: options.CellWidthRatio,
 		mode:           options.StartMode,
 		keymap:         normalizedKeyMap(options.Keybinds),
@@ -57,6 +61,8 @@ func NewApp(services Services, options Options) *App {
 	model.status = readyStatus(model.keymap.Global)
 	model.queue = newQueueScreenWithKeyMap(services, model.keymap.Queue)
 	model.playback = newPlaybackScreenWithKeyMap(services, options.AlbumArt, model.keymap.Playback)
+	model.applyRestoredSession(options.Restore)
+	model.rememberRestoredSession()
 	width, height := initialTerminalSize()
 
 	return &App{
@@ -123,6 +129,8 @@ func parsePositiveEnvInt(key string) (int, bool) {
 // Update routes Bubble Tea messages through the active screen and root shell state.
 func (m *rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmdBatch []tea.Cmd
+	allowPersistThrottle := false
+	skipScreenUpdate := false
 
 HandleMsg:
 	switch typed := msg.(type) {
@@ -131,6 +139,7 @@ HandleMsg:
 			m.playback.refreshSnapshot()
 		}
 		cmdBatch = append(cmdBatch, tickCmd())
+		allowPersistThrottle = true
 	case tea.WindowSizeMsg:
 		m.width = typed.Width
 		m.height = typed.Height
@@ -140,6 +149,11 @@ HandleMsg:
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(typed, m.keymap.Global.Quit):
+			if err := m.persistSession(true, false); err != nil {
+				m.status = fmt.Sprintf("Failed to save session state: %v", err)
+				return m, nil
+			}
+			skipScreenUpdate = true
 			cmdBatch = append(cmdBatch, tea.Quit)
 			break HandleMsg
 		}
@@ -151,7 +165,7 @@ HandleMsg:
 		switch {
 		case key.Matches(typed, m.keymap.Global.ToggleMode):
 			m.toggleMode()
-			return m, nil
+			skipScreenUpdate = true
 		case key.Matches(typed, m.keymap.Global.ToggleHelp):
 			m.showHelp = !m.showHelp
 			if m.showHelp {
@@ -162,19 +176,25 @@ HandleMsg:
 		}
 	}
 
-	switch m.mode {
-	case ModeQueue:
-		status, cmd := m.queue.Update(msg)
-		if status != "" {
-			m.status = status
+	if !skipScreenUpdate {
+		switch m.mode {
+		case ModeQueue:
+			status, cmd := m.queue.Update(msg)
+			if status != "" {
+				m.status = status
+			}
+			cmdBatch = append(cmdBatch, cmd)
+		case ModePlayback:
+			status, cmd := m.playback.Update(msg)
+			if status != "" {
+				m.status = status
+			}
+			cmdBatch = append(cmdBatch, cmd)
 		}
-		cmdBatch = append(cmdBatch, cmd)
-	case ModePlayback:
-		status, cmd := m.playback.Update(msg)
-		if status != "" {
-			m.status = status
-		}
-		cmdBatch = append(cmdBatch, cmd)
+	}
+
+	if err := m.persistSession(false, allowPersistThrottle); err != nil {
+		m.status = fmt.Sprintf("Failed to save session state: %v", err)
 	}
 
 	return m, tea.Batch(cmdBatch...)
