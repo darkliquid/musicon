@@ -3,7 +3,7 @@ package components
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // RenderEmptyState renders a centered title/body pair for panels without data.

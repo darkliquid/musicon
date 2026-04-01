@@ -9,7 +9,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	bubblekey "github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/lyrics"
 )
@@ -421,7 +421,7 @@ func (p *playbackScreen) centerView(width, height int) string {
 				lipgloss.Center,
 				artwork,
 				lipgloss.WithWhitespaceChars("·"),
-				lipgloss.WithWhitespaceForeground(lipgloss.Color("238")),
+				lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("238"))),
 			)
 		}
 		if renderErr := p.artwork.Error(); renderErr != nil {
@@ -446,7 +446,7 @@ func neutralPlaybackPane(width, height int) string {
 		lipgloss.Center,
 		"",
 		lipgloss.WithWhitespaceChars("·"),
-		lipgloss.WithWhitespaceForeground(lipgloss.Color("238")),
+		lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("238"))),
 	)
 }
 

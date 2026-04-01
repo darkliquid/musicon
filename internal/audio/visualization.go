@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	teaui "github.com/darkliquid/musicon/internal/ui"
 	"github.com/gopxl/beep"
 )

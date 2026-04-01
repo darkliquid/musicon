@@ -3,7 +3,7 @@ package components
 import (
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // RenderProgress draws a simple progress bar with an optional label.

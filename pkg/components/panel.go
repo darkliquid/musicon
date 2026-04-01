@@ -1,6 +1,6 @@
 package components
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // PanelOptions controls the generic panel renderer.
 type PanelOptions struct {

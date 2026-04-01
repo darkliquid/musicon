@@ -17,6 +17,8 @@ The square viewport helpers now support visually square layouts under non-square
 
 The reusable `List` widget now supports an optional leading marker per item. This lets callers distinguish pinned or stateful rows such as "already queued" entries while keeping selection, scrolling, and row layout generic.
 
+The list row renderer reserves 2 columns for the selection prefix ("▸ " or "  ") before calculating left/meta column widths. The `truncate` helper uses `github.com/charmbracelet/x/ansi.Truncate` for ANSI-aware string truncation so styled meta text survives width limits without corrupting escape sequences.
+
 The same list now also exposes explicit selected-index restoration so callers that rebuild their item set from live state can preserve which logical row stays highlighted after reordering or snapshot refreshes.
 
 The same list now also accepts a Bubble-style configurable keymap for navigation actions. This keeps reusable scrolling behavior in `pkg/components` while letting `internal/ui` supply app-configured bindings for queue browsing without forking list logic.

@@ -4,8 +4,9 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	bubblekey "github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // ListKeyMap defines the navigation bindings used by List.
@@ -198,10 +199,11 @@ func (l List) View() string {
 			label += " — " + item.Subtitle
 		}
 
+		const prefixWidth = 2 // "  " or "▸ "
 		metaWidth := lipgloss.Width(item.Meta)
-		leftWidth := l.width
+		leftWidth := l.width - prefixWidth
 		if metaWidth > 0 {
-			leftWidth = l.width - metaWidth - 1
+			leftWidth = l.width - prefixWidth - metaWidth - 1
 		}
 		if leftWidth < 1 {
 			leftWidth = 1
@@ -241,14 +243,10 @@ func truncate(value string, width int) string {
 	if lipgloss.Width(value) <= width {
 		return value
 	}
-	runes := []rune(value)
 	if width == 1 {
 		return "…"
 	}
-	if len(runes) >= width {
-		return string(runes[:width-1]) + "…"
-	}
-	return value
+	return ansi.Truncate(value, width-1, "…")
 }
 
 func max(a, b int) int {

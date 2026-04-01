@@ -11,7 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	bubblekey "github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 	"golang.org/x/term"
 )
