@@ -6,6 +6,7 @@
 *.dll
 *.so
 *.dylib
+musicon
 
 # Go test and coverage output
 *.test
