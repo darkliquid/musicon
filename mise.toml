@@ -7,4 +7,36 @@ golangci-lint = "latest"
 "npm:@chrisdudek/yg" = "latest"
 
 [env]
-CGO_ENABLED=0
+CGO_ENABLED = 0
+
+[tasks.fmt-check]
+description = "Check gofmt formatting like CI"
+run = '''
+set -euo pipefail
+unformatted="$(gofmt -l .)"
+if [[ -n "${unformatted}" ]]; then
+  echo "The following files need gofmt:"
+  echo "${unformatted}"
+  exit 1
+fi
+'''
+
+[tasks.lint]
+description = "Run repository lint checks like CI"
+depends = ["fmt-check"]
+run = "go vet ./..."
+
+[tasks.test]
+description = "Run unit tests like CI"
+run = "go test ./..."
+
+[tasks.vuln]
+description = "Run govulncheck like CI"
+run = '''
+set -euo pipefail
+go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+'''
+
+[tasks.ci]
+description = "Run the full local CI-equivalent validation suite"
+depends = ["lint", "test", "vuln"]

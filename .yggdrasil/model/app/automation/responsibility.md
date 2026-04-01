@@ -2,7 +2,7 @@
 
 This node owns repository automation for Musicon.
 
-It is responsible for GitHub Actions workflows that verify the Go codebase on push and pull request, run repository-level lint and vulnerability checks, and publish tagged cross-platform binaries through Goreleaser.
+It is responsible for GitHub Actions workflows that verify the Go codebase on push and pull request, local `mise` tasks that mirror those validation jobs, run repository-level lint and vulnerability checks, and publish tagged cross-platform binaries through Goreleaser.
 
 # Boundaries
 

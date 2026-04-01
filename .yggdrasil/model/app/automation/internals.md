@@ -5,6 +5,7 @@ Repository automation is intentionally separate from the CLI entrypoint because 
 The current implementation:
 
 - runs a CI workflow for pushes and pull requests
+- exposes matching local `mise` tasks so contributors can run the same formatting, vet, test, and vulnerability checks before pushing
 - verifies formatting with `gofmt -l .`
 - runs `go vet ./...` as the repository lint gate alongside formatting checks
 - runs `go test ./...` as the correctness gate
@@ -17,6 +18,7 @@ The current implementation:
 
 - Chose a dedicated `app/automation` infrastructure node over expanding `app/cli` because CI/CD behavior is repository automation, not executable wiring.
 - Chose GitHub-hosted workflows over local-only release scripts because the request was specifically to set up GitHub workflows for repeatable automation.
+- Chose `mise` task aliases that mirror the GitHub Actions commands over inventing a different local validation flow because contributors should be able to reproduce CI behavior locally with one consistent tool entrypoint.
 - Chose tag-driven releases matching `v*` because the user was unavailable for follow-up, and tag-based publishing is the safest default for explicit release intent.
 - Chose built-in Go tooling (`gofmt`, `go test`) plus `govulncheck` over a broader third-party lint stack to keep the pipeline aligned with repository-native checks and reduce configuration risk.
 - Chose to gate CI on `go vet` again after fixing the `internal/mpris` export issue, so the repository now enforces both formatting and static interface checks in its lint workflow.
