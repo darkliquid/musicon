@@ -114,6 +114,106 @@ type ThemeConfig struct {
 	OnWarning      string `toml:"on_warning"`
 }
 
+// UnmarshalTOML accepts both the new `[ui.theme]` table and the legacy
+// `theme = "preset"` string form.
+func (t *ThemeConfig) UnmarshalTOML(value any) error {
+	switch typed := value.(type) {
+	case string:
+		*t = defaultThemeConfig()
+		return nil
+	case map[string]any:
+		var decoded ThemeConfig
+		if raw, ok := typed["file"]; ok {
+			value, err := themeStringField(raw, "file")
+			if err != nil {
+				return err
+			}
+			decoded.File = value
+		}
+		if raw, ok := typed["background"]; ok {
+			value, err := themeStringField(raw, "background")
+			if err != nil {
+				return err
+			}
+			decoded.Background = value
+		}
+		if raw, ok := typed["surface"]; ok {
+			value, err := themeStringField(raw, "surface")
+			if err != nil {
+				return err
+			}
+			decoded.Surface = value
+		}
+		if raw, ok := typed["surface_variant"]; ok {
+			value, err := themeStringField(raw, "surface_variant")
+			if err != nil {
+				return err
+			}
+			decoded.SurfaceVariant = value
+		}
+		if raw, ok := typed["primary"]; ok {
+			value, err := themeStringField(raw, "primary")
+			if err != nil {
+				return err
+			}
+			decoded.Primary = value
+		}
+		if raw, ok := typed["on_primary"]; ok {
+			value, err := themeStringField(raw, "on_primary")
+			if err != nil {
+				return err
+			}
+			decoded.OnPrimary = value
+		}
+		if raw, ok := typed["text"]; ok {
+			value, err := themeStringField(raw, "text")
+			if err != nil {
+				return err
+			}
+			decoded.Text = value
+		}
+		if raw, ok := typed["text_muted"]; ok {
+			value, err := themeStringField(raw, "text_muted")
+			if err != nil {
+				return err
+			}
+			decoded.TextMuted = value
+		}
+		if raw, ok := typed["text_subtle"]; ok {
+			value, err := themeStringField(raw, "text_subtle")
+			if err != nil {
+				return err
+			}
+			decoded.TextSubtle = value
+		}
+		if raw, ok := typed["border"]; ok {
+			value, err := themeStringField(raw, "border")
+			if err != nil {
+				return err
+			}
+			decoded.Border = value
+		}
+		if raw, ok := typed["warning"]; ok {
+			value, err := themeStringField(raw, "warning")
+			if err != nil {
+				return err
+			}
+			decoded.Warning = value
+		}
+		if raw, ok := typed["on_warning"]; ok {
+			value, err := themeStringField(raw, "on_warning")
+			if err != nil {
+				return err
+			}
+			decoded.OnWarning = value
+		}
+		*t = decoded
+		return nil
+	default:
+		return fmt.Errorf("ui.theme must be a string or table, got %T", value)
+	}
+}
+
 // AlbumArtConfig configures album-art rendering defaults.
 type AlbumArtConfig struct {
 	FillMode string `toml:"fill_mode"`
@@ -160,6 +260,14 @@ func defaultThemeConfig() ThemeConfig {
 	cfg := ThemeConfig{}
 	cfg.setPalette(components.DefaultTheme())
 	return cfg
+}
+
+func themeStringField(value any, key string) (string, error) {
+	typed, ok := value.(string)
+	if !ok {
+		return "", fmt.Errorf("ui.theme.%s must be a string, got %T", key, value)
+	}
+	return typed, nil
 }
 
 func (t ThemeConfig) Palette() components.Theme {
@@ -257,7 +365,7 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// LoadDefault loads the default layered config search path and reports which files were applied.
+// LoadDefault loads the default user config path and falls back to built-in defaults when it is absent.
 func LoadDefault() (LoadResult, error) {
 	path, explicit, err := explicitPath()
 	if err != nil {
@@ -271,30 +379,25 @@ func LoadDefault() (LoadResult, error) {
 		return LoadResult{Path: path, Config: cfg}, nil
 	}
 
-	paths, err := defaultPaths()
+	path, err = defaultPath()
 	if err != nil {
 		return LoadResult{}, err
 	}
-
-	cfg := Default()
-	loaded := make([]string, 0, len(paths))
-	for _, candidate := range paths {
-		metadata, err := toml.DecodeFile(candidate, &cfg)
-		if err != nil {
-			return LoadResult{}, err
-		}
-		if err := applyThemeConfig(&cfg.UI.Theme, metadata, candidate); err != nil {
-			return LoadResult{}, err
-		}
-		loaded = append(loaded, candidate)
+	ok, err := isRegularFile(path)
+	if err != nil {
+		return LoadResult{}, fmt.Errorf("stat config %q: %w", path, err)
 	}
-	if err := cfg.normalize(); err != nil {
+	if !ok {
+		return LoadResult{
+			Path:   path,
+			Config: Default(),
+		}, nil
+	}
+	cfg, err := Load(path)
+	if err != nil {
 		return LoadResult{}, err
 	}
-	return LoadResult{
-		Path:   strings.Join(loaded, ":"),
-		Config: cfg,
-	}, nil
+	return LoadResult{Path: path, Config: cfg}, nil
 }
 
 // ResolvedLocalDirs returns deduplicated, expanded local-library directories.
@@ -601,6 +704,17 @@ func explicitPath() (path string, explicit bool, err error) {
 		return raw, true, nil
 	}
 	return "", false, nil
+}
+
+func defaultPath() (string, error) {
+	configRoot, err := os.UserConfigDir()
+	if err != nil {
+		return "", err
+	}
+	if configRoot == "" {
+		return "", errors.New("user config dir is empty")
+	}
+	return filepath.Join(configRoot, "musicon", "config.toml"), nil
 }
 
 func defaultPaths() ([]string, error) {

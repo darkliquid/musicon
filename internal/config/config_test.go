@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -210,6 +211,26 @@ primary = "#ff00ff"
 	}
 }
 
+func TestLoadAcceptsLegacyThemeString(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "musicon.toml")
+	if err := os.WriteFile(path, []byte(`
+[ui]
+theme = "default"
+`), 0o644); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	if cfg.UI.Theme.Palette() != components.DefaultTheme() {
+		t.Fatalf("expected legacy theme string to map to default palette, got %#v", cfg.UI.Theme.Palette())
+	}
+}
+
 func TestLoadRejectsInvalidThemeColor(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "musicon.toml")
@@ -251,7 +272,7 @@ func TestResolvedLocalDirsExpandsHomeAndDeduplicates(t *testing.T) {
 	}
 }
 
-func TestLoadDefaultOverlaysGlobalWithUserXDGConfig(t *testing.T) {
+func TestLoadDefaultUsesUserXDGConfigPath(t *testing.T) {
 	root := t.TempDir()
 	globalDir := filepath.Join(root, "global")
 	userDir := filepath.Join(root, "user")
@@ -292,16 +313,37 @@ dirs = ["~/Music", "/tmp/user-library"]
 		t.Fatalf("load default failed: %v", err)
 	}
 
-	if result.Config.Audio.Backend != "alsa" {
-		t.Fatalf("expected global backend, got %q", result.Config.Audio.Backend)
+	if result.Config.Audio.Backend != "auto" {
+		t.Fatalf("expected default backend because global overlays are ignored, got %q", result.Config.Audio.Backend)
 	}
 	if result.Config.UI.StartMode != "playback" {
-		t.Fatalf("expected user start mode overlay, got %q", result.Config.UI.StartMode)
+		t.Fatalf("expected user config start mode, got %q", result.Config.UI.StartMode)
 	}
-	if result.Config.UI.CellWidthRatio != 0.55 {
-		t.Fatalf("expected global cell width ratio preserved, got %v", result.Config.UI.CellWidthRatio)
+	if result.Config.UI.CellWidthRatio != components.TerminalCellWidthRatio() {
+		t.Fatalf("expected default cell width ratio because global overlays are ignored, got %v", result.Config.UI.CellWidthRatio)
 	}
 	if len(result.Config.Sources.Local.Dirs) != 2 || result.Config.Sources.Local.Dirs[1] != "/tmp/user-library" {
-		t.Fatalf("expected user local dirs overlay, got %#v", result.Config.Sources.Local.Dirs)
+		t.Fatalf("expected user local dirs, got %#v", result.Config.Sources.Local.Dirs)
+	}
+	if result.Path != filepath.Join(userDir, "musicon", "config.toml") {
+		t.Fatalf("expected default user config path, got %q", result.Path)
+	}
+}
+
+func TestLoadDefaultReturnsDefaultsWhenUserConfigIsMissing(t *testing.T) {
+	userDir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", userDir)
+	t.Setenv("MUSICON_CONFIG", "")
+
+	result, err := LoadDefault()
+	if err != nil {
+		t.Fatalf("load default failed: %v", err)
+	}
+
+	if !reflect.DeepEqual(result.Config, Default()) {
+		t.Fatalf("expected built-in defaults when user config is missing, got %#v", result.Config)
+	}
+	if result.Path != filepath.Join(userDir, "musicon", "config.toml") {
+		t.Fatalf("expected default user config path, got %q", result.Path)
 	}
 }

@@ -3,6 +3,7 @@
 This node does not expose a reusable library API, but it does define the executable startup contract used by the binary entrypoint:
 
 - load and normalize startup configuration through `internal/config`
+- allow `--config-path` to point startup at an explicit TOML config file
 - list usable audio backends through a CLI flag and mark the currently effective configured choice
 - list usable image renderers through a CLI flag and mark the currently effective choice after applying config plus env override precedence
 - mirror startup and artwork-resolution diagnostics to stderr and/or a caller-selected debug-log file through CLI flags

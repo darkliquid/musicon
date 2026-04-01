@@ -1,16 +1,13 @@
 {
-  "hash": "ff582c6be8e42d45e431cf0195eab8d8f8fb1493dfa95abf272119f9551051fa",
+  "hash": "8e174d6b3d4aaddf4b8145dd2cd520fb3349d626f1633147072bb8187f5df5f1",
   "files": {
     ".yggdrasil/model/app/cli/yg-node.yaml": "7d7d04b219543f6f4601cee8e67df6b0d5e42c6cdad6e0c1b2376a441e8faed5",
-    ".yggdrasil/model/app/cli/interface.md": "fe6286de6aa170bc60c2dac4c9822adad97206b59cb9df9229a79c7fc6deedc9",
-    ".yggdrasil/model/app/cli/internals.md": "50037b0fa88cbe4cc64af88d805128968b08ca1903b90cd714fbee98257c9bfe",
     ".yggdrasil/model/app/cli/responsibility.md": "39a365e3d4299656fb5daa58c4c8a62e97b2b4dd77cace7198d041bdf0a6f0f0",
     ".yggdrasil/model/app/yg-node.yaml": "3ff1b09541a43f32a625db53aa813b01fc441539c2fef4ba37030d6eec3353ba",
     ".yggdrasil/model/app/responsibility.md": "370acf592e591f7931933ac92849d7d565d233f955e1c7c2e2f6608071aff13c",
     ".yggdrasil/aspects/ui/mode-toggle/yg-aspect.yaml": "e8a77816aaecfc859ce13d0c3b2ed952b3626e95e4e29a38192849f29a3ee748",
     ".yggdrasil/aspects/ui/mode-toggle/requirements.md": "f8ed7c5f8e73a7bee0b76b00f3889e51700cc7cde9bfb59065d48b88a9ef35aa",
     ".yggdrasil/model/internal/config/responsibility.md": "f95f99360ede9401c9b895de44c94e72e0c0316832c83f0f4bd19586d59696bc",
-    ".yggdrasil/model/internal/config/interface.md": "a02212e1d885137b726b6f176ca0513436cbe7f03281881faa85f12b7d191283",
     ".yggdrasil/model/internal/responsibility.md": "90fa17d80db7c3265833b84cf53518ceac4f367db6fef86dd3ea8b4adf3ddee7",
     ".yggdrasil/model/internal/ui/responsibility.md": "9a7460b933e43faf3b3c084f89f7afb8f7314acd2e3e3733828180cdd35da00e",
     ".yggdrasil/model/internal/ui/interface.md": "f3da24de7ceb790504c792cd9b03c66fb1c377bd90ba0302a29036db621761bc",
@@ -40,19 +37,22 @@
     ".yggdrasil/flows/playback-control/description.md": "bb98b04756342cbd0bdf68daac097a616a32ae5ca08997dc828ff9a36cf83f17",
     ".yggdrasil/flows/queue-management/yg-flow.yaml": "e56c1aa847b658a970bdb45c1b40a65575dab39057d32b9646c94201a0d14bc5",
     ".yggdrasil/flows/queue-management/description.md": "4115d56bbcfcd33f2683a931edbc5e7e46e4c20cd06efc7d9ba623bf10729123",
-    "main.go": "80d97ad1e4539beee69f061c315a57f45d61a4147dc9768575ba0ba49a6ef36c"
+    ".yggdrasil/model/app/cli/interface.md": "1faa0f2c4c0e0556f5f07412e3fa68a6ec099eac4756c09c48c08b4d7c418862",
+    ".yggdrasil/model/app/cli/internals.md": "de25a1a59b4f4714e0288d85a3b341d48629196a9a03f7f74047acc7c541003f",
+    ".yggdrasil/model/internal/config/interface.md": "59fa8b999b8d000a63eb3347f60b3e2373c5bc4689dd7a4f3ee8ed5e2d25d9d9",
+    "main.go": "2c3789731ea9c2239f1fcacf57e17db22ecf557234836132cc5282932dad8b25"
   },
   "mtimes": {
     ".yggdrasil/model/app/cli/yg-node.yaml": 1774949597907.6177,
-    ".yggdrasil/model/app/cli/interface.md": 1775052227566.0881,
-    ".yggdrasil/model/app/cli/internals.md": 1775052227567.0881,
+    ".yggdrasil/model/app/cli/interface.md": 1775055448592.9414,
+    ".yggdrasil/model/app/cli/internals.md": 1775055448593.9414,
     ".yggdrasil/model/app/cli/responsibility.md": 1775040567387.2524,
     ".yggdrasil/model/app/yg-node.yaml": 1774839898455.773,
     ".yggdrasil/model/app/responsibility.md": 1774839901724.833,
     ".yggdrasil/aspects/ui/mode-toggle/yg-aspect.yaml": 1774839519036.7817,
     ".yggdrasil/aspects/ui/mode-toggle/requirements.md": 1774839520278.8047,
     ".yggdrasil/model/internal/config/responsibility.md": 1774879625624.6428,
-    ".yggdrasil/model/internal/config/interface.md": 1775052111572.8665,
+    ".yggdrasil/model/internal/config/interface.md": 1775055448592.9414,
     ".yggdrasil/model/internal/responsibility.md": 1774848185793.962,
     ".yggdrasil/model/internal/ui/responsibility.md": 1775040567387.2524,
     ".yggdrasil/model/internal/ui/interface.md": 1775052111573.8665,
@@ -82,6 +82,6 @@
     ".yggdrasil/flows/playback-control/description.md": 1774878372940.832,
     ".yggdrasil/flows/queue-management/yg-flow.yaml": 1774960305807.481,
     ".yggdrasil/flows/queue-management/description.md": 1774880361834.21,
-    "main.go": 1775053051972.8735
+    "main.go": 1775055361129.5059
   }
 }

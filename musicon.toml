@@ -1,3 +1,5 @@
+# Copy this file to ~/.config/musicon/config.toml, set MUSICON_CONFIG, or pass --config-path=/path/to/config.toml.
+
 [audio]
 backend = "auto"
 

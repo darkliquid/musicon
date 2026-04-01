@@ -30,6 +30,7 @@ func main() {
 	listImageRenderers := flag.Bool("list-image-renderers", false, "list usable image renderers and exit")
 	audioBackend := flag.String("audio-backend", "", "force a specific audio backend (e.g. alsa, pulse, jack)")
 	imageBackend := flag.String("image-backend", "", "force a specific image renderer (e.g. kitty, sixel, iterm2, halfblocks)")
+	configPath := flag.String("config-path", "", "load config from this explicit path instead of the default XDG user config path")
 	flag.Parse()
 
 	if err := configureDebugLogging(*debug, *debugLogPath); err != nil {
@@ -44,7 +45,7 @@ func main() {
 	}
 
 	debuglog("Loading Musicon Config...")
-	loaded, err := config.LoadDefault()
+	loaded, err := loadConfig(*configPath)
 	if err != nil {
 		if listingOnly {
 			os.Exit(1)
@@ -202,6 +203,18 @@ func main() {
 		debuglog("musicon: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func loadConfig(path string) (config.LoadResult, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return config.LoadDefault()
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		return config.LoadResult{}, err
+	}
+	return config.LoadResult{Path: path, Config: cfg}, nil
 }
 
 func buildArtworkProvider() ui.ArtworkProvider {

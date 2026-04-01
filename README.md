@@ -40,6 +40,7 @@ Useful startup flags:
 
 - `--list-backends` lists usable audio backends in config-compatible form
 - `--list-image-renderers` lists usable album-art renderers
+- `--config-path=<path>` loads config from an explicit TOML path instead of the default XDG user config path
 - `--audio-backend=<name>` overrides the configured audio backend
 - `--image-backend=<name>` overrides the configured image renderer
 
@@ -47,6 +48,7 @@ Examples:
 
 ```bash
 go run . --list-backends
+go run . --config-path=/tmp/musicon.toml
 go run . --audio-backend=pulse
 go run . --image-backend=kitty
 ```
@@ -105,9 +107,9 @@ The radio path is:
 
 Musicon loads TOML configuration from:
 
+- `--config-path=<path>`, when passed on startup
 - `$MUSICON_CONFIG`, when set to an explicit TOML file path
-- `/etc/xdg/musicon/config.toml` and other `XDG_CONFIG_DIRS` entries
-- `$XDG_CONFIG_HOME/musicon/config.toml` or `~/.config/musicon/config.toml`
+- otherwise `$XDG_CONFIG_HOME/musicon/config.toml` or `~/.config/musicon/config.toml`
 
 The repository root also includes a complete example config in `musicon.toml`.
 
@@ -208,10 +210,11 @@ max_results = 20
 base_url = "https://all.api.radio-browser.info"
 ```
 
-`[ui.theme]` replaces the older `theme = "default"` string. You can either set
-all semantic roles inline or point `file` at a TOML palette file and then
-override only the roles you want in the main config. Relative `file` paths are
-resolved relative to the config file that declares them.
+`[ui.theme]` is the new theming surface. You can either set all semantic roles
+inline or point `file` at a TOML palette file and then override only the roles
+you want in the main config. Relative `file` paths are resolved relative to the
+config file that declares them. Legacy `theme = "default"` configs are still
+accepted as a compatibility alias for the built-in default palette.
 
 On Linux, `~/Music` and `~/.cache/musicon/youtube` correspond to the normal
 per-user default library and cache locations.
