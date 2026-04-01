@@ -55,6 +55,7 @@ func (e listEntry) FilterValue() string { return e.item.Title }
 // title+subtitle, right-aligned meta, and focus/selection styling.
 type listDelegate struct {
 	focused bool
+	theme   Theme
 }
 
 func (d *listDelegate) Height() int                             { return 1 }
@@ -68,6 +69,7 @@ func (d *listDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	}
 	it := entry.item
 	width := m.Width()
+	theme := d.theme.Normalize()
 
 	anchoredPrefix := ""
 	if it.Leading != "" {
@@ -97,19 +99,19 @@ func (d *listDelegate) Render(w io.Writer, m list.Model, index int, item list.It
 	left := lipgloss.NewStyle().Width(leftWidth).Render(leftLabel)
 	row := left
 	if metaWidth > 0 {
-		meta := lipgloss.NewStyle().Width(metaWidth).Align(lipgloss.Right).Foreground(lipgloss.Color("246")).Render(it.Meta)
+		meta := lipgloss.NewStyle().Width(metaWidth).Align(lipgloss.Right).Foreground(lipgloss.Color(theme.TextMuted)).Render(it.Meta)
 		row = lipgloss.JoinHorizontal(lipgloss.Left, left, " ", meta)
 	}
 
 	prefix := "  "
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Text))
 	if selected {
 		prefix = "▸ "
 		style = style.Bold(true)
 		if d.focused {
-			style = style.Foreground(lipgloss.Color("230")).Background(lipgloss.Color("63"))
+			style = style.Foreground(lipgloss.Color(theme.OnPrimary)).Background(lipgloss.Color(theme.Primary))
 		} else {
-			style = style.Foreground(lipgloss.Color("255")).Background(lipgloss.Color("238"))
+			style = style.Foreground(lipgloss.Color(theme.Text)).Background(lipgloss.Color(theme.SurfaceVariant))
 		}
 	} else if !d.focused {
 		style = style.Faint(true)
@@ -128,11 +130,12 @@ type List struct {
 	emptyBody  string
 	width      int
 	height     int
+	theme      Theme
 }
 
 // NewList constructs a selectable list with default sizing and empty-state messaging.
 func NewList() List {
-	d := &listDelegate{}
+	d := &listDelegate{theme: DefaultTheme()}
 	km := DefaultListKeyMap()
 	inner := list.New(nil, d, 20, 5)
 	applyKeyMap(&inner, km)
@@ -145,6 +148,7 @@ func NewList() List {
 		height:     5,
 		emptyTitle: "Nothing here",
 		emptyBody:  "No items are available in this panel yet.",
+		theme:      DefaultTheme(),
 	}
 }
 
@@ -205,6 +209,12 @@ func (l *List) SetFocused(focused bool) {
 	l.delegate.focused = focused
 }
 
+// SetTheme replaces the semantic palette used by the list renderer.
+func (l *List) SetTheme(theme Theme) {
+	l.theme = theme.Normalize()
+	l.delegate.theme = l.theme
+}
+
 // SetKeyMap replaces the navigation bindings used by Update.
 func (l *List) SetKeyMap(keymap ListKeyMap) {
 	l.keymap = keymap
@@ -247,7 +257,7 @@ func (l List) View() string {
 		return ""
 	}
 	if l.itemCount == 0 {
-		return RenderEmptyState(l.width, l.height, l.emptyTitle, l.emptyBody)
+		return RenderEmptyState(l.width, l.height, l.emptyTitle, l.emptyBody, l.theme)
 	}
 	return lipgloss.NewStyle().Width(l.width).Height(l.height).Render(l.inner.View())
 }

@@ -16,6 +16,7 @@ import (
 
 type playbackScreen struct {
 	services  Services
+	theme     components.Theme
 	width     int
 	height    int
 	keymap    PlaybackKeyMap
@@ -86,8 +87,13 @@ func newPlaybackScreen(services Services, options AlbumArtOptions) *playbackScre
 }
 
 func newPlaybackScreenWithKeyMap(services Services, options AlbumArtOptions, keymap PlaybackKeyMap) *playbackScreen {
+	return newPlaybackScreenWithThemeAndKeyMap(services, components.DefaultTheme(), options, keymap)
+}
+
+func newPlaybackScreenWithThemeAndKeyMap(services Services, theme components.Theme, options AlbumArtOptions, keymap PlaybackKeyMap) *playbackScreen {
 	screen := &playbackScreen{
 		services: services,
+		theme:    theme.Normalize(),
 		keymap:   keymap,
 		pane:     PaneArtwork,
 		snapshot: PlaybackSnapshot{Volume: 60},
@@ -281,6 +287,7 @@ func (p *playbackScreen) HelpView() string {
 		Width:    width,
 		Height:   height,
 		Focused:  true,
+		Theme:    p.theme,
 	}, strings.Join([]string{
 		helpLine(p.keymap.TogglePause, "toggle play / pause state"),
 		helpLinePair(p.keymap.PreviousTrack, p.keymap.NextTrack, "previous / next track request"),
@@ -296,15 +303,16 @@ func (p *playbackScreen) HelpView() string {
 }
 
 func (p *playbackScreen) paneOverlay() string {
+	theme := p.theme.Normalize()
 	content := lipgloss.JoinHorizontal(
 		lipgloss.Left,
-		pill(p.pane.String(), true),
+		pill(p.pane.String(), true, theme),
 		"  ",
-		lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Render(paneHint(p.pane)),
+		lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextMuted)).Render(paneHint(p.pane)),
 	)
 	return lipgloss.NewStyle().
-		Background(lipgloss.Color("236")).
-		Foreground(lipgloss.Color("252")).
+		Background(lipgloss.Color(theme.Surface)).
+		Foreground(lipgloss.Color(theme.Text)).
 		Padding(0, 1).
 		Width(min(p.width, max(24, lipgloss.Width(content)+2))).
 		Render(content)
@@ -318,6 +326,7 @@ func (p *playbackScreen) infoOverlay() string {
 		Width:    width,
 		Height:   8,
 		Focused:  false,
+		Theme:    p.theme,
 	}, p.infoView(width-4, 5))
 }
 
@@ -333,10 +342,12 @@ func (p *playbackScreen) controlsOverlay() string {
 		Width:   width,
 		Height:  6,
 		Focused: false,
+		Theme:   p.theme,
 	}, p.controlsView(width-4))
 }
 
 func (p *playbackScreen) controlsView(width int) string {
+	theme := p.theme.Normalize()
 	position := p.snapshot.Position
 	duration := p.snapshot.Duration
 	if duration <= 0 {
@@ -355,16 +366,16 @@ func (p *playbackScreen) controlsView(width int) string {
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Left,
-		components.RenderProgress(width, ratio, fmt.Sprintf("%s / %s", formatDuration(position), formatDuration(duration))),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render(strings.Join(statusBits, " · ")),
-		lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Render(fmt.Sprintf("visual mode: %s · info: %s", bindingLabel(p.keymap.CyclePane), bindingLabel(p.keymap.ToggleInfo))),
+		components.RenderProgress(width, ratio, fmt.Sprintf("%s / %s", formatDuration(position), formatDuration(duration)), theme),
+		lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextSubtle)).Render(strings.Join(statusBits, " · ")),
+		lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextMuted)).Render(fmt.Sprintf("visual mode: %s · info: %s", bindingLabel(p.keymap.CyclePane), bindingLabel(p.keymap.ToggleInfo))),
 	)
 }
 
 func (p *playbackScreen) infoView(width, height int) string {
 	track := p.snapshot.Track
 	if track == nil {
-		return components.RenderEmptyState(width, height, "No active track", "Connect a playback backend or load a track to populate metadata.")
+		return components.RenderEmptyState(width, height, "No active track", "Connect a playback backend or load a track to populate metadata.", p.theme)
 	}
 
 	lines := []string{
@@ -392,24 +403,24 @@ func (p *playbackScreen) centerView(width, height int) string {
 			}
 		}
 		if p.lyricsLoading {
-			return components.RenderEmptyState(width, height, "Loading lyrics", "Fetching lyrics for the active track without blocking playback mode.")
+			return components.RenderEmptyState(width, height, "Loading lyrics", "Fetching lyrics for the active track without blocking playback mode.", p.theme)
 		}
 		if p.lyricsErr != nil {
-			return components.RenderEmptyState(width, height, "Lyrics unavailable", p.lyricsErr.Error())
+			return components.RenderEmptyState(width, height, "Lyrics unavailable", p.lyricsErr.Error(), p.theme)
 		}
 		if p.lyricsDoc != nil && p.lyricsDoc.Instrumental {
 			return lipgloss.NewStyle().Width(width).Height(height).Render(strings.Join(p.lyricsDoc.DisplayLines(), "\n"))
 		}
-		return components.RenderEmptyState(width, height, "Lyrics unavailable", "No lyrics matched the active track.")
+		return components.RenderEmptyState(width, height, "Lyrics unavailable", "No lyrics matched the active track.", p.theme)
 	case PaneEQ, PaneVisualizer:
 		p.refreshVisualization(width, height)
 		if strings.TrimSpace(p.visualContent) != "" {
 			return lipgloss.NewStyle().Width(width).Height(height).Render(p.visualContent)
 		}
 		if p.visualErr != nil {
-			return components.RenderEmptyState(width, height, p.pane.String()+" unavailable", p.visualErr.Error())
+			return components.RenderEmptyState(width, height, p.pane.String()+" unavailable", p.visualErr.Error(), p.theme)
 		}
-		return neutralPlaybackPane(width, height)
+		return neutralPlaybackPane(width, height, p.theme)
 	default:
 		p.artwork.SetSize(width, height)
 		p.refreshArtwork(trackInfo)
@@ -421,7 +432,7 @@ func (p *playbackScreen) centerView(width, height int) string {
 				lipgloss.Center,
 				artwork,
 				lipgloss.WithWhitespaceChars("·"),
-				lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("238"))),
+				lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(p.theme.Normalize().SurfaceVariant))),
 			)
 		}
 		if renderErr := p.artwork.Error(); renderErr != nil {
@@ -432,13 +443,13 @@ func (p *playbackScreen) centerView(width, height int) string {
 			p.artStatus = p.artworkSource.Description
 		}
 		if strings.TrimSpace(p.artStatus) != "" {
-			return components.RenderEmptyState(width, height, "Album art", p.artStatus)
+			return components.RenderEmptyState(width, height, "Album art", p.artStatus, p.theme)
 		}
-		return neutralPlaybackPane(width, height)
+		return neutralPlaybackPane(width, height, p.theme)
 	}
 }
 
-func neutralPlaybackPane(width, height int) string {
+func neutralPlaybackPane(width, height int, theme components.Theme) string {
 	return lipgloss.Place(
 		width,
 		height,
@@ -446,7 +457,7 @@ func neutralPlaybackPane(width, height int) string {
 		lipgloss.Center,
 		"",
 		lipgloss.WithWhitespaceChars("·"),
-		lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("238"))),
+		lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Normalize().SurfaceVariant))),
 	)
 }
 
@@ -574,6 +585,7 @@ func (p *playbackScreen) artworkActivityOverlay(width, height int) string {
 		Width:    width,
 		Height:   min(height-2, max(4, len(lines)+2)),
 		Focused:  false,
+		Theme:    p.theme,
 	}, strings.Join(lines, "\n"))
 }
 
@@ -799,12 +811,13 @@ func (p *playbackScreen) renderedLyricsViewportLines() []string {
 	active := p.activeTimedLyricsLine()
 	start, _ := p.lyricsWindow(len(p.lyricsDisplayLines()))
 	rendered := make([]string, 0, len(lines))
-	pastStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-	futureStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	theme := p.theme.Normalize()
+	pastStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextSubtle))
+	futureStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Text))
 	activeStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("230")).
-		Background(lipgloss.Color("57"))
+		Foreground(lipgloss.Color(theme.OnPrimary)).
+		Background(lipgloss.Color(theme.Primary))
 
 	for offset, line := range lines {
 		index := start + offset

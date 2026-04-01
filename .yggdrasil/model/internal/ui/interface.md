@@ -11,7 +11,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - `QueueService` for queue snapshots and mutation
 - `PlaybackService` for transport, volume, and playback snapshots
 - `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with lyrics providers receiving reusable metadata requests and returning reusable lyrics documents, artwork providers receiving reusable cover-art metadata, optionally reporting provider-attempt progress, and visualization providers returning live pane-sized EQ/visualizer content that is safe to request during ordinary redraws
-- `Options` for startup mode, theme selection, cell-width ratio, playback artwork rendering preferences, an optional restored session snapshot, and an app-owned session store used for persistence
+- `Options` for startup mode, a resolved semantic theme palette, cell-width ratio, playback artwork rendering preferences, an optional restored session snapshot, and an app-owned session store used for persistence
 
 # Contracts
 
@@ -21,6 +21,7 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - The root model owns mode switching, help toggling, and visually square viewport resizing.
 - `NewApp` seeds the Bubble Tea program with a best-effort initial terminal size so the first frame can render even when the terminal does not deliver an immediate startup resize event.
 - `NewApp` should accept typed startup options from the application layer, including the initial mode and terminal cell width ratio, while still allowing an env override and a shared fixed fallback for legacy/default operation.
+- `NewApp` should accept a fully resolved semantic theme palette from application wiring and apply it consistently across root chrome, warnings, queue chips, playback overlays, and reusable component render helpers without making `internal/ui` parse config files.
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
 - The root model should capture restorable UI state through an app-owned session-store contract instead of writing files itself, so app wiring can choose where the session snapshot lives.
 - The root model also publishes terminal window titles derived from mode, help state, and current playback snapshot through Bubble Tea's `View.WindowTitle` field.

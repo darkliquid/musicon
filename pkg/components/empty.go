@@ -7,10 +7,11 @@ import (
 )
 
 // RenderEmptyState renders a centered title/body pair for panels without data.
-func RenderEmptyState(width, height int, title, body string) string {
+func RenderEmptyState(width, height int, title, body string, theme Theme) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
+	theme = theme.Normalize()
 
 	bodyWidth := width
 	if bodyWidth > 4 {
@@ -18,10 +19,10 @@ func RenderEmptyState(width, height int, title, body string) string {
 	}
 
 	parts := []string{
-		lipgloss.NewStyle().Bold(true).Align(lipgloss.Center).Width(width).Render(title),
+		lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(theme.Text)).Align(lipgloss.Center).Width(width).Render(title),
 	}
 	if strings.TrimSpace(body) != "" {
-		parts = append(parts, lipgloss.NewStyle().Faint(true).Align(lipgloss.Center).Width(bodyWidth).Render(body))
+		parts = append(parts, lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextMuted)).Align(lipgloss.Center).Width(bodyWidth).Render(body))
 	}
 
 	content := lipgloss.JoinVertical(lipgloss.Center, parts...)

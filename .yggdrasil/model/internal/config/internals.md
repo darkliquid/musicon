@@ -7,10 +7,11 @@ The expected shape is:
 - look for an explicit config path first
 - otherwise load the global XDG config and then overlay the user XDG config if it is present
 - start from code defaults, then overlay TOML values
-- normalize values such as audio backend names, image-renderer backend names, start mode, fill mode, local directories, configurable keybinding lists, and YouTube source paths/args
+- normalize values such as audio backend names, semantic UI theme colors, image-renderer backend names, start mode, fill mode, local directories, configurable keybinding lists, and YouTube source paths/args
+- when a config file defines `[ui.theme.file]`, resolve the path relative to the config file that declared it, decode the external TOML palette, and then let any inline `[ui.theme]` role values override the external palette
 - carry queue-mode bindings for source switching, visible search-kind slot selection, search-kind cycling, and collection expansion so the richer multi-source queue workflow stays configurable from TOML instead of hardcoded in the UI
 - apply the shared fallback cell ratio when the config does not pin one explicitly
-- pass typed options into `internal/audio`, `internal/ui`, `internal/sources/local`, and `internal/sources/youtube`
+- pass typed options into `internal/audio`, `internal/ui`, `internal/sources/local`, and `internal/sources/youtube`, including a resolved semantic UI palette instead of a preset theme string
 
 The package source now also carries package-level and exported-symbol documentation so the TOML surface and normalization helpers stay understandable through Go tooling as the configuration surface grows.
 
@@ -26,3 +27,4 @@ Path handling belongs here so the rest of the application can work with cleaned,
 - Chose to reuse the shared fixed fallback ratio from `pkg/components` when `ui.cell_width_ratio` is omitted because the user explicitly asked to keep configured values only when set and otherwise use the default fallback during the Chafa migration.
 - Chose cookie-file and browser-cookie settings plus optional raw yt-dlp args for the YouTube source because the user wanted authenticated access to private playlists and uploaded music without forcing the source layer to invent a separate auth protocol.
 - Chose a TOML-backed `[keybinds]` section over leaving key handling hardcoded in the UI because the user wanted different terminals and personal habits to support custom shortcuts without code changes.
+- Chose a semantic `[ui.theme]` palette plus optional external TOML theme file over a single preset-name string because the user wanted matugen-style color coordination while still being able to keep everything app-owned and startup-friendly.

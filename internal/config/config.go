@@ -14,7 +14,6 @@ import (
 const (
 	// DefaultFileName is the conventional base name for Musicon configuration files.
 	DefaultFileName     = "musicon.toml"
-	defaultTheme        = "default"
 	defaultStartMode    = "queue"
 	defaultBackend      = "auto"
 	defaultFillMode     = "fill"
@@ -93,10 +92,26 @@ type AudioConfig struct {
 
 // UIConfig holds terminal UI startup settings.
 type UIConfig struct {
-	Theme          string         `toml:"theme"`
+	Theme          ThemeConfig    `toml:"theme"`
 	StartMode      string         `toml:"start_mode"`
 	CellWidthRatio float64        `toml:"cell_width_ratio"`
 	AlbumArt       AlbumArtConfig `toml:"album_art"`
+}
+
+// ThemeConfig holds semantic UI color roles and an optional external theme file.
+type ThemeConfig struct {
+	File           string `toml:"file"`
+	Background     string `toml:"background"`
+	Surface        string `toml:"surface"`
+	SurfaceVariant string `toml:"surface_variant"`
+	Primary        string `toml:"primary"`
+	OnPrimary      string `toml:"on_primary"`
+	Text           string `toml:"text"`
+	TextMuted      string `toml:"text_muted"`
+	TextSubtle     string `toml:"text_subtle"`
+	Border         string `toml:"border"`
+	Warning        string `toml:"warning"`
+	OnWarning      string `toml:"on_warning"`
 }
 
 // AlbumArtConfig configures album-art rendering defaults.
@@ -141,6 +156,52 @@ type LoadResult struct {
 	Config Config
 }
 
+func defaultThemeConfig() ThemeConfig {
+	cfg := ThemeConfig{}
+	cfg.setPalette(components.DefaultTheme())
+	return cfg
+}
+
+func (t ThemeConfig) Palette() components.Theme {
+	return components.Theme{
+		Background:     t.Background,
+		Surface:        t.Surface,
+		SurfaceVariant: t.SurfaceVariant,
+		Primary:        t.Primary,
+		OnPrimary:      t.OnPrimary,
+		Text:           t.Text,
+		TextMuted:      t.TextMuted,
+		TextSubtle:     t.TextSubtle,
+		Border:         t.Border,
+		Warning:        t.Warning,
+		OnWarning:      t.OnWarning,
+	}
+}
+
+func (t *ThemeConfig) setPalette(theme components.Theme) {
+	t.Background = theme.Background
+	t.Surface = theme.Surface
+	t.SurfaceVariant = theme.SurfaceVariant
+	t.Primary = theme.Primary
+	t.OnPrimary = theme.OnPrimary
+	t.Text = theme.Text
+	t.TextMuted = theme.TextMuted
+	t.TextSubtle = theme.TextSubtle
+	t.Border = theme.Border
+	t.Warning = theme.Warning
+	t.OnWarning = theme.OnWarning
+}
+
+func (t *ThemeConfig) normalize() error {
+	t.File = normalizePath(t.File)
+	palette := t.Palette().Normalize()
+	if err := palette.Validate(); err != nil {
+		return err
+	}
+	t.setPalette(palette)
+	return nil
+}
+
 // Default returns the built-in Musicon configuration defaults.
 func Default() Config {
 	return Config{
@@ -148,7 +209,7 @@ func Default() Config {
 			Backend: defaultBackend,
 		},
 		UI: UIConfig{
-			Theme:          defaultTheme,
+			Theme:          defaultThemeConfig(),
 			StartMode:      defaultStartMode,
 			CellWidthRatio: components.TerminalCellWidthRatio(),
 			AlbumArt: AlbumArtConfig{
@@ -183,10 +244,16 @@ func Load(path string) (Config, error) {
 	}
 
 	cfg := Default()
-	if _, err := toml.DecodeFile(path, &cfg); err != nil {
+	metadata, err := toml.DecodeFile(path, &cfg)
+	if err != nil {
 		return Config{}, err
 	}
-	cfg.normalize()
+	if err := applyThemeConfig(&cfg.UI.Theme, metadata, path); err != nil {
+		return Config{}, err
+	}
+	if err := cfg.normalize(); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 
@@ -212,12 +279,18 @@ func LoadDefault() (LoadResult, error) {
 	cfg := Default()
 	loaded := make([]string, 0, len(paths))
 	for _, candidate := range paths {
-		if _, err := toml.DecodeFile(candidate, &cfg); err != nil {
+		metadata, err := toml.DecodeFile(candidate, &cfg)
+		if err != nil {
+			return LoadResult{}, err
+		}
+		if err := applyThemeConfig(&cfg.UI.Theme, metadata, candidate); err != nil {
 			return LoadResult{}, err
 		}
 		loaded = append(loaded, candidate)
 	}
-	cfg.normalize()
+	if err := cfg.normalize(); err != nil {
+		return LoadResult{}, err
+	}
 	return LoadResult{
 		Path:   strings.Join(loaded, ":"),
 		Config: cfg,
@@ -246,9 +319,11 @@ func (c Config) ResolvedLocalDirs() []string {
 	return dirs
 }
 
-func (c *Config) normalize() {
+func (c *Config) normalize() error {
 	c.Audio.Backend = normalizeString(c.Audio.Backend, defaultBackend)
-	c.UI.Theme = normalizeString(c.UI.Theme, defaultTheme)
+	if err := c.UI.Theme.normalize(); err != nil {
+		return fmt.Errorf("normalize ui theme: %w", err)
+	}
 	c.UI.StartMode = normalizeStartMode(c.UI.StartMode)
 	if c.UI.CellWidthRatio <= 0 {
 		c.UI.CellWidthRatio = components.TerminalCellWidthRatio()
@@ -296,6 +371,7 @@ func (c *Config) normalize() {
 	if c.Sources.Radio.MaxResults <= 0 {
 		c.Sources.Radio.MaxResults = defaultRadioResults
 	}
+	return nil
 }
 
 func defaultKeybinds() KeybindsConfig {
@@ -447,6 +523,79 @@ func normalizeProtocol(values ...string) string {
 	return defaultProtocol
 }
 
+func applyThemeConfig(theme *ThemeConfig, metadata toml.MetaData, configPath string) error {
+	if theme == nil || !metadata.IsDefined("ui", "theme") {
+		return nil
+	}
+
+	palette := theme.Palette().Normalize()
+	if metadata.IsDefined("ui", "theme", "file") {
+		theme.File = normalizePathRelative(theme.File, filepath.Dir(configPath))
+		if theme.File == "" {
+			palette = components.DefaultTheme()
+		} else {
+			loaded, err := loadThemeFile(theme.File)
+			if err != nil {
+				return fmt.Errorf("load ui theme file %q: %w", theme.File, err)
+			}
+			palette = loaded
+		}
+	}
+
+	if metadata.IsDefined("ui", "theme", "background") {
+		palette.Background = theme.Background
+	}
+	if metadata.IsDefined("ui", "theme", "surface") {
+		palette.Surface = theme.Surface
+	}
+	if metadata.IsDefined("ui", "theme", "surface_variant") {
+		palette.SurfaceVariant = theme.SurfaceVariant
+	}
+	if metadata.IsDefined("ui", "theme", "primary") {
+		palette.Primary = theme.Primary
+	}
+	if metadata.IsDefined("ui", "theme", "on_primary") {
+		palette.OnPrimary = theme.OnPrimary
+	}
+	if metadata.IsDefined("ui", "theme", "text") {
+		palette.Text = theme.Text
+	}
+	if metadata.IsDefined("ui", "theme", "text_muted") {
+		palette.TextMuted = theme.TextMuted
+	}
+	if metadata.IsDefined("ui", "theme", "text_subtle") {
+		palette.TextSubtle = theme.TextSubtle
+	}
+	if metadata.IsDefined("ui", "theme", "border") {
+		palette.Border = theme.Border
+	}
+	if metadata.IsDefined("ui", "theme", "warning") {
+		palette.Warning = theme.Warning
+	}
+	if metadata.IsDefined("ui", "theme", "on_warning") {
+		palette.OnWarning = theme.OnWarning
+	}
+
+	palette = palette.Normalize()
+	if err := palette.Validate(); err != nil {
+		return fmt.Errorf("invalid ui theme: %w", err)
+	}
+	theme.setPalette(palette)
+	return nil
+}
+
+func loadThemeFile(path string) (components.Theme, error) {
+	theme := defaultThemeConfig()
+	if _, err := toml.DecodeFile(path, &theme); err != nil {
+		return components.Theme{}, err
+	}
+	palette := theme.Palette().Normalize()
+	if err := palette.Validate(); err != nil {
+		return components.Theme{}, err
+	}
+	return palette, nil
+}
+
 func explicitPath() (path string, explicit bool, err error) {
 	if raw := strings.TrimSpace(os.Getenv("MUSICON_CONFIG")); raw != "" {
 		return raw, true, nil
@@ -519,6 +668,20 @@ func normalizePath(raw string) string {
 		return ""
 	}
 	return filepath.Clean(expanded)
+}
+
+func normalizePathRelative(raw, baseDir string) string {
+	expanded, ok := expandPath(raw)
+	if !ok {
+		return ""
+	}
+	if filepath.IsAbs(expanded) {
+		return filepath.Clean(expanded)
+	}
+	if baseDir == "" {
+		return filepath.Clean(expanded)
+	}
+	return filepath.Clean(filepath.Join(baseDir, expanded))
 }
 
 func normalizePathWithFallback(raw, fallback string) string {

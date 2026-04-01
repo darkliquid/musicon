@@ -145,7 +145,7 @@ func main() {
 		Visualization: engine.VisualizationService(),
 	}, ui.Options{
 		StartMode:      modeFromConfig(loaded.Config.UI.StartMode),
-		Theme:          loaded.Config.UI.Theme,
+		Theme:          loaded.Config.UI.Theme.Palette(),
 		CellWidthRatio: loaded.Config.UI.CellWidthRatio,
 		AlbumArt: ui.AlbumArtOptions{
 			FillMode: loaded.Config.UI.AlbumArt.FillMode,

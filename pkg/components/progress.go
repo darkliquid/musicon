@@ -7,10 +7,11 @@ import (
 )
 
 // RenderProgress draws a simple progress bar with an optional label.
-func RenderProgress(width int, ratio float64, label string) string {
+func RenderProgress(width int, ratio float64, label string, theme Theme) string {
 	if width <= 0 {
 		return ""
 	}
+	theme = theme.Normalize()
 	if ratio < 0 {
 		ratio = 0
 	}
@@ -33,11 +34,11 @@ func RenderProgress(width int, ratio float64, label string) string {
 	if filled > barWidth {
 		filled = barWidth
 	}
-	bar := lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Render(strings.Repeat("█", filled))
-	empty := lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render(strings.Repeat("░", barWidth-filled))
+	bar := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Primary)).Render(strings.Repeat("█", filled))
+	empty := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.SurfaceVariant)).Render(strings.Repeat("░", barWidth-filled))
 
 	if label == "" {
 		return lipgloss.NewStyle().Width(width).Render(bar + empty)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Left, bar+empty, " ", lipgloss.NewStyle().Width(labelWidth).Align(lipgloss.Right).Render(label))
+	return lipgloss.JoinHorizontal(lipgloss.Left, bar+empty, " ", lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Text)).Width(labelWidth).Align(lipgloss.Right).Render(label))
 }

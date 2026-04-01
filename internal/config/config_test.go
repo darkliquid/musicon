@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/darkliquid/musicon/pkg/components"
 )
 
 func TestDefaultProvidesExpectedTunables(t *testing.T) {
@@ -13,8 +15,8 @@ func TestDefaultProvidesExpectedTunables(t *testing.T) {
 	if cfg.Audio.Backend != "auto" {
 		t.Fatalf("expected auto backend, got %q", cfg.Audio.Backend)
 	}
-	if cfg.UI.Theme != "default" {
-		t.Fatalf("expected default theme, got %q", cfg.UI.Theme)
+	if cfg.UI.Theme.Palette() != components.DefaultTheme() {
+		t.Fatalf("expected default theme palette, got %#v", cfg.UI.Theme.Palette())
 	}
 	if cfg.UI.StartMode != "queue" {
 		t.Fatalf("expected queue start mode, got %q", cfg.UI.StartMode)
@@ -52,8 +54,11 @@ func TestLoadOverlaysTOMLAndNormalizesValues(t *testing.T) {
 [audio]
 backend = "ALSA"
 
+[ui.theme]
+primary = " #aBcDeF "
+text = "#123456"
+
 [ui]
-theme = "Midnight"
 start_mode = "playback"
 cell_width_ratio = 0.6
 
@@ -97,8 +102,11 @@ base_url = " https://de1.api.radio-browser.info/ "
 	if cfg.Audio.Backend != "alsa" {
 		t.Fatalf("expected normalized backend, got %q", cfg.Audio.Backend)
 	}
-	if cfg.UI.Theme != "midnight" {
-		t.Fatalf("expected normalized theme, got %q", cfg.UI.Theme)
+	if cfg.UI.Theme.Primary != "#abcdef" {
+		t.Fatalf("expected normalized theme primary, got %q", cfg.UI.Theme.Primary)
+	}
+	if cfg.UI.Theme.Text != "#123456" {
+		t.Fatalf("expected configured theme text, got %q", cfg.UI.Theme.Text)
 	}
 	if cfg.UI.StartMode != "playback" {
 		t.Fatalf("expected playback start mode, got %q", cfg.UI.StartMode)
@@ -164,6 +172,63 @@ protocol = "unicode"
 	}
 }
 
+func TestLoadThemeFileSupportsInlineOverrides(t *testing.T) {
+	dir := t.TempDir()
+	themePath := filepath.Join(dir, "theme.toml")
+	configPath := filepath.Join(dir, "musicon.toml")
+	if err := os.WriteFile(themePath, []byte(`
+surface = "#20242c"
+primary = "#89b4fa"
+text = "#cdd6f4"
+`), 0o644); err != nil {
+		t.Fatalf("write theme file failed: %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(`
+[ui.theme]
+file = "theme.toml"
+primary = "#ff00ff"
+`), 0o644); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatalf("load failed: %v", err)
+	}
+
+	if cfg.UI.Theme.File != themePath {
+		t.Fatalf("expected resolved theme file path, got %q", cfg.UI.Theme.File)
+	}
+	if cfg.UI.Theme.Surface != "#20242c" {
+		t.Fatalf("expected theme file surface, got %q", cfg.UI.Theme.Surface)
+	}
+	if cfg.UI.Theme.Primary != "#ff00ff" {
+		t.Fatalf("expected inline theme override, got %q", cfg.UI.Theme.Primary)
+	}
+	if cfg.UI.Theme.Text != "#cdd6f4" {
+		t.Fatalf("expected theme file text, got %q", cfg.UI.Theme.Text)
+	}
+}
+
+func TestLoadRejectsInvalidThemeColor(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "musicon.toml")
+	if err := os.WriteFile(path, []byte(`
+[ui.theme]
+primary = "not-a-color"
+`), 0o644); err != nil {
+		t.Fatalf("write config failed: %v", err)
+	}
+
+	_, err := Load(path)
+	if err == nil {
+		t.Fatal("expected invalid theme color error")
+	}
+	if !strings.Contains(err.Error(), "invalid ui theme") {
+		t.Fatalf("expected invalid ui theme error, got %v", err)
+	}
+}
+
 func TestResolvedLocalDirsExpandsHomeAndDeduplicates(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	cfg := Config{
@@ -173,7 +238,9 @@ func TestResolvedLocalDirsExpandsHomeAndDeduplicates(t *testing.T) {
 			},
 		},
 	}
-	cfg.normalize()
+	if err := cfg.normalize(); err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
 
 	dirs := cfg.ResolvedLocalDirs()
 	if len(dirs) != 2 {

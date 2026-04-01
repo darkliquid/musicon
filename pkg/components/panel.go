@@ -9,6 +9,7 @@ type PanelOptions struct {
 	Width    int
 	Height   int
 	Focused  bool
+	Theme    Theme
 }
 
 // RenderPanel draws a bordered panel with a title line and bounded content.
@@ -16,6 +17,7 @@ func RenderPanel(opts PanelOptions, body string) string {
 	if opts.Width <= 0 || opts.Height <= 0 {
 		return ""
 	}
+	theme := opts.Theme.Normalize()
 
 	innerWidth := opts.Width - 2
 	innerHeight := opts.Height - 2
@@ -26,15 +28,15 @@ func RenderPanel(opts PanelOptions, body string) string {
 		innerHeight = 1
 	}
 
-	borderColor := lipgloss.Color("240")
-	titleColor := lipgloss.Color("252")
+	borderColor := lipgloss.Color(theme.Border)
+	titleColor := lipgloss.Color(theme.Text)
 	if opts.Focused {
-		borderColor = lipgloss.Color("63")
-		titleColor = lipgloss.Color("230")
+		borderColor = lipgloss.Color(theme.Primary)
+		titleColor = lipgloss.Color(theme.Primary)
 	}
 
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(titleColor)
-	subtitleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+	subtitleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextSubtle))
 	title := titleStyle.Render(opts.Title)
 	if opts.Subtitle != "" {
 		title = lipgloss.JoinHorizontal(lipgloss.Left, title, "  ", subtitleStyle.Render(opts.Subtitle))

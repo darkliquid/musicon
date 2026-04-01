@@ -33,6 +33,7 @@ type rootModel struct {
 	services          Services
 	options           Options
 	sessionStore      SessionStore
+	theme             components.Theme
 	width             int
 	height            int
 	cellWidthRatio    float64
@@ -54,13 +55,14 @@ func NewApp(services Services, options Options) *App {
 		services:       services,
 		options:        options,
 		sessionStore:   options.SessionStore,
+		theme:          options.Theme,
 		cellWidthRatio: options.CellWidthRatio,
 		mode:           options.StartMode,
 		keymap:         normalizedKeyMap(options.Keybinds),
 	}
 	model.status = readyStatus(model.keymap.Global)
-	model.queue = newQueueScreenWithKeyMap(services, model.keymap.Queue)
-	model.playback = newPlaybackScreenWithKeyMap(services, options.AlbumArt, model.keymap.Playback)
+	model.queue = newQueueScreenWithThemeAndKeyMap(services, model.theme, model.keymap.Queue)
+	model.playback = newPlaybackScreenWithThemeAndKeyMap(services, model.theme, options.AlbumArt, model.keymap.Playback)
 	model.applyRestoredSession(options.Restore)
 	model.rememberRestoredSession()
 	width, height := initialTerminalSize()
@@ -209,16 +211,17 @@ func (m *rootModel) View() tea.View {
 	check := m.layoutCheck()
 	m.viewport = check.Viewport
 	if !check.Fits() {
+		theme := m.theme.Normalize()
 		message := lipgloss.JoinVertical(
 			lipgloss.Center,
-			lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("230")).Render("terminal too small"),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Render("Musicon needs a minimum 20×20 terminal to preserve the square UI."),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render(m.sizeFailureDetail(check)),
-			lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render("Resize the terminal. Only ctrl+c is active until the minimum is met."),
+			lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(theme.OnWarning)).Render("terminal too small"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Text)).Render("Musicon needs a minimum 20×20 terminal to preserve the square UI."),
+			lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextSubtle)).Render(m.sizeFailureDetail(check)),
+			lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextSubtle)).Render("Resize the terminal. Only ctrl+c is active until the minimum is met."),
 		)
 		message = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("230")).
-			Background(lipgloss.Color("52")).
+			Foreground(lipgloss.Color(theme.OnWarning)).
+			Background(lipgloss.Color(theme.Warning)).
 			Padding(1, 2).
 			Render(message)
 		title := fmt.Sprintf("Musicon - Resize Required (%dx%d)", check.Viewport.TerminalWidth, check.Viewport.TerminalHeight)
@@ -303,10 +306,10 @@ func (m *rootModel) sizeFailureDetail(check components.SizeCheck) string {
 
 func (m *rootModel) renderHeader(width int) string {
 	left := lipgloss.JoinHorizontal(lipgloss.Left,
-		pill("tab Queue", m.mode == ModeQueue),
-		pill("tab Playback", m.mode == ModePlayback),
+		pill("tab Queue", m.mode == ModeQueue, m.theme),
+		pill("tab Playback", m.mode == ModePlayback, m.theme),
 	)
-	right := lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Align(lipgloss.Right).Render("musicon · square viewport")
+	right := lipgloss.NewStyle().Foreground(lipgloss.Color(m.theme.Normalize().TextSubtle)).Align(lipgloss.Right).Render("musicon · square viewport")
 	line := lipgloss.JoinHorizontal(lipgloss.Left,
 		lipgloss.NewStyle().Width(max(1, width-lipgloss.Width(right)-1)).Render(left),
 		" ",
@@ -318,7 +321,7 @@ func (m *rootModel) renderHeader(width int) string {
 	}
 	return lipgloss.JoinVertical(lipgloss.Left,
 		line,
-		lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Width(width).Render(truncate(modeSummary, width)),
+		lipgloss.NewStyle().Foreground(lipgloss.Color(m.theme.Normalize().TextMuted)).Width(width).Render(truncate(modeSummary, width)),
 	)
 }
 
@@ -329,14 +332,15 @@ func (m *rootModel) renderFooter(width int) string {
 		statusWidth = width
 		hint = ""
 	}
-	line := lipgloss.NewStyle().Foreground(lipgloss.Color("252")).Width(statusWidth).Render(truncate(m.status, statusWidth))
+	theme := m.theme.Normalize()
+	line := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.Text)).Width(statusWidth).Render(truncate(m.status, statusWidth))
 	if hint == "" {
 		return line
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left,
 		line,
 		" ",
-		lipgloss.NewStyle().Foreground(lipgloss.Color("244")).Render(hint),
+		lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextSubtle)).Render(hint),
 	)
 }
 
@@ -394,9 +398,7 @@ func normalizedOptions(options Options) Options {
 	if options.CellWidthRatio <= 0 {
 		options.CellWidthRatio = terminalCellWidthRatio()
 	}
-	if options.Theme == "" {
-		options.Theme = "default"
-	}
+	options.Theme = options.Theme.Normalize()
 	switch options.StartMode {
 	case ModePlayback:
 	default:

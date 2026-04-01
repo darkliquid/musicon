@@ -114,7 +114,7 @@ The repository root also includes a complete example config in `musicon.toml`.
 The config surface includes:
 
 - audio backend selection
-- UI start mode and theme
+- UI start mode, semantic theme palette, and optional external theme file
 - album-art renderer / fill mode
 - local-library roots
 - Radio Browser source options such as API base URL and search result limits
@@ -129,9 +129,22 @@ A complete example with every supported option set to its normal default value:
 backend = "auto"
 
 [ui]
-theme = "default"
 start_mode = "queue"
 cell_width_ratio = 0.5
+
+[ui.theme]
+file = ""
+background = "235"
+surface = "236"
+surface_variant = "238"
+primary = "63"
+on_primary = "230"
+text = "252"
+text_muted = "246"
+text_subtle = "244"
+border = "240"
+warning = "52"
+on_warning = "230"
 
 [ui.album_art]
 fill_mode = "fill"
@@ -194,6 +207,11 @@ enabled = true
 max_results = 20
 base_url = "https://all.api.radio-browser.info"
 ```
+
+`[ui.theme]` replaces the older `theme = "default"` string. You can either set
+all semantic roles inline or point `file` at a TOML palette file and then
+override only the roles you want in the main config. Relative `file` paths are
+resolved relative to the config file that declares them.
 
 On Linux, `~/Music` and `~/.cache/musicon/youtube` correspond to the normal
 per-user default library and cache locations.

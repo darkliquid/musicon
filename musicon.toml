@@ -2,9 +2,22 @@
 backend = "auto"
 
 [ui]
-theme = "default"
 start_mode = "queue"
 cell_width_ratio = 0.5
+
+[ui.theme]
+file = ""
+background = "235"
+surface = "236"
+surface_variant = "238"
+primary = "63"
+on_primary = "230"
+text = "252"
+text_muted = "246"
+text_subtle = "244"
+border = "240"
+warning = "52"
+on_warning = "230"
 
 [ui.album_art]
 fill_mode = "fill"

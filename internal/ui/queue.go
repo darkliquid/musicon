@@ -44,6 +44,7 @@ const (
 
 type queueScreen struct {
 	services              Services
+	theme                 components.Theme
 	width                 int
 	height                int
 	keymap                QueueKeyMap
@@ -102,16 +103,22 @@ func newQueueScreen(services Services) *queueScreen {
 }
 
 func newQueueScreenWithKeyMap(services Services, keymap QueueKeyMap) *queueScreen {
+	return newQueueScreenWithThemeAndKeyMap(services, components.DefaultTheme(), keymap)
+}
+
+func newQueueScreenWithThemeAndKeyMap(services Services, theme components.Theme, keymap QueueKeyMap) *queueScreen {
 	searchInput := components.NewInput("type to search the active source")
 	searchInput.SetFocused(true)
 
 	browser := components.NewList()
 	browser.SetEmptyState("Queue is empty", "Queued items stay at the top. Type to append matching search results below them.")
 	browser.SetKeyMap(keymap.Browser)
+	browser.SetTheme(theme)
 	browser.SetFocused(true)
 
 	screen := &queueScreen{
 		services:              services,
+		theme:                 theme.Normalize(),
 		keymap:                keymap,
 		searchInput:           searchInput,
 		browser:               browser,
@@ -354,9 +361,9 @@ func (q *queueScreen) View() string {
 	q.resizeBrowser()
 
 	body := joinLines(
-		renderSourceChips(q.sources, q.sourceIndex, q.focus == focusSources),
-		renderSearchModeChips(q.visibleSearchModes(), q.activeSearchMode(), q.keymap, q.focus == focusModes),
-		renderArtistFilterChip(q.artistFilter),
+		renderSourceChips(q.sources, q.sourceIndex, q.focus == focusSources, q.theme),
+		renderSearchModeChips(q.visibleSearchModes(), q.activeSearchMode(), q.keymap, q.focus == focusModes, q.theme),
+		renderArtistFilterChip(q.artistFilter, q.theme),
 		q.searchInput.View(),
 		q.browser.View(),
 	)
@@ -383,7 +390,7 @@ func (q *queueScreen) HelpView() string {
 		helpLine(q.keymap.ActivateSelected, "queue, unqueue, filter by artist, or add a whole collection"),
 		helpLinePair(q.keymap.RemoveSelected, q.keymap.ClearQueue, "remove selected queued item or clear the queue"),
 	}
-	return components.RenderPanel(components.PanelOptions{Title: "Queue help", Subtitle: "arrow keys move focus; search stays ready without a required shortcut", Width: width, Height: height, Focused: true}, strings.Join(lines, "\n"))
+	return components.RenderPanel(components.PanelOptions{Title: "Queue help", Subtitle: "arrow keys move focus; search stays ready without a required shortcut", Width: width, Height: height, Focused: true, Theme: q.theme}, strings.Join(lines, "\n"))
 }
 
 func (q *queueScreen) syncFocus() {
@@ -936,10 +943,10 @@ func (q *queueScreen) selectedQueueEntry(row queueBrowserRow) (QueueEntry, bool)
 	}
 }
 
-func renderSourceChips(sources []SourceDescriptor, active int, focused bool) string {
+func renderSourceChips(sources []SourceDescriptor, active int, focused bool, theme components.Theme) string {
 	chips := make([]string, 0, len(sources))
 	for idx, source := range sources {
-		chips = append(chips, pill(source.Name, idx == active))
+		chips = append(chips, pill(source.Name, idx == active, theme))
 	}
 	indicator := "  "
 	if focused {
@@ -948,13 +955,13 @@ func renderSourceChips(sources []SourceDescriptor, active int, focused bool) str
 	return indicator + lipgloss.JoinHorizontal(lipgloss.Left, chips...)
 }
 
-func renderSearchModeChips(modes []SearchModeDescriptor, active SearchMode, keymap QueueKeyMap, focused bool) string {
+func renderSearchModeChips(modes []SearchModeDescriptor, active SearchMode, keymap QueueKeyMap, focused bool, theme components.Theme) string {
 	if len(modes) == 0 {
 		return ""
 	}
 	chips := make([]string, 0, len(modes))
 	for index, mode := range modes {
-		chips = append(chips, pill(searchModeChipLabel(index, mode.Name, keymap), mode.ID == active))
+		chips = append(chips, pill(searchModeChipLabel(index, mode.Name, keymap), mode.ID == active, theme))
 	}
 	indicator := "  "
 	if focused {
@@ -963,11 +970,11 @@ func renderSearchModeChips(modes []SearchModeDescriptor, active SearchMode, keym
 	return indicator + lipgloss.JoinHorizontal(lipgloss.Left, chips...)
 }
 
-func renderArtistFilterChip(filter SearchArtistFilter) string {
+func renderArtistFilterChip(filter SearchArtistFilter, theme components.Theme) string {
 	if strings.TrimSpace(filter.Name) == "" {
 		return ""
 	}
-	return pill("artist: "+filter.Name, true)
+	return pill("artist: "+filter.Name, true, theme)
 }
 
 func searchModeChipLabel(index int, name string, keymap QueueKeyMap) string {

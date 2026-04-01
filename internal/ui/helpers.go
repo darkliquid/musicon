@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/darkliquid/musicon/pkg/components"
 )
 
 func max(a, b int) int {
@@ -59,10 +60,11 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%02d:%02d", minutes, seconds)
 }
 
-func pill(label string, active bool) string {
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Padding(0, 1)
+func pill(label string, active bool, theme components.Theme) string {
+	theme = theme.Normalize()
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(theme.TextMuted)).Padding(0, 1)
 	if active {
-		style = style.Foreground(lipgloss.Color("230")).Background(lipgloss.Color("63")).Bold(true)
+		style = style.Foreground(lipgloss.Color(theme.OnPrimary)).Background(lipgloss.Color(theme.Primary)).Bold(true)
 	}
 	return style.Render(label)
 }
