@@ -3,7 +3,7 @@ package ui
 import (
 	"strings"
 
-	bubblekey "github.com/charmbracelet/bubbles/key"
+	"charm.land/bubbles/v2/key"
 	"github.com/darkliquid/musicon/pkg/components"
 )
 
@@ -69,43 +69,43 @@ type KeyMap struct {
 
 // GlobalKeyMap stores normalized global bindings.
 type GlobalKeyMap struct {
-	Quit       bubblekey.Binding
-	ToggleMode bubblekey.Binding
-	ToggleHelp bubblekey.Binding
+	Quit       key.Binding
+	ToggleMode key.Binding
+	ToggleHelp key.Binding
 }
 
 // QueueKeyMap stores normalized queue-mode bindings.
 type QueueKeyMap struct {
-	ToggleSearchFocus bubblekey.Binding
-	SourcePrev        bubblekey.Binding
-	SourceNext        bubblekey.Binding
-	CycleSearchMode   bubblekey.Binding
-	ModeSongs         bubblekey.Binding
-	ModeArtists       bubblekey.Binding
-	ModeAlbums        bubblekey.Binding
-	ModePlaylists     bubblekey.Binding
-	ExpandSelected    bubblekey.Binding
-	ActivateSelected  bubblekey.Binding
-	MoveSelectedUp    bubblekey.Binding
-	MoveSelectedDown  bubblekey.Binding
-	ClearQueue        bubblekey.Binding
-	RemoveSelected    bubblekey.Binding
+	ToggleSearchFocus key.Binding
+	SourcePrev        key.Binding
+	SourceNext        key.Binding
+	CycleSearchMode   key.Binding
+	ModeSongs         key.Binding
+	ModeArtists       key.Binding
+	ModeAlbums        key.Binding
+	ModePlaylists     key.Binding
+	ExpandSelected    key.Binding
+	ActivateSelected  key.Binding
+	MoveSelectedUp    key.Binding
+	MoveSelectedDown  key.Binding
+	ClearQueue        key.Binding
+	RemoveSelected    key.Binding
 	Browser           components.ListKeyMap
 }
 
 // PlaybackKeyMap stores normalized playback-mode bindings.
 type PlaybackKeyMap struct {
-	CyclePane     bubblekey.Binding
-	ToggleInfo    bubblekey.Binding
-	ToggleRepeat  bubblekey.Binding
-	ToggleStream  bubblekey.Binding
-	TogglePause   bubblekey.Binding
-	PreviousTrack bubblekey.Binding
-	NextTrack     bubblekey.Binding
-	SeekBackward  bubblekey.Binding
-	SeekForward   bubblekey.Binding
-	VolumeDown    bubblekey.Binding
-	VolumeUp      bubblekey.Binding
+	CyclePane     key.Binding
+	ToggleInfo    key.Binding
+	ToggleRepeat  key.Binding
+	ToggleStream  key.Binding
+	TogglePause   key.Binding
+	PreviousTrack key.Binding
+	NextTrack     key.Binding
+	SeekBackward  key.Binding
+	SeekForward   key.Binding
+	VolumeDown    key.Binding
+	VolumeUp      key.Binding
 }
 
 func defaultKeybindOptions() KeybindOptions {
@@ -208,14 +208,14 @@ func normalizedKeyMap(options KeybindOptions) KeyMap {
 	}
 }
 
-func newBinding(keys, fallback []string, desc string) bubblekey.Binding {
+func newBinding(keys, fallback []string, desc string) key.Binding {
 	keys = normalizeBindingKeys(keys)
 	if len(keys) == 0 {
 		keys = normalizeBindingKeys(fallback)
 	}
-	return bubblekey.NewBinding(
-		bubblekey.WithKeys(keys...),
-		bubblekey.WithHelp(strings.Join(keys, " / "), desc),
+	return key.NewBinding(
+		key.WithKeys(keys...),
+		key.WithHelp(strings.Join(keys, " / "), desc),
 	)
 }
 
@@ -236,7 +236,7 @@ func normalizeBindingKeys(keys []string) []string {
 	return normalized
 }
 
-func bindingLabel(binding bubblekey.Binding) string {
+func bindingLabel(binding key.Binding) string {
 	help := binding.Help()
 	if help.Key != "" {
 		return help.Key
@@ -244,11 +244,11 @@ func bindingLabel(binding bubblekey.Binding) string {
 	return strings.Join(binding.Keys(), " / ")
 }
 
-func helpLine(binding bubblekey.Binding, desc string) string {
+func helpLine(binding key.Binding, desc string) string {
 	return padKeyLabel(bindingLabel(binding), 18) + desc
 }
 
-func helpLinePair(left, right bubblekey.Binding, desc string) string {
+func helpLinePair(left, right key.Binding, desc string) string {
 	return padKeyLabel(bindingLabel(left)+" / "+bindingLabel(right), 18) + desc
 }
 

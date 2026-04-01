@@ -5,7 +5,7 @@ The node currently exposes generic rendering primitives and widgets including:
 - `ClampSquare`, `ClampSquareWithCellWidthRatio`, and `SquareViewport` for square-frame layout calculations
 - `SizeRequirements` and `SizeCheck` for explicit terminal-size validation
 - `Input` with `Update`, `View`, `SetSize`, `SetValue`, and `SetFocused`, backed by the Bubbles `textinput` component for cursor movement, word deletion, and standard editing shortcuts
-- `List` with `SetItems`, `Update`, `View`, `SetSize`, `SetFocused`, and `SetSelectedIndex`, plus optional leading markers on items
+- `List` with `SetItems`, `Update`, `View`, `SetSize`, `SetFocused`, and `SetSelectedIndex`, backed by the Bubbles `list` component for pagination, selection, and keyboard navigation, plus optional leading markers on items
 - `ImageSource` plus `TerminalImage` with `SetSource`, `SetSize`, `View`, `Ready`, and `Error`, plus construction with explicit render settings when callers want config-driven behavior
 - terminal-image renderer helpers that can canonicalize configured renderer names, compute the effective env-aware renderer selection, list the currently usable renderer backends for the active terminal, and expose the shared fallback cell-width ratio used when config does not pin one
 - `RenderPanel`, `RenderProgress`, and `RenderEmptyState` helpers

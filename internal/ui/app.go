@@ -10,7 +10,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	bubblekey "github.com/charmbracelet/bubbles/key"
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 	"golang.org/x/term"
@@ -139,7 +139,7 @@ HandleMsg:
 		m.resizeScreens()
 	case tea.KeyPressMsg:
 		switch {
-		case bubblekey.Matches(typed, m.keymap.Global.Quit):
+		case key.Matches(typed, m.keymap.Global.Quit):
 			cmdBatch = append(cmdBatch, tea.Quit)
 			break HandleMsg
 		}
@@ -149,10 +149,10 @@ HandleMsg:
 		}
 
 		switch {
-		case bubblekey.Matches(typed, m.keymap.Global.ToggleMode):
+		case key.Matches(typed, m.keymap.Global.ToggleMode):
 			m.toggleMode()
 			return m, nil
-		case bubblekey.Matches(typed, m.keymap.Global.ToggleHelp):
+		case key.Matches(typed, m.keymap.Global.ToggleHelp):
 			m.showHelp = !m.showHelp
 			if m.showHelp {
 				m.status = fmt.Sprintf("%s help shown.", m.mode.String())

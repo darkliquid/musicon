@@ -9,7 +9,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	bubblekey "github.com/charmbracelet/bubbles/key"
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 )
@@ -207,7 +207,7 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 
 	keypress, ok := msg.(tea.KeyPressMsg)
 	if ok {
-		if bubblekey.Matches(keypress, q.keymap.ToggleSearchFocus) {
+		if key.Matches(keypress, q.keymap.ToggleSearchFocus) {
 			q.searchFocused = !q.searchFocused
 			q.syncFocus()
 			if q.searchFocused {
@@ -233,41 +233,41 @@ func (q *queueScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 
 		if !q.searchFocused {
 			switch {
-			case bubblekey.Matches(keypress, q.keymap.SourcePrev):
+			case key.Matches(keypress, q.keymap.SourcePrev):
 				q.sourceIndex--
 				if q.sourceIndex < 0 {
 					q.sourceIndex = len(q.sources) - 1
 				}
 				q.resetSourceScopedState()
 				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
-			case bubblekey.Matches(keypress, q.keymap.SourceNext):
+			case key.Matches(keypress, q.keymap.SourceNext):
 				q.sourceIndex = (q.sourceIndex + 1) % len(q.sources)
 				q.resetSourceScopedState()
 				return fmt.Sprintf("Active source: %s", q.activeSource().Name), q.refreshResultsCmd()
-			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModeSongs):
+			case q.hasFocusedSearchModes() && key.Matches(keypress, q.keymap.ModeSongs):
 				return q.selectVisibleSearchMode(0), q.refreshResultsCmd()
-			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModeArtists):
+			case q.hasFocusedSearchModes() && key.Matches(keypress, q.keymap.ModeArtists):
 				return q.selectVisibleSearchMode(1), q.refreshResultsCmd()
-			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModeAlbums):
+			case q.hasFocusedSearchModes() && key.Matches(keypress, q.keymap.ModeAlbums):
 				return q.selectVisibleSearchMode(2), q.refreshResultsCmd()
-			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.ModePlaylists):
+			case q.hasFocusedSearchModes() && key.Matches(keypress, q.keymap.ModePlaylists):
 				return q.selectVisibleSearchMode(3), q.refreshResultsCmd()
-			case q.hasFocusedSearchModes() && bubblekey.Matches(keypress, q.keymap.CycleSearchMode):
+			case q.hasFocusedSearchModes() && key.Matches(keypress, q.keymap.CycleSearchMode):
 				return q.cycleSearchMode(), q.refreshResultsCmd()
-			case bubblekey.Matches(keypress, q.keymap.MoveSelectedUp):
+			case key.Matches(keypress, q.keymap.MoveSelectedUp):
 				return q.moveSelectedQueueEntry(-1), nil
-			case bubblekey.Matches(keypress, q.keymap.MoveSelectedDown):
+			case key.Matches(keypress, q.keymap.MoveSelectedDown):
 				return q.moveSelectedQueueEntry(1), nil
-			case bubblekey.Matches(keypress, q.keymap.ClearQueue):
+			case key.Matches(keypress, q.keymap.ClearQueue):
 				return q.clearQueue(), nil
-			case bubblekey.Matches(keypress, q.keymap.RemoveSelected):
+			case key.Matches(keypress, q.keymap.RemoveSelected):
 				return q.removeSelectedQueueItem(), nil
-			case bubblekey.Matches(keypress, q.keymap.ExpandSelected):
+			case key.Matches(keypress, q.keymap.ExpandSelected):
 				return q.expandSelectedCollection()
 			}
 		}
 
-		if bubblekey.Matches(keypress, q.keymap.ActivateSelected) {
+		if key.Matches(keypress, q.keymap.ActivateSelected) {
 			return q.activateSelectedRow()
 		}
 	}

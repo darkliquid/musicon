@@ -8,7 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	bubblekey "github.com/charmbracelet/bubbles/key"
+	"charm.land/bubbles/v2/key"
 	"charm.land/lipgloss/v2"
 	"github.com/darkliquid/musicon/pkg/components"
 	"github.com/darkliquid/musicon/pkg/lyrics"
@@ -157,16 +157,16 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	}
 
 	switch {
-	case bubblekey.Matches(keypress, p.keymap.CyclePane):
+	case key.Matches(keypress, p.keymap.CyclePane):
 		p.pane = (p.pane + 1) % 4
 		return fmt.Sprintf("Playback pane: %s", p.pane.String()), nil
-	case bubblekey.Matches(keypress, p.keymap.ToggleInfo):
+	case key.Matches(keypress, p.keymap.ToggleInfo):
 		p.showInfo = !p.showInfo
 		if p.showInfo {
 			return "Track information shown.", nil
 		}
 		return "Track information hidden.", nil
-	case bubblekey.Matches(keypress, p.keymap.ToggleRepeat):
+	case key.Matches(keypress, p.keymap.ToggleRepeat):
 		if p.services.Playback != nil {
 			next := !p.snapshot.Repeat
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
@@ -178,7 +178,7 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			p.snapshot.Repeat = !p.snapshot.Repeat
 		}
 		return fmt.Sprintf("Repeat %s.", onOff(p.snapshot.Repeat)), nil
-	case bubblekey.Matches(keypress, p.keymap.ToggleStream):
+	case key.Matches(keypress, p.keymap.ToggleStream):
 		if p.services.Playback != nil {
 			next := !p.snapshot.Stream
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
@@ -190,7 +190,7 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			p.snapshot.Stream = !p.snapshot.Stream
 		}
 		return fmt.Sprintf("Stream continuation %s.", onOff(p.snapshot.Stream)), nil
-	case bubblekey.Matches(keypress, p.keymap.TogglePause):
+	case key.Matches(keypress, p.keymap.TogglePause):
 		if p.services.Playback != nil {
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
 				return service.TogglePause()
@@ -207,7 +207,7 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			return "Playback paused.", nil
 		}
 		return "Playback resumed.", nil
-	case bubblekey.Matches(keypress, p.keymap.PreviousTrack):
+	case key.Matches(keypress, p.keymap.PreviousTrack):
 		if p.services.Playback != nil {
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
 				return service.Previous()
@@ -216,7 +216,7 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			})
 		}
 		return "Previous track requires a playback backend.", nil
-	case bubblekey.Matches(keypress, p.keymap.NextTrack):
+	case key.Matches(keypress, p.keymap.NextTrack):
 		if p.services.Playback != nil {
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
 				return service.Next()
@@ -225,11 +225,11 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			})
 		}
 		return "Next track requires a playback backend.", nil
-	case bubblekey.Matches(keypress, p.keymap.SeekBackward):
+	case key.Matches(keypress, p.keymap.SeekBackward):
 		return p.accumulateSeek(-playbackSeekStep), nil
-	case bubblekey.Matches(keypress, p.keymap.SeekForward):
+	case key.Matches(keypress, p.keymap.SeekForward):
 		return p.accumulateSeek(playbackSeekStep), nil
-	case bubblekey.Matches(keypress, p.keymap.VolumeDown):
+	case key.Matches(keypress, p.keymap.VolumeDown):
 		if p.services.Playback != nil {
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
 				return service.AdjustVolume(-5)
@@ -238,7 +238,7 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 			})
 		}
 		return p.adjustVolume(-5), nil
-	case bubblekey.Matches(keypress, p.keymap.VolumeUp):
+	case key.Matches(keypress, p.keymap.VolumeUp):
 		if p.services.Playback != nil {
 			return "", p.runPlaybackAction(func(service PlaybackService) error {
 				return service.AdjustVolume(5)
@@ -539,12 +539,12 @@ func artworkCacheKey(track *TrackInfo) string {
 var artworkSpinnerFrames = []string{"-", "\\", "|", "/"}
 
 var (
-	lyricsScrollUpKey   = bubblekey.NewBinding(bubblekey.WithKeys("up"), bubblekey.WithHelp("up", "scroll up"))
-	lyricsScrollDownKey = bubblekey.NewBinding(bubblekey.WithKeys("down"), bubblekey.WithHelp("down", "scroll down"))
-	lyricsPageUpKey     = bubblekey.NewBinding(bubblekey.WithKeys("pgup"), bubblekey.WithHelp("pgup", "page up"))
-	lyricsPageDownKey   = bubblekey.NewBinding(bubblekey.WithKeys("pgdown"), bubblekey.WithHelp("pgdn", "page down"))
-	lyricsHomeKey       = bubblekey.NewBinding(bubblekey.WithKeys("home"), bubblekey.WithHelp("home", "jump to top"))
-	lyricsEndKey        = bubblekey.NewBinding(bubblekey.WithKeys("end"), bubblekey.WithHelp("end", "jump to bottom"))
+	lyricsScrollUpKey   = key.NewBinding(key.WithKeys("up"), key.WithHelp("up", "scroll up"))
+	lyricsScrollDownKey = key.NewBinding(key.WithKeys("down"), key.WithHelp("down", "scroll down"))
+	lyricsPageUpKey     = key.NewBinding(key.WithKeys("pgup"), key.WithHelp("pgup", "page up"))
+	lyricsPageDownKey   = key.NewBinding(key.WithKeys("pgdown"), key.WithHelp("pgdn", "page down"))
+	lyricsHomeKey       = key.NewBinding(key.WithKeys("home"), key.WithHelp("home", "jump to top"))
+	lyricsEndKey        = key.NewBinding(key.WithKeys("end"), key.WithHelp("end", "jump to bottom"))
 )
 
 func (p *playbackScreen) artworkActivityOverlay(width, height int) string {
@@ -701,12 +701,12 @@ func (p *playbackScreen) consumeLyricsLookup() {
 func (p *playbackScreen) handleLyricsScrollKey(keypress tea.KeyPressMsg) (string, bool) {
 	if p.lyricsHasTimedSync() {
 		switch {
-		case bubblekey.Matches(keypress, lyricsScrollUpKey),
-			bubblekey.Matches(keypress, lyricsScrollDownKey),
-			bubblekey.Matches(keypress, lyricsPageUpKey),
-			bubblekey.Matches(keypress, lyricsPageDownKey),
-			bubblekey.Matches(keypress, lyricsHomeKey),
-			bubblekey.Matches(keypress, lyricsEndKey):
+		case key.Matches(keypress, lyricsScrollUpKey),
+			key.Matches(keypress, lyricsScrollDownKey),
+			key.Matches(keypress, lyricsPageUpKey),
+			key.Matches(keypress, lyricsPageDownKey),
+			key.Matches(keypress, lyricsHomeKey),
+			key.Matches(keypress, lyricsEndKey):
 			return "Synced lyrics follow playback automatically.", true
 		}
 	}
@@ -723,17 +723,17 @@ func (p *playbackScreen) handleLyricsScrollKey(keypress tea.KeyPressMsg) (string
 
 	next := p.lyricsScroll
 	switch {
-	case bubblekey.Matches(keypress, lyricsScrollUpKey):
+	case key.Matches(keypress, lyricsScrollUpKey):
 		next--
-	case bubblekey.Matches(keypress, lyricsScrollDownKey):
+	case key.Matches(keypress, lyricsScrollDownKey):
 		next++
-	case bubblekey.Matches(keypress, lyricsPageUpKey):
+	case key.Matches(keypress, lyricsPageUpKey):
 		next -= page
-	case bubblekey.Matches(keypress, lyricsPageDownKey):
+	case key.Matches(keypress, lyricsPageDownKey):
 		next += page
-	case bubblekey.Matches(keypress, lyricsHomeKey):
+	case key.Matches(keypress, lyricsHomeKey):
 		next = 0
-	case bubblekey.Matches(keypress, lyricsEndKey):
+	case key.Matches(keypress, lyricsEndKey):
 		next = p.maxLyricsScroll()
 	default:
 		return "", false

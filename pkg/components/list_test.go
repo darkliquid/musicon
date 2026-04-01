@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	bubblekey "github.com/charmbracelet/bubbles/key"
+	"charm.land/bubbles/v2/key"
 )
 
 func TestListViewRendersLeadingMarker(t *testing.T) {
@@ -23,12 +23,12 @@ func TestListUpdateUsesConfigurableKeyMap(t *testing.T) {
 	list := NewList()
 	list.SetItems([]ListItem{{Title: "First"}, {Title: "Second"}})
 	list.SetKeyMap(ListKeyMap{
-		Up:       bubblekey.NewBinding(bubblekey.WithKeys("p"), bubblekey.WithHelp("p", "move up")),
-		Down:     bubblekey.NewBinding(bubblekey.WithKeys("n"), bubblekey.WithHelp("n", "move down")),
-		Home:     bubblekey.NewBinding(bubblekey.WithKeys("h"), bubblekey.WithHelp("h", "jump to top")),
-		End:      bubblekey.NewBinding(bubblekey.WithKeys("e"), bubblekey.WithHelp("e", "jump to bottom")),
-		PageUp:   bubblekey.NewBinding(bubblekey.WithKeys("u"), bubblekey.WithHelp("u", "page up")),
-		PageDown: bubblekey.NewBinding(bubblekey.WithKeys("d"), bubblekey.WithHelp("d", "page down")),
+		Up:       key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "move up")),
+		Down:     key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "move down")),
+		Home:     key.NewBinding(key.WithKeys("h"), key.WithHelp("h", "jump to top")),
+		End:      key.NewBinding(key.WithKeys("e"), key.WithHelp("e", "jump to bottom")),
+		PageUp:   key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "page up")),
+		PageDown: key.NewBinding(key.WithKeys("d"), key.WithHelp("d", "page down")),
 	})
 
 	if !list.Update(tea.KeyPressMsg(tea.Key{Text: "n"})) {
