@@ -14,6 +14,10 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// This file contains Musicon's reusable list widget wrapper around bubbles/list.
+// The wrapper exists so application code can reason in terms of simple rows and
+// typed keymaps while this package handles styling, marquee behavior, and focus.
+
 // ListKeyMap defines the navigation bindings used by List.
 type ListKeyMap struct {
 	Up       key.Binding

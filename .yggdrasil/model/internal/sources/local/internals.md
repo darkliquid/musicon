@@ -12,7 +12,7 @@ Its expected shape is:
 - expose generic queue search kinds (`All`, `Tracks`, `Streams`, `Playlists`) so the shared queue UI can render one consistent search-kind row even though local results are currently playable tracks only
 - resolve queued local files to the matching `beep` decoder based on file extension
 
-The package source now also carries package-level and exported-symbol documentation so discovery, search, and resolve behavior remain readable from Go docs without re-deriving how the library bridges UI and playback contracts.
+The package source now also carries package-level and exported-symbol documentation so discovery, search, and resolve behavior remain readable from Go docs without re-deriving how the library bridges UI and playback contracts. The contributor-doc sweep also added a file-level overview explaining why the local source keeps indexing and playback resolution together in one node.
 
 ## Decisions
 

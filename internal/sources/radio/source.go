@@ -22,6 +22,10 @@ import (
 	"github.com/gopxl/beep/wav"
 )
 
+// This file owns the high-level Radio Browser source surface: search, result
+// shaping, and the first step of turning a chosen station into a playable live
+// stream.
+
 const (
 	sourceID              = "radio"
 	sourceName            = "Radio"
@@ -46,6 +50,10 @@ type Options struct {
 }
 
 // Source searches Radio Browser for live stations and resolves them into playable streams.
+//
+// It deliberately keeps codec-specific decoding in helper paths so the top-level
+// source object can stay focused on source semantics rather than transport
+// details.
 type Source struct {
 	enabled    bool
 	maxResults int

@@ -6,6 +6,10 @@ import (
 	"github.com/darkliquid/musicon/pkg/lyrics"
 )
 
+// This file adapts the reusable lyrics package to the UI's simpler lyrics
+// contract, translating "not found" into an empty-state result instead of an
+// application-level failure.
+
 // LyricsResolver matches reusable lyrics resolvers such as pkg/lyrics.Chain.
 type LyricsResolver interface {
 	Resolve(context.Context, lyrics.Request) (lyrics.Document, error)

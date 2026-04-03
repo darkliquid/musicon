@@ -27,7 +27,7 @@ The expected shape is:
 - the mirrored visualizer still maps color symmetrically from the playback centerline outward, but its shape is now represented through the braille raster instead of separate upper/lower block-orientation rules
 - tests that exercise real speaker initialization should pin the `null` backend so CI can verify resume/seek behavior without depending on ALSA or another host audio device being available
 
-The package source now also carries package-level and exported-symbol documentation so the engine, adapters, and speaker helpers can be understood from Go docs without reopening every runtime implementation detail.
+The package source now also carries package-level and exported-symbol documentation so the engine, adapters, and speaker helpers can be understood from Go docs without reopening every runtime implementation detail. The contributor-doc sweep also added file-level overview comments to the engine, speaker, and visualization files so newcomers can orient themselves before diving into the runtime internals.
 
 This node should own concurrency, lifecycle, cleanup concerns, and restorable playback context so `internal/ui` stays presentation-focused.
 

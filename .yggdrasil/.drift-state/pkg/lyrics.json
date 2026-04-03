@@ -1,39 +1,39 @@
 {
-  "hash": "31f630d8fb5685a30e63bd4ea2027c9d0b830013148ef5d12507f31f9d4a8eb4",
+  "hash": "4155317e00dc2398808cf442bd317320647d90592adcaa5748834b0fb5d070cc",
   "files": {
-    ".yggdrasil/model/pkg/yg-node.yaml": "dbc3dc2dddb151cd20a5b6f89b16ff3e556f0882ac9eae39b71c9aabc3a51e87",
-    ".yggdrasil/model/pkg/responsibility.md": "027978e70222d23f608075d8ab639b9734a31cf3e2383dd9fef77d03392cd91f",
     ".yggdrasil/model/pkg/lyrics/yg-node.yaml": "faffff7367bf8b59895efc8a6a3cb1106de061d59faccd7bd386e97a17f01a37",
     ".yggdrasil/model/pkg/lyrics/interface.md": "e0110a99cbbf81eb5833de4a2395e04eb43f203ec8fc25f73edc905311729092",
-    ".yggdrasil/model/pkg/lyrics/internals.md": "0345727be8a68ffed7d9fbbf1c10c6b420a4b03093300cc880378ced3fe3507f",
     ".yggdrasil/model/pkg/lyrics/responsibility.md": "64e6fdb1dacaaa1dba6188c25545b46840906be1b9777dabe96082568e6e627d",
+    ".yggdrasil/model/pkg/yg-node.yaml": "dbc3dc2dddb151cd20a5b6f89b16ff3e556f0882ac9eae39b71c9aabc3a51e87",
+    ".yggdrasil/model/pkg/responsibility.md": "027978e70222d23f608075d8ab639b9734a31cf3e2383dd9fef77d03392cd91f",
     "pkg/lyrics/cache.go": "47f8a125dc0cf14bdc212af03bed965d6660bbeb03c21b674603eff7db956c9d",
-    "pkg/lyrics/doc.go": "4724f9958a275aadd25a1b31b5d3ca96729d5999fb0ff0175833211ab74fe939",
+    "pkg/lyrics/doc.go": "008905d6400569abc8729afabd8ef470bdcbede1d269498edf3877932be76820",
     "pkg/lyrics/local.go": "d0c2e09e3787f10b9c367d8b21741d6600b3c3de9a6ec48b18b0e34ce2ecbd9c",
     "pkg/lyrics/local_test.go": "779260454ccbe9bd437ec6dacf5cefc2c6899253e56987a179222d87a9a03c20",
     "pkg/lyrics/lrc.go": "f3be9cf04456c8a85477881d24d1f54160b4319897eb1c7e02a73271ed02be1e",
     "pkg/lyrics/lrc_test.go": "0bfb774cf3d114f2a28afc9f1efa432e1d1e5a3d0984bc65000cf18a14948532",
-    "pkg/lyrics/lrclib.go": "9aa1bb3a445dfe9f886e69c612e9cd868bd7e0215f92757953311653c82accd7",
+    "pkg/lyrics/lrclib.go": "208fb9fab604646eb2c9fd5f29b594d8dd1f5e9ddd545b95871f9980eb18efbf",
     "pkg/lyrics/lrclib_test.go": "91df18a48410024852691fe77ea050d037044984b868780b131d2729bea883c4",
-    "pkg/lyrics/lyrics.go": "68c46d4917591a8083ff8ae1f4cbf124718edd4e0347bce2a6a92dcaaaff1b36",
-    "pkg/lyrics/lyrics_test.go": "6ec9d702b0e6c7cf8b5f184b6c03d37ccb538ab583569f5f8e19c800dc177011"
+    "pkg/lyrics/lyrics.go": "0258ba81eb763e29dd1ac4aff09fe100e2ecb214b91d1302516a510fcc5f13a7",
+    "pkg/lyrics/lyrics_test.go": "6ec9d702b0e6c7cf8b5f184b6c03d37ccb538ab583569f5f8e19c800dc177011",
+    ".yggdrasil/model/pkg/lyrics/internals.md": "40351640eb2730c1a2622543bca0868567b411efd1f28256421efb1ba7219f5f"
   },
   "mtimes": {
     ".yggdrasil/model/pkg/lyrics/yg-node.yaml": 1774949597908.937,
-    ".yggdrasil/model/pkg/lyrics/interface.md": 1774962704743.4756,
-    ".yggdrasil/model/pkg/lyrics/internals.md": 1774962704756.4756,
+    ".yggdrasil/model/pkg/lyrics/interface.md": 1774963529101.7693,
+    ".yggdrasil/model/pkg/lyrics/internals.md": 1775243379488.8264,
     ".yggdrasil/model/pkg/lyrics/responsibility.md": 1774949597908.937,
     ".yggdrasil/model/pkg/yg-node.yaml": 1774839904936.892,
     ".yggdrasil/model/pkg/responsibility.md": 1774845840022.5544,
     "pkg/lyrics/cache.go": 1774949597908.937,
-    "pkg/lyrics/doc.go": 1774949597909.524,
+    "pkg/lyrics/doc.go": 1775243201223.665,
     "pkg/lyrics/local.go": 1774949597909.524,
     "pkg/lyrics/local_test.go": 1774949597909.524,
     "pkg/lyrics/lrc.go": 1774949597909.524,
     "pkg/lyrics/lrc_test.go": 1774949597909.524,
-    "pkg/lyrics/lrclib.go": 1774949597909.524,
+    "pkg/lyrics/lrclib.go": 1775243201234.158,
     "pkg/lyrics/lrclib_test.go": 1774949597909.524,
-    "pkg/lyrics/lyrics.go": 1774962689276.464,
-    "pkg/lyrics/lyrics_test.go": 1774962745505.6182
+    "pkg/lyrics/lyrics.go": 1775243221246.632,
+    "pkg/lyrics/lyrics_test.go": 1774963529101.7693
   }
 }

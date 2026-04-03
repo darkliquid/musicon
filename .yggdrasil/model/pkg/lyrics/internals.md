@@ -19,6 +19,8 @@ Caching is provider-scoped and request-derived. `CachedProvider` hashes a JSON p
 
 Timed LRC documents now also centralize playback-position mapping in the reusable package instead of making each UI binary-search `TimedLines` independently. `Document.ActiveTimedLineIndex` returns the latest synced row whose start time is at or before the playback position, while still reporting "no active line yet" before the first timestamp. This keeps karaoke-style follow-along behavior consistent across any future TUI or alternate renderer that consumes the same lyrics package.
 
+The contributor-doc sweep also added file-level overview comments to the core model file and lrclib provider file so newcomers can distinguish reusable lyrics contracts from one concrete remote provider implementation.
+
 ## Decisions
 
 - Chose a dedicated reusable lyrics package over embedding lookup logic in `internal/ui` because provider chaining, parsing, and cache behavior should be reusable independently of Bubble Tea rendering.

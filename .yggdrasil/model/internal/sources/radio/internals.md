@@ -19,6 +19,8 @@ The implementation is expected to keep radio playback modeled as live, open-ende
 - native stream selection remains an implementation detail behind the resolver contract, not a UI concern
 - the live decode path keeps a bounded PCM buffer in memory and presents a non-seekable `beep.StreamSeekCloser`
 
+The contributor-doc sweep also added file-level overview comments to both the high-level source file and the native live-stream decode file so newcomers can separate "station search and resolution" from "codec- and transport-specific playback machinery."
+
 ## Constraints
 
 - Radio Browser marks stations with `hls=1` when they use HTTP Live Streaming playlists rather than a single direct audio stream.

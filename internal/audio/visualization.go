@@ -13,6 +13,10 @@ import (
 	"github.com/gopxl/beep"
 )
 
+// This file holds the analysis side-channel used by the UI's EQ and visualizer
+// panes. Playback remains the source of truth; visualization simply taps the
+// outgoing audio stream and maintains a decaying spectral summary for rendering.
+
 const (
 	analysisFFTSize        = 1024
 	analysisBandCount      = 24

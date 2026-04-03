@@ -14,7 +14,7 @@ The chain can now execute in either a quiet mode (`Resolve`) or an observed mode
 
 Provider success is now gated by image usability, not just by receiving non-empty bytes. After each provider returns, the core validates that the image can be decoded by the same Go image stack the terminal renderer uses. If the payload is SVG, the core rasterizes it to PNG with the pure-Go `oksvg` + `rasterx` stack and returns the PNG bytes to callers. If the payload is neither rasterizable SVG nor a decodable raster format, the core converts that outcome into `ErrNotFound` so the provider chain can keep searching instead of locking the UI onto artwork it cannot render.
 
-The package source now also carries package-level and exported-symbol documentation so reusable metadata, cache, and chain contracts remain understandable from Go tooling without reopening every provider implementation.
+The package source now also carries package-level and exported-symbol documentation so reusable metadata, cache, and chain contracts remain understandable from Go tooling without reopening every provider implementation. The contributor-doc sweep also added file-level overview comments to the core metadata/contracts file and cache file so newcomers can understand that this node defines the reusable cover-art model beneath the higher-level provider implementations.
 
 This node exists so other consumers can reuse the resolution primitives without inheriting every concrete provider implementation.
 

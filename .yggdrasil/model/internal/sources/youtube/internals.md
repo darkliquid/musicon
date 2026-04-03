@@ -4,7 +4,7 @@
 
 The implementation is now physically split by responsibility as well: `source.go` holds the top-level source surface, `search.go` owns YouTube Music search and URL-inspection helpers, `media.go` owns yt-dlp extraction plus ranged media IO, and `stream.go` owns WebM/Opus decode and streamer implementations.
 
-The package source now also carries richer package-level, exported-symbol, and inline documentation around the non-obvious parts of that pipeline: why search avoids yt-dlp, why playback uses yt-dlp only as an extractor, how ranged reads emulate `io.ReadSeeker`, and how the bounded PCM window maps decoded packets into beep's streaming contract.
+The package source now also carries richer package-level, exported-symbol, and inline documentation around the non-obvious parts of that pipeline: why search avoids yt-dlp, why playback uses yt-dlp only as an extractor, how ranged reads emulate `io.ReadSeeker`, and how the bounded PCM window maps decoded packets into beep's streaming contract. The contributor-doc sweep also added explicit file-level overview comments to `source.go`, `search.go`, `media.go`, and `stream.go` so newcomers can quickly identify which file owns which stage of the YouTube pipeline.
 
 Its expected shape is:
 

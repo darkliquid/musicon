@@ -19,6 +19,10 @@ import (
 	"github.com/srwiley/rasterx"
 )
 
+// This file defines the reusable cover-art domain model. Higher-level providers,
+// caches, and adapters all build on these types and contracts, so this is the
+// place to look first when understanding how artwork flows through the app.
+
 // ErrNotFound reports that a provider could not locate cover art for the supplied metadata.
 var ErrNotFound = errors.New("cover art not found")
 

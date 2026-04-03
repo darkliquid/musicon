@@ -14,6 +14,13 @@ import (
 	"github.com/darkliquid/musicon/pkg/lyrics"
 )
 
+// This file owns playback-mode interaction.
+//
+// Playback mode is overlay-heavy: one active pane provides the visual body while
+// transport state, artwork activity, and optional metadata are layered on top.
+// It also has to keep expensive work such as artwork and lyrics lookup off the
+// Bubble Tea event loop.
+
 type playbackScreen struct {
 	services  Services
 	theme     components.Theme

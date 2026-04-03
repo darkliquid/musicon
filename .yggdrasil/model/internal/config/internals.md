@@ -14,7 +14,7 @@ The expected shape is:
 - apply the shared fallback cell ratio when the config does not pin one explicitly
 - pass typed options into `internal/audio`, `internal/ui`, `internal/sources/local`, and `internal/sources/youtube`, including a resolved semantic UI palette instead of a preset theme string
 
-The package source now also carries package-level and exported-symbol documentation so the TOML surface and normalization helpers stay understandable through Go tooling as the configuration surface grows.
+The package source now also carries package-level and exported-symbol documentation so the TOML surface and normalization helpers stay understandable through Go tooling as the configuration surface grows. The contributor-doc sweep also added a file-level overview to the main config implementation so new contributors can distinguish schema definition from normalization and path-resolution policy.
 
 Path handling belongs here so the rest of the application can work with cleaned, expanded filesystem paths instead of user-facing shorthand.
 

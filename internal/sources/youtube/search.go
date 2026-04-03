@@ -16,6 +16,10 @@ import (
 	youtubev2 "github.com/kkdai/youtube/v2"
 )
 
+// This file owns the discovery side of the YouTube Music integration: HTTP
+// search requests, browse expansion, and translation into UI-facing rows. The
+// playback-specific byte/stream work lives in the sibling media and stream files.
+
 const musicBrowseEndpoint = "https://music.youtube.com/youtubei/v1/browse?prettyPrint=false"
 
 // The search-side types in this file mirror just enough of the YouTube Music

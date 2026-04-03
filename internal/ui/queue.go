@@ -14,6 +14,13 @@ import (
 	"github.com/darkliquid/musicon/pkg/components"
 )
 
+// This file owns queue-mode interaction.
+//
+// Queue mode is where source discovery and queue curation meet. It has to
+// reconcile UI concerns like focus and keyboard navigation with backend concerns
+// like debounced searches, async expansion, and keeping the active queue visible
+// beside current search results.
+
 const defaultQueueSearchDebounce = 300 * time.Millisecond
 
 type queueBrowserRowKind int
@@ -42,6 +49,7 @@ const (
 	focusBrowser
 )
 
+// queueScreen tracks queue-mode state inside the larger root model.
 type queueScreen struct {
 	services              Services
 	theme                 components.Theme

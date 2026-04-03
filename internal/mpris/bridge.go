@@ -12,6 +12,9 @@ import (
 	"github.com/godbus/dbus/v5/prop"
 )
 
+// This file contains the concrete D-Bus bridge that mirrors the playback
+// service onto the standard MPRIS object model expected by desktop clients.
+
 const (
 	busName         = "org.mpris.MediaPlayer2.musicon"
 	objectPath      = dbus.ObjectPath("/org/mpris/MediaPlayer2")

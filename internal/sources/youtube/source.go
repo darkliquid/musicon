@@ -65,6 +65,9 @@ type youtubeClient interface {
 // It deliberately stores a few function fields (`openMedia`, `streamDecode`,
 // `openYTDLP`) so tests can replace the expensive external/media pieces without
 // stubbing the entire provider.
+//
+// In other words, this type is where discovery and playback resolution meet,
+// while the lower-level helpers in sibling files handle the transport details.
 type Source struct {
 	enabled        bool
 	maxResults     int

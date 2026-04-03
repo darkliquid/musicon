@@ -12,6 +12,10 @@ import (
 	"github.com/gopxl/beep/effects"
 )
 
+// This file contains the playback engine proper. It is the stateful core that
+// coordinates queue mutation, track resolution, transport control, speaker
+// output, and snapshot generation for the rest of the app.
+
 const (
 	defaultSampleRate     = beep.SampleRate(48_000)
 	defaultBufferDuration = 100 * time.Millisecond

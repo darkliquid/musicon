@@ -9,6 +9,10 @@ import (
 	"path/filepath"
 )
 
+// This file contains cache wrappers for cover-art providers. The cache sits at
+// the reusable package layer so callers can benefit from persistence without
+// reimplementing provider-specific storage policy.
+
 // Cache stores successful cover-art results for reuse.
 type Cache interface {
 	Get(key string) (Image, error)

@@ -7,6 +7,11 @@ import (
 	"github.com/darkliquid/musicon/pkg/components"
 )
 
+// This file centralizes keyboard binding normalization.
+//
+// The rest of the UI works with typed keymaps so update loops stay focused on
+// behavior rather than parsing raw TOML strings or repeating fallback logic.
+
 // KeybindOptions declares config-friendly key lists for every supported UI action.
 type KeybindOptions struct {
 	Global   GlobalKeybindOptions

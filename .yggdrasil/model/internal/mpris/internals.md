@@ -13,7 +13,7 @@ It should:
 - export player transport methods through an explicit D-Bus method table so MPRIS method names such as `Seek` and `SetPosition` do not need to mirror Go method names that trigger `go vet` interface checks
 - fail both relative `Seek` and absolute `SetPosition` requests explicitly because Musicon no longer exposes seek control through its playback service and already advertises `CanSeek=false`
 
-The package source now also carries package-level and exported-symbol documentation so the MPRIS lifecycle and method mappings remain readable from Go tooling without replaying the D-Bus export sequence mentally.
+The package source now also carries package-level and exported-symbol documentation so the MPRIS lifecycle and method mappings remain readable from Go tooling without replaying the D-Bus export sequence mentally. The contributor-doc sweep also added a file-level overview around the concrete bridge implementation so newcomers can see that this node is pure infrastructure layered on top of the playback service.
 
 This node should own D-Bus-specific details so the audio runtime and UI remain focused on playback and presentation concerns.
 

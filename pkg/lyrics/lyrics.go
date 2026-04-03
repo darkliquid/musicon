@@ -8,6 +8,10 @@ import (
 	"time"
 )
 
+// This file defines the reusable lyrics domain model: requests, documents,
+// provider contracts, and provider-chain behavior. Concrete local/remote lookup
+// implementations layer on top of these abstractions.
+
 // ErrNotFound reports that no provider could find lyrics for the supplied request.
 var ErrNotFound = errors.New("lyrics not found")
 

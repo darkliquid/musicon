@@ -18,6 +18,10 @@ import (
 	mkvparse "github.com/remko/go-mkvparse"
 )
 
+// This file implements the low-level WebM/Opus streamers used by the YouTube
+// source. It is intentionally isolated because cue-aware seeking, background
+// buffering, and Opus decode are the trickiest parts of the entire source.
+
 // This file holds the actual streaming and decode machinery.
 //
 // The central idea is:

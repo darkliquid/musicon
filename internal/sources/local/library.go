@@ -21,6 +21,10 @@ import (
 	"github.com/gopxl/beep/wav"
 )
 
+// This file implements the local-library source's two main responsibilities:
+// indexing filesystem content into search results and resolving those same
+// entries into playable streams.
+
 const sourceID = "local-files"
 const defaultRefreshInterval = 2 * time.Second
 
@@ -33,6 +37,10 @@ var supportedExtensions = map[string]struct{}{
 }
 
 // Library provides a concrete local-file source and resolver.
+//
+// Keeping discovery and resolution together means the local source can preserve
+// filesystem-derived metadata, artwork hints, and paths all the way through to
+// playback.
 type Library struct {
 	roots []string
 

@@ -16,6 +16,12 @@ import (
 	"golang.org/x/term"
 )
 
+// This file holds the root Bubble Tea shell.
+//
+// The root model does the cross-screen work that should not live in either queue
+// or playback alone: terminal sizing, square-viewport enforcement, mode
+// switching, global help/compact toggles, and app-owned session persistence.
+
 var minimumViewportRequirements = components.SizeRequirements{
 	MinWidth:  20,
 	MinHeight: 20,
@@ -29,6 +35,7 @@ type App struct {
 
 type tickMsg time.Time
 
+// rootModel is the long-lived top-level Bubble Tea state machine for the entire UI.
 type rootModel struct {
 	services          Services
 	options           Options

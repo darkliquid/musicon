@@ -26,6 +26,11 @@ import (
 	aacdecoder "github.com/skrashevich/go-aac/pkg/decoder"
 )
 
+// This file holds the native live-stream playback paths used by the radio
+// source when plain MP3/Ogg/WAV decoding is not enough. In practice that mostly
+// means HLS and AAC variants, plus the buffering needed to make live audio fit
+// beep's streaming interfaces.
+
 const (
 	initialBufferDuration = 250 * time.Millisecond
 	initialPCMBufferBytes = 1 << 20

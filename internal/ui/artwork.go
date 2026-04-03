@@ -7,6 +7,10 @@ import (
 	"github.com/darkliquid/musicon/pkg/coverart"
 )
 
+// This file adapts the reusable cover-art package to the narrower UI artwork
+// contract. The adapter lets internal/ui stay presentation-focused while the
+// cover-art package remains reusable outside Bubble Tea.
+
 // CoverArtResolver matches reusable cover-art resolvers such as pkg/coverart.Chain.
 type CoverArtResolver interface {
 	Resolve(ctx context.Context, metadata coverart.Metadata) (coverart.Result, error)

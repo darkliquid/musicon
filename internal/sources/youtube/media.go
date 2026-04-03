@@ -18,6 +18,11 @@ import (
 	"github.com/gopxl/beep"
 )
 
+// This file turns yt-dlp extraction output into seekable media access. It sits
+// between source-level URL resolution and the lower-level WebM/Opus decode path,
+// which lets Musicon keep yt-dlp as metadata extraction only rather than a full
+// playback subprocess.
+
 // ytDLPStreamInfo captures the subset of `yt-dlp -j` output that playback
 // needs: the final media URL plus any request headers required to access it.
 type ytDLPStreamInfo struct {

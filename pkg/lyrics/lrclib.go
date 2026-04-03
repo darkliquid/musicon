@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// This file implements the remote lrclib.net provider. It prefers exact matches
+// when enough metadata is available, then falls back to broader search because
+// real-world track metadata is often incomplete.
+
 const defaultLRCLibBaseURL = "https://lrclib.net/api"
 
 // LRCLibProvider resolves lyrics from lrclib.net.

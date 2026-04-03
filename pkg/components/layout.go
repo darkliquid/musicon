@@ -2,6 +2,10 @@ package components
 
 import "math"
 
+// This file contains the square-viewport math that the rest of Musicon's UI
+// layout depends on. Keeping it isolated makes the viewport policy reusable and
+// keeps rendering code free of repeated geometry calculations.
+
 // SquareViewport describes the largest centered square that fits inside the
 // current terminal dimensions. Width and Height are terminal-cell dimensions
 // chosen to approximate a visual 1:1 square when terminal cells are not

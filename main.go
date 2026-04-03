@@ -25,6 +25,8 @@ import (
 	"github.com/darkliquid/musicon/pkg/lyrics"
 )
 
+// main owns application wiring. It turns config and environment state into a
+// concrete set of runtime services, then hands those services to the UI layer.
 func main() {
 	listBackends := flag.Bool("list-backends", false, "list usable audio backends in config-compatible form and exit")
 	listImageRenderers := flag.Bool("list-image-renderers", false, "list usable image renderers and exit")
@@ -44,6 +46,8 @@ func main() {
 		_ = os.Stderr.Close()
 	}
 
+	// Configuration is resolved before any runtime construction so every later
+	// subsystem receives typed startup options instead of reading files itself.
 	debuglog("Loading Musicon Config...")
 	loaded, err := loadConfig(*configPath)
 	if err != nil {
@@ -79,6 +83,8 @@ func main() {
 		return
 	}
 
+	// Source construction happens in the executable so the runtime and UI can stay
+	// source-agnostic and depend only on narrow service contracts.
 	debuglog("Loading Local Library")
 	library := local.NewLibrary(local.Options{Roots: loaded.Config.ResolvedLocalDirs()})
 	ytmusic := youtube.NewSource(youtube.Options{
@@ -102,6 +108,8 @@ func main() {
 		youtube: ytmusic,
 	}
 
+	// The audio engine is the long-lived runtime core that owns queue state,
+	// playback state, transport control, and visualization analysis.
 	debuglog("Initializing Musicon Engine...")
 	engine := audio.NewEngine(audio.Options{
 		Resolver: resolver,
@@ -112,6 +120,8 @@ func main() {
 	debuglog("Creating Playback Service...")
 	playback := engine.PlaybackService()
 
+	// Session restore is app-owned rather than UI-owned so persistence policy
+	// stays in the executable layer instead of leaking into presentation code.
 	sessionStatePath, err := sessionSnapshotPath()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "musicon: resolve session state path: %v\n", err)
@@ -129,6 +139,8 @@ func main() {
 		}
 	}
 
+	// Desktop integration is optional infrastructure. Failure here should not
+	// prevent the terminal player from running.
 	debuglog("Connecting MPRIS...")
 	bridge := mpris.NewBridge(playback)
 	if err := bridge.Start(); err != nil {
@@ -137,6 +149,8 @@ func main() {
 		defer bridge.Close()
 	}
 
+	// At this point the app has assembled every backend-facing dependency the UI
+	// needs. From here on, Bubble Tea owns the interactive event loop.
 	app := ui.NewApp(ui.Services{
 		Search:        search,
 		Queue:         engine.QueueService(),

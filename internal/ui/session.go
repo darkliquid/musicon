@@ -7,6 +7,9 @@ import (
 	"time"
 )
 
+// This file keeps UI session persistence isolated from ordinary screen logic so
+// restore/save concerns do not leak into queue and playback update paths.
+
 // SessionStore persists restorable app session snapshots outside the UI process.
 type SessionStore interface {
 	Save(SessionSnapshot) error

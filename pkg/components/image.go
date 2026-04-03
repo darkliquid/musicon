@@ -16,6 +16,10 @@ import (
 	chafa "github.com/ploMP4/chafa-go"
 )
 
+// This file owns terminal image rendering and capability detection. It is kept
+// reusable because multiple UI surfaces may want image support, while the higher
+// layers should not need to know about chafa protocols or terminal quirks.
+
 const defaultTerminalCellWidthRatio = 0.5
 
 type terminalImageCapabilities struct {

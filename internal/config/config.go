@@ -11,6 +11,9 @@ import (
 	"github.com/darkliquid/musicon/pkg/components"
 )
 
+// This file defines the config schema plus the normalization pipeline that turns
+// user TOML into startup-ready options for the rest of the application.
+
 const (
 	// DefaultFileName is the conventional base name for Musicon configuration files.
 	DefaultFileName     = "musicon.toml"

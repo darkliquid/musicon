@@ -15,6 +15,10 @@ import (
 	"github.com/gopxl/beep"
 )
 
+// This file adapts beep's pull-based mixer onto mago's host-audio callback
+// model. The rest of the engine can think in terms of beep streamers while this
+// adapter handles device lifetimes and float buffer conversion.
+
 const speakerChannelCount = 2
 
 type runtimeSpeaker struct {
