@@ -5,6 +5,7 @@ backend = "auto"
 
 [ui]
 start_mode = "queue"
+compact_mode = false
 cell_width_ratio = 0.5
 
 [ui.theme]
@@ -30,6 +31,7 @@ protocol = "halfblocks"
 quit = ["ctrl+c"]
 toggle_mode = ["tab"]
 toggle_help = ["?"]
+toggle_compact = ["ctrl+g"]
 
 [keybinds.queue]
 toggle_search_focus = ["ctrl+f"]

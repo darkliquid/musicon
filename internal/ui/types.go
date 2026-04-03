@@ -334,6 +334,7 @@ type Services struct {
 // Options configures the root UI shell at startup.
 type Options struct {
 	StartMode      Mode
+	CompactMode    bool
 	Theme          components.Theme
 	CellWidthRatio float64
 	AlbumArt       AlbumArtOptions

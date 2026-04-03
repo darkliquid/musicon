@@ -571,3 +571,63 @@ func TestPlaybackArtworkWithoutProviderDoesNotShowPlaceholderText(t *testing.T) 
 		t.Fatalf("expected neutral artwork background, got %q", view)
 	}
 }
+
+func TestPlaybackCompactViewShowsActivePaneWithoutChrome(t *testing.T) {
+	screen := newPlaybackScreen(Services{Lyrics: &lyricsTestProvider{doc: &lyrics.Document{PlainLyrics: "line one\nline two"}}}, AlbumArtOptions{})
+	screen.SetCompact(true)
+	screen.SetSize(48, 20)
+	screen.pane = PaneLyrics
+	screen.showInfo = true
+	screen.snapshot = PlaybackSnapshot{
+		Position: 90 * time.Second,
+		Duration: 3 * time.Minute,
+		Track:    &TrackInfo{ID: "track-1", Title: "Song", Artist: "Artist"},
+	}
+
+	_ = screen.View()
+	deadline := time.Now().Add(250 * time.Millisecond)
+	for {
+		screen.consumeLyricsLookup()
+		if !screen.lyricsLoading && screen.lyricsDoc != nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("expected compact lyrics pane to settle")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	view := screen.View()
+	if strings.Contains(view, "Playback") || strings.Contains(view, "Track info") || strings.Contains(view, "visual mode:") {
+		t.Fatalf("expected compact playback to hide chrome and alternate pane copy, got %q", view)
+	}
+	if !strings.Contains(view, "line one") {
+		t.Fatalf("expected compact playback to keep the active lyrics pane visible, got %q", view)
+	}
+	if !strings.Contains(view, "01:30 / 03:00") {
+		t.Fatalf("expected compact playback progress label, got %q", view)
+	}
+}
+
+func TestPlaybackCompactModeStillAllowsPaneCyclingButNotInfoOverlay(t *testing.T) {
+	screen := newPlaybackScreen(Services{}, AlbumArtOptions{})
+	screen.SetCompact(true)
+	screen.pane = PaneArtwork
+	screen.showInfo = false
+
+	status, cmd := screen.Update(tea.KeyPressMsg(tea.Key{Code: 'v'}))
+	if status != "Playback pane: Lyrics" || cmd != nil {
+		t.Fatalf("unexpected compact pane-cycle result: status=%q cmd=%v", status, cmd)
+	}
+	if screen.pane != PaneLyrics {
+		t.Fatalf("expected compact pane cycle to advance to lyrics, got %v", screen.pane)
+	}
+
+	status, cmd = screen.Update(tea.KeyPressMsg(tea.Key{Code: 'i'}))
+	if status != "Compact playback hides track information." || cmd != nil {
+		t.Fatalf("unexpected compact info-toggle result: status=%q cmd=%v", status, cmd)
+	}
+	if screen.showInfo {
+		t.Fatal("expected compact info toggle to leave info hidden")
+	}
+}

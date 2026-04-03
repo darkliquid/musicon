@@ -135,7 +135,8 @@ func TestNormalizedOptionsUsesConfiguredKeybinds(t *testing.T) {
 	options := normalizedOptions(Options{
 		Keybinds: KeybindOptions{
 			Global: GlobalKeybindOptions{
-				ToggleMode: []string{"ctrl+o"},
+				ToggleMode:    []string{"ctrl+o"},
+				ToggleCompact: []string{"ctrl+l"},
 			},
 		},
 	})
@@ -145,6 +146,9 @@ func TestNormalizedOptionsUsesConfiguredKeybinds(t *testing.T) {
 	}
 	if len(options.Keybinds.Global.Quit) != 1 || options.Keybinds.Global.Quit[0] != "ctrl+c" {
 		t.Fatalf("expected default quit keybind, got %#v", options.Keybinds.Global.Quit)
+	}
+	if len(options.Keybinds.Global.ToggleCompact) != 1 || options.Keybinds.Global.ToggleCompact[0] != "ctrl+l" {
+		t.Fatalf("expected configured compact-toggle keybind, got %#v", options.Keybinds.Global.ToggleCompact)
 	}
 }
 
@@ -167,6 +171,30 @@ func TestRootModelUsesConfiguredModeToggleBinding(t *testing.T) {
 	updated := next.(*rootModel)
 	if updated.mode != ModePlayback {
 		t.Fatalf("expected custom toggle-mode binding to switch to playback, got %v", updated.mode)
+	}
+}
+
+func TestRootModelUsesConfiguredCompactToggleBinding(t *testing.T) {
+	model := &rootModel{
+		width:          80,
+		height:         40,
+		cellWidthRatio: 1,
+		keymap: normalizedKeyMap(KeybindOptions{
+			Global: GlobalKeybindOptions{
+				ToggleCompact: []string{"ctrl+l"},
+			},
+		}),
+		queue:    newQueueScreen(Services{}),
+		playback: newPlaybackScreen(Services{}, AlbumArtOptions{}),
+	}
+
+	next, _ := model.Update(tea.KeyPressMsg(tea.Key{Code: 'l', Mod: tea.ModCtrl}))
+	updated := next.(*rootModel)
+	if !updated.compactMode {
+		t.Fatal("expected custom compact binding to enable compact mode")
+	}
+	if !updated.playback.compact {
+		t.Fatal("expected playback screen compact state to track root compact mode")
 	}
 }
 
@@ -274,6 +302,25 @@ func TestRootViewOverlaysHelpInsideSquare(t *testing.T) {
 	}
 }
 
+func TestRootViewSuppressesPlaybackHelpOverlayInCompactMode(t *testing.T) {
+	model := &rootModel{
+		width:          80,
+		height:         40,
+		cellWidthRatio: 1,
+		mode:           ModePlayback,
+		compactMode:    true,
+		showHelp:       true,
+		queue:          newQueueScreen(Services{}),
+		playback:       newPlaybackScreen(Services{}, AlbumArtOptions{}),
+	}
+	model.playback.SetCompact(true)
+
+	view := model.View().Content
+	if strings.Contains(view, "Playback help") {
+		t.Fatalf("expected compact playback to suppress help overlay, got %q", view)
+	}
+}
+
 func TestApplyRestoredSessionRestoresQueueAndPlaybackState(t *testing.T) {
 	queue := &appTestQueueService{
 		entries: []QueueEntry{{ID: "queued-1", Title: "Queued", Source: "local"}},
@@ -296,8 +343,9 @@ func TestApplyRestoredSessionRestoresQueueAndPlaybackState(t *testing.T) {
 	}
 
 	model.applyRestoredSession(&SessionSnapshot{
-		Mode:     ModePlayback,
-		ShowHelp: true,
+		Mode:        ModePlayback,
+		CompactMode: true,
+		ShowHelp:    true,
 		Queue: QueueSessionState{
 			SourceID:       "all",
 			SearchMode:     SearchModeTracks,
@@ -319,6 +367,9 @@ func TestApplyRestoredSessionRestoresQueueAndPlaybackState(t *testing.T) {
 
 	if model.mode != ModePlayback || !model.showHelp {
 		t.Fatalf("expected playback mode with help restored, got mode=%v help=%t", model.mode, model.showHelp)
+	}
+	if !model.compactMode || !model.playback.compact {
+		t.Fatalf("expected compact mode restored, got compact=%t playback=%t", model.compactMode, model.playback.compact)
 	}
 	if got := model.queue.searchInput.Value(); got != "boards of canada" {
 		t.Fatalf("expected restored query, got %q", got)
@@ -357,6 +408,7 @@ func TestPersistSessionSavesQueueAndPlaybackContext(t *testing.T) {
 		services:     Services{Queue: queue, Playback: playback},
 		sessionStore: store,
 		mode:         ModePlayback,
+		compactMode:  true,
 		showHelp:     true,
 		queue:        newQueueScreen(Services{Queue: queue, Playback: playback}),
 		playback:     newPlaybackScreen(Services{Playback: playback}, AlbumArtOptions{}),
@@ -377,6 +429,9 @@ func TestPersistSessionSavesQueueAndPlaybackContext(t *testing.T) {
 	snapshot := store.snapshots[0]
 	if snapshot.Mode != ModePlayback || !snapshot.ShowHelp {
 		t.Fatalf("expected mode/help persisted, got %#v", snapshot)
+	}
+	if !snapshot.CompactMode {
+		t.Fatalf("expected compact mode persisted, got %#v", snapshot)
 	}
 	if snapshot.Queue.Query != "aphex twin" || len(snapshot.Queue.SearchResults) != 1 {
 		t.Fatalf("expected queue search persisted, got %#v", snapshot.Queue)

@@ -15,6 +15,7 @@ type SessionStore interface {
 // SessionSnapshot captures the restorable UI and playback context for one Musicon session.
 type SessionSnapshot struct {
 	Mode             Mode                 `json:"mode"`
+	CompactMode      bool                 `json:"compact_mode"`
 	ShowHelp         bool                 `json:"show_help"`
 	Queue            QueueSessionState    `json:"queue"`
 	Playback         PlaybackSessionState `json:"playback"`
@@ -54,12 +55,14 @@ func (m *rootModel) applyRestoredSession(snapshot *SessionSnapshot) {
 		m.mode = ModeQueue
 	}
 	m.showHelp = snapshot.ShowHelp
+	m.compactMode = snapshot.CompactMode
 	if m.queue != nil {
 		m.queue.applySessionState(snapshot.Queue)
 	}
 	if m.playback != nil {
 		m.playback.applySessionState(snapshot.Playback, snapshot.PlaybackSnapshot)
 	}
+	m.syncCompactMode()
 	m.status = "Restored previous session."
 }
 
@@ -100,6 +103,7 @@ func (m *rootModel) rememberRestoredSession() {
 func (m *rootModel) sessionSnapshot() SessionSnapshot {
 	snapshot := SessionSnapshot{
 		Mode:             m.mode,
+		CompactMode:      m.compactMode,
 		ShowHelp:         m.showHelp,
 		Queue:            m.queue.sessionState(),
 		Playback:         m.playback.sessionState(),
@@ -289,5 +293,5 @@ func clonePlaybackSnapshot(snapshot PlaybackSnapshot) PlaybackSnapshot {
 }
 
 func (s SessionSnapshot) String() string {
-	return fmt.Sprintf("%s:%t:%s:%s", s.Mode.String(), s.ShowHelp, s.Queue.SourceID, s.Playback.Pane.String())
+	return fmt.Sprintf("%s:%t:%t:%s:%s", s.Mode.String(), s.CompactMode, s.ShowHelp, s.Queue.SourceID, s.Playback.Pane.String())
 }

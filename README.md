@@ -64,6 +64,7 @@ go run . --image-backend=kitty
 ### Playback mode
 
 - artwork-first square layout with alternate lyrics / EQ / visualizer panes
+- optional compact playback mode that reduces chrome to artwork plus the scrubber
 - asynchronous transport handling so input remains responsive during backend work
 - debounced absolute seeking that collapses repeated seek taps into one target
 - repeat, stream-continuation, volume, previous / next, and pause controls
@@ -116,7 +117,7 @@ The repository root also includes a complete example config in `musicon.toml`.
 The config surface includes:
 
 - audio backend selection
-- UI start mode, semantic theme palette, and optional external theme file
+- UI start mode, optional compact mode, semantic theme palette, and optional external theme file
 - album-art renderer / fill mode
 - local-library roots
 - Radio Browser source options such as API base URL and search result limits
@@ -132,6 +133,7 @@ backend = "auto"
 
 [ui]
 start_mode = "queue"
+compact_mode = false
 cell_width_ratio = 0.5
 
 [ui.theme]
@@ -157,6 +159,7 @@ protocol = "halfblocks"
 quit = ["ctrl+c"]
 toggle_mode = ["tab"]
 toggle_help = ["?"]
+toggle_compact = ["ctrl+g"]
 
 [keybinds.queue]
 toggle_search_focus = ["ctrl+f"]

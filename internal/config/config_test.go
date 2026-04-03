@@ -22,8 +22,14 @@ func TestDefaultProvidesExpectedTunables(t *testing.T) {
 	if cfg.UI.StartMode != "queue" {
 		t.Fatalf("expected queue start mode, got %q", cfg.UI.StartMode)
 	}
+	if cfg.UI.CompactMode {
+		t.Fatal("expected compact mode disabled by default")
+	}
 	if cfg.UI.AlbumArt.FillMode != "fill" {
 		t.Fatalf("expected fill mode, got %q", cfg.UI.AlbumArt.FillMode)
+	}
+	if len(cfg.Keybinds.Global.ToggleCompact) != 1 || cfg.Keybinds.Global.ToggleCompact[0] != "ctrl+g" {
+		t.Fatalf("expected default compact toggle keybind, got %#v", cfg.Keybinds.Global.ToggleCompact)
 	}
 	if len(cfg.Keybinds.Queue.ToggleSearchFocus) != 1 || cfg.Keybinds.Queue.ToggleSearchFocus[0] != "ctrl+f" {
 		t.Fatalf("expected default queue search focus toggle, got %#v", cfg.Keybinds.Queue.ToggleSearchFocus)
@@ -61,6 +67,7 @@ text = "#123456"
 
 [ui]
 start_mode = "playback"
+compact_mode = true
 cell_width_ratio = 0.6
 
 [ui.album_art]
@@ -69,6 +76,7 @@ protocol = "kitty"
 
 [keybinds.global]
 toggle_mode = [" ctrl+o "]
+toggle_compact = [" ctrl+l "]
 
 [keybinds.queue]
 toggle_search_focus = [" ctrl+g "]
@@ -112,6 +120,9 @@ base_url = " https://de1.api.radio-browser.info/ "
 	if cfg.UI.StartMode != "playback" {
 		t.Fatalf("expected playback start mode, got %q", cfg.UI.StartMode)
 	}
+	if !cfg.UI.CompactMode {
+		t.Fatal("expected compact mode from config")
+	}
 	if cfg.UI.CellWidthRatio != 0.6 {
 		t.Fatalf("expected cell width ratio 0.6, got %v", cfg.UI.CellWidthRatio)
 	}
@@ -120,6 +131,9 @@ base_url = " https://de1.api.radio-browser.info/ "
 	}
 	if len(cfg.Keybinds.Global.ToggleMode) != 1 || cfg.Keybinds.Global.ToggleMode[0] != "ctrl+o" {
 		t.Fatalf("expected normalized toggle-mode keybind, got %#v", cfg.Keybinds.Global.ToggleMode)
+	}
+	if len(cfg.Keybinds.Global.ToggleCompact) != 1 || cfg.Keybinds.Global.ToggleCompact[0] != "ctrl+l" {
+		t.Fatalf("expected normalized compact-toggle keybind, got %#v", cfg.Keybinds.Global.ToggleCompact)
 	}
 	if len(cfg.Keybinds.Queue.ToggleSearchFocus) != 1 || cfg.Keybinds.Queue.ToggleSearchFocus[0] != "ctrl+g" {
 		t.Fatalf("expected normalized queue search focus keybind, got %#v", cfg.Keybinds.Queue.ToggleSearchFocus)

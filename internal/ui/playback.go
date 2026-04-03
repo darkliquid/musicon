@@ -20,6 +20,7 @@ type playbackScreen struct {
 	width     int
 	height    int
 	keymap    PlaybackKeyMap
+	compact   bool
 	pane      PlaybackPane
 	showInfo  bool
 	pending   bool
@@ -113,6 +114,11 @@ func (p *playbackScreen) SetSize(width, height int) {
 	p.height = max(1, height)
 }
 
+// SetCompact updates whether playback should elide most chrome and show only artwork plus progress.
+func (p *playbackScreen) SetCompact(compact bool) {
+	p.compact = compact
+}
+
 // Update handles playback-screen input, ticks, and async playback results.
 func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 	switch typed := msg.(type) {
@@ -167,6 +173,9 @@ func (p *playbackScreen) Update(msg tea.Msg) (string, tea.Cmd) {
 		p.pane = (p.pane + 1) % 4
 		return fmt.Sprintf("Playback pane: %s", p.pane.String()), nil
 	case key.Matches(keypress, p.keymap.ToggleInfo):
+		if p.compact {
+			return "Compact playback hides track information.", nil
+		}
 		p.showInfo = !p.showInfo
 		if p.showInfo {
 			return "Track information shown.", nil
@@ -263,6 +272,9 @@ func (p *playbackScreen) View() string {
 	if p.width <= 0 || p.height <= 0 {
 		return ""
 	}
+	if p.compact {
+		return p.compactView()
+	}
 
 	body := lipgloss.NewStyle().Width(p.width).Height(p.height).Render(p.centerView(p.width, p.height))
 	if overlay := p.artworkActivityOverlay(p.width, p.height); overlay != "" {
@@ -279,6 +291,9 @@ func (p *playbackScreen) View() string {
 
 // HelpView renders the playback-screen help overlay.
 func (p *playbackScreen) HelpView() string {
+	if p.compact {
+		return ""
+	}
 	width := min(p.width, 68)
 	height := min(p.height, 15)
 	return components.RenderPanel(components.PanelOptions{
@@ -372,6 +387,37 @@ func (p *playbackScreen) controlsView(width int) string {
 	)
 }
 
+func (p *playbackScreen) compactView() string {
+	body := lipgloss.NewStyle().Width(p.width).Height(p.height).Render(p.centerView(p.width, p.height))
+	if overlay := p.artworkActivityOverlay(p.width, p.height); overlay != "" {
+		body = centeredOverlay(body, overlay, p.width, p.height)
+	}
+	return bottomOverlay(body, p.compactProgressOverlay(), p.width, p.height)
+}
+
+func (p *playbackScreen) compactProgressOverlay() string {
+	width := max(1, p.width-2)
+	return lipgloss.NewStyle().
+		Width(width).
+		Padding(0, 1).
+		Render(p.compactProgressView(width - 2))
+}
+
+func (p *playbackScreen) compactProgressView(width int) string {
+	if width <= 0 {
+		return ""
+	}
+	duration := p.snapshot.Duration
+	if duration < 0 {
+		duration = 0
+	}
+	ratio := 0.0
+	if duration > 0 {
+		ratio = float64(p.snapshot.Position) / float64(duration)
+	}
+	return components.RenderProgress(width, ratio, fmt.Sprintf("%s / %s", formatDuration(p.snapshot.Position), formatDuration(duration)), p.theme)
+}
+
 func (p *playbackScreen) infoView(width, height int) string {
 	track := p.snapshot.Track
 	if track == nil {
@@ -422,31 +468,39 @@ func (p *playbackScreen) centerView(width, height int) string {
 		}
 		return neutralPlaybackPane(width, height, p.theme)
 	default:
-		p.artwork.SetSize(width, height)
-		p.refreshArtwork(trackInfo)
-		if artwork := strings.TrimSpace(p.artwork.View()); artwork != "" {
-			return lipgloss.Place(
-				width,
-				height,
-				lipgloss.Center,
-				lipgloss.Center,
-				artwork,
-				lipgloss.WithWhitespaceChars("·"),
-				lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(p.theme.Normalize().SurfaceVariant))),
-			)
-		}
-		if renderErr := p.artwork.Error(); renderErr != nil {
-			p.artStatus = fmt.Sprintf("Artwork render failed: %v", renderErr)
-		} else if p.artworkErr != nil {
-			p.artStatus = p.artworkErr.Error()
-		} else if p.artworkSource != nil && strings.TrimSpace(p.artworkSource.Description) != "" {
-			p.artStatus = p.artworkSource.Description
-		}
-		if strings.TrimSpace(p.artStatus) != "" {
-			return components.RenderEmptyState(width, height, "Album art", p.artStatus, p.theme)
-		}
-		return neutralPlaybackPane(width, height, p.theme)
+		return p.artworkPaneView(width, height)
 	}
+}
+
+func (p *playbackScreen) artworkPaneView(width, height int) string {
+	var trackInfo *TrackInfo
+	if p.snapshot.Track != nil {
+		trackInfo = p.snapshot.Track
+	}
+	p.artwork.SetSize(width, height)
+	p.refreshArtwork(trackInfo)
+	if artwork := strings.TrimSpace(p.artwork.View()); artwork != "" {
+		return lipgloss.Place(
+			width,
+			height,
+			lipgloss.Center,
+			lipgloss.Center,
+			artwork,
+			lipgloss.WithWhitespaceChars("·"),
+			lipgloss.WithWhitespaceStyle(lipgloss.NewStyle().Foreground(lipgloss.Color(p.theme.Normalize().SurfaceVariant))),
+		)
+	}
+	if renderErr := p.artwork.Error(); renderErr != nil {
+		p.artStatus = fmt.Sprintf("Artwork render failed: %v", renderErr)
+	} else if p.artworkErr != nil {
+		p.artStatus = p.artworkErr.Error()
+	} else if p.artworkSource != nil && strings.TrimSpace(p.artworkSource.Description) != "" {
+		p.artStatus = p.artworkSource.Description
+	}
+	if strings.TrimSpace(p.artStatus) != "" {
+		return components.RenderEmptyState(width, height, "Album art", p.artStatus, p.theme)
+	}
+	return neutralPlaybackPane(width, height, p.theme)
 }
 
 func neutralPlaybackPane(width, height int, theme components.Theme) string {

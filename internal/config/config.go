@@ -41,9 +41,10 @@ type KeybindsConfig struct {
 
 // GlobalKeybindsConfig declares bindings that are active in every UI mode.
 type GlobalKeybindsConfig struct {
-	Quit       []string `toml:"quit"`
-	ToggleMode []string `toml:"toggle_mode"`
-	ToggleHelp []string `toml:"toggle_help"`
+	Quit          []string `toml:"quit"`
+	ToggleMode    []string `toml:"toggle_mode"`
+	ToggleHelp    []string `toml:"toggle_help"`
+	ToggleCompact []string `toml:"toggle_compact"`
 }
 
 // QueueKeybindsConfig declares shortcuts specific to queue mode.
@@ -94,6 +95,7 @@ type AudioConfig struct {
 type UIConfig struct {
 	Theme          ThemeConfig    `toml:"theme"`
 	StartMode      string         `toml:"start_mode"`
+	CompactMode    bool           `toml:"compact_mode"`
 	CellWidthRatio float64        `toml:"cell_width_ratio"`
 	AlbumArt       AlbumArtConfig `toml:"album_art"`
 }
@@ -480,9 +482,10 @@ func (c *Config) normalize() error {
 func defaultKeybinds() KeybindsConfig {
 	return KeybindsConfig{
 		Global: GlobalKeybindsConfig{
-			Quit:       []string{"ctrl+c"},
-			ToggleMode: []string{"tab"},
-			ToggleHelp: []string{"?"},
+			Quit:          []string{"ctrl+c"},
+			ToggleMode:    []string{"tab"},
+			ToggleHelp:    []string{"?"},
+			ToggleCompact: []string{"ctrl+g"},
 		},
 		Queue: QueueKeybindsConfig{
 			ToggleSearchFocus: []string{"ctrl+f"},
@@ -527,6 +530,7 @@ func (k *KeybindsConfig) normalize() {
 	k.Global.Quit = normalizeKeyList(k.Global.Quit, defaults.Global.Quit)
 	k.Global.ToggleMode = normalizeKeyList(k.Global.ToggleMode, defaults.Global.ToggleMode)
 	k.Global.ToggleHelp = normalizeKeyList(k.Global.ToggleHelp, defaults.Global.ToggleHelp)
+	k.Global.ToggleCompact = normalizeKeyList(k.Global.ToggleCompact, defaults.Global.ToggleCompact)
 
 	k.Queue.ToggleSearchFocus = normalizeKeyList(k.Queue.ToggleSearchFocus, defaults.Queue.ToggleSearchFocus)
 	k.Queue.SourcePrev = normalizeKeyList(k.Queue.SourcePrev, defaults.Queue.SourcePrev)

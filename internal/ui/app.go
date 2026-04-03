@@ -38,6 +38,7 @@ type rootModel struct {
 	height            int
 	cellWidthRatio    float64
 	mode              Mode
+	compactMode       bool
 	showHelp          bool
 	status            string
 	keymap            KeyMap
@@ -58,12 +59,14 @@ func NewApp(services Services, options Options) *App {
 		theme:          options.Theme,
 		cellWidthRatio: options.CellWidthRatio,
 		mode:           options.StartMode,
+		compactMode:    options.CompactMode,
 		keymap:         normalizedKeyMap(options.Keybinds),
 	}
 	model.status = readyStatus(model.keymap.Global)
 	model.queue = newQueueScreenWithThemeAndKeyMap(services, model.theme, model.keymap.Queue)
 	model.playback = newPlaybackScreenWithThemeAndKeyMap(services, model.theme, options.AlbumArt, model.keymap.Playback)
 	model.applyRestoredSession(options.Restore)
+	model.syncCompactMode()
 	model.rememberRestoredSession()
 	width, height := initialTerminalSize()
 
@@ -168,10 +171,15 @@ HandleMsg:
 		case key.Matches(typed, m.keymap.Global.ToggleMode):
 			m.toggleMode()
 			skipScreenUpdate = true
+		case key.Matches(typed, m.keymap.Global.ToggleCompact):
+			m.toggleCompact()
+			skipScreenUpdate = true
 		case key.Matches(typed, m.keymap.Global.ToggleHelp):
 			m.showHelp = !m.showHelp
-			if m.showHelp {
+			if m.showHelp && m.helpVisible() {
 				m.status = fmt.Sprintf("%s help shown.", m.mode.String())
+			} else if m.showHelp {
+				m.status = "Compact playback hides the help overlay."
 			} else {
 				m.status = fmt.Sprintf("%s help hidden.", m.mode.String())
 			}
@@ -234,7 +242,7 @@ func (m *rootModel) View() tea.View {
 	m.playback.SetSize(bodyWidth, bodyHeight)
 
 	body := lipgloss.NewStyle().Width(bodyWidth).Height(bodyHeight).Render(m.activeBody())
-	if m.showHelp {
+	if m.helpVisible() {
 		body = centeredOverlay(body, m.activeHelpOverlay(), bodyWidth, bodyHeight)
 	}
 
@@ -267,6 +275,10 @@ func (m *rootModel) activeHelpOverlay() string {
 	return m.playback.HelpView()
 }
 
+func (m *rootModel) helpVisible() bool {
+	return m.showHelp && !(m.compactMode && m.mode == ModePlayback)
+}
+
 func (m *rootModel) toggleMode() {
 	if m.mode == ModeQueue {
 		m.mode = ModePlayback
@@ -274,6 +286,22 @@ func (m *rootModel) toggleMode() {
 		m.mode = ModeQueue
 	}
 	m.status = fmt.Sprintf("Switched to %s mode.", m.mode.String())
+}
+
+func (m *rootModel) toggleCompact() {
+	m.compactMode = !m.compactMode
+	m.syncCompactMode()
+	if m.compactMode {
+		m.status = "Compact mode enabled."
+		return
+	}
+	m.status = "Compact mode disabled."
+}
+
+func (m *rootModel) syncCompactMode() {
+	if m.playback != nil {
+		m.playback.SetCompact(m.compactMode)
+	}
 }
 
 func (m *rootModel) layoutCheck() components.SizeCheck {
@@ -352,7 +380,7 @@ func tickCmd() tea.Cmd {
 
 func (m *rootModel) terminalTitle() string {
 	segments := []string{"Musicon", m.mode.String()}
-	if m.showHelp {
+	if m.helpVisible() {
 		segments = append(segments, "Help")
 	}
 
@@ -415,8 +443,9 @@ func normalizedOptions(options Options) Options {
 }
 
 func readyStatus(keymap GlobalKeyMap) string {
-	return fmt.Sprintf("Ready. %s switches modes, %s toggles help, %s exits.",
+	return fmt.Sprintf("Ready. %s switches modes, %s toggles compact mode, %s toggles help, %s exits.",
 		bindingLabel(keymap.ToggleMode),
+		bindingLabel(keymap.ToggleCompact),
 		bindingLabel(keymap.ToggleHelp),
 		bindingLabel(keymap.Quit),
 	)
@@ -433,6 +462,9 @@ func mergeKeybindOptions(defaults, provided KeybindOptions) KeybindOptions {
 	}
 	if len(provided.Global.ToggleHelp) > 0 {
 		merged.Global.ToggleHelp = append([]string(nil), provided.Global.ToggleHelp...)
+	}
+	if len(provided.Global.ToggleCompact) > 0 {
+		merged.Global.ToggleCompact = append([]string(nil), provided.Global.ToggleCompact...)
 	}
 
 	if len(provided.Queue.ToggleSearchFocus) > 0 {

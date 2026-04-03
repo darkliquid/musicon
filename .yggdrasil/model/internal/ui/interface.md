@@ -11,20 +11,21 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - `QueueService` for queue snapshots and mutation
 - `PlaybackService` for transport, volume, and playback snapshots
 - `LyricsProvider`, `ArtworkProvider`, and `VisualizationProvider` for alternate playback panes, with lyrics providers receiving reusable metadata requests and returning reusable lyrics documents, artwork providers receiving reusable cover-art metadata, optionally reporting provider-attempt progress, and visualization providers returning live pane-sized EQ/visualizer content that is safe to request during ordinary redraws
-- `Options` for startup mode, a resolved semantic theme palette, cell-width ratio, playback artwork rendering preferences, an optional restored session snapshot, and an app-owned session store used for persistence
+- `Options` for startup mode, startup compact-mode preference, a resolved semantic theme palette, cell-width ratio, playback artwork rendering preferences, an optional restored session snapshot, and an app-owned session store used for persistence
 
 # Contracts
 
 - Contracts stay narrow and UI-oriented rather than mirroring backend internals.
 - Queue and playback screens must run against nil or partially configured services by showing explicit placeholders and empty states.
 - Search results and queue entries should be able to carry reusable artwork metadata forward so playback snapshots can reuse source-derived local paths, embedded-art hints, and external IDs.
-- The root model owns mode switching, help toggling, and visually square viewport resizing.
+- The root model owns mode switching, compact-mode toggling, help toggling, and visually square viewport resizing.
 - `NewApp` seeds the Bubble Tea program with a best-effort initial terminal size so the first frame can render even when the terminal does not deliver an immediate startup resize event.
 - `NewApp` should accept typed startup options from the application layer, including the initial mode and terminal cell width ratio, while still allowing an env override and a shared fixed fallback for legacy/default operation.
 - `NewApp` should accept a fully resolved semantic theme palette from application wiring and apply it consistently across root chrome, warnings, queue chips, playback overlays, and reusable component render helpers without making `internal/ui` parse config files.
 - The root model drives periodic tick-based redraws so playback status and progress can refresh without waiting for user input.
 - The root model should capture restorable UI state through an app-owned session-store contract instead of writing files itself, so app wiring can choose where the session snapshot lives.
 - The root model also publishes terminal window titles derived from mode, help state, and current playback snapshot through Bubble Tea's `View.WindowTitle` field.
+- The root model should persist compact-mode state in the app-owned session snapshot so runtime toggles survive a restart alongside mode, help, queue, and playback-pane state.
 - The root model also enforces the minimum supported terminal size and suppresses normal mode interaction until the viewport is large enough.
 - The root model must render only the centered square itself during normal operation; persistent outer chrome such as tab bars, footer bars, or mode banners should not live outside the square.
 - Help stays in the active mode instead of replacing it with a separate screen: the root model overlays the current mode's help card inside the square viewport.
@@ -42,9 +43,11 @@ The `Services` struct carries the backend-facing contracts the UI compiles again
 - Queue mode should pass source labels such as `radio:` or `youtube:` to the shared list as anchored leading prefixes instead of baking them into the scrolling title text, so focused marquee rendering can expose long names without moving the source identity marker.
 - Queue mode should render directly into the square without wrapping itself in a second persistent chrome layer.
 - Playback mode owns pane switching, transport key routing, repeat/stream toggles, and track-info visibility while delegating real playback state changes to injected services.
+- Playback mode should honor a root-owned compact flag that strips playback-specific chrome; in compact mode the rendered playback view keeps the active artwork/lyrics/eq/visualizer pane visible while eliding pane labels, help overlays, and track-info cards, leaving only the pane content plus a minimal scrubber/progress strip.
 - Playback mode should be able to restore its last pane, track-info overlay visibility, lyrics scroll position, and caller-supplied playback snapshot so reopening the app feels seamless even though audio does not auto-start.
 - Playback mode should accept album-art rendering preferences from UI startup options so fill mode and protocol selection no longer depend on each screen reading env directly.
 - Playback mode should treat the active artwork/lyrics/eq/visualizer pane as the base layer and place pane labels, transport controls, and optional track metadata as overlays within that same square instead of stacking separate panels below it.
+- Compact playback should intentionally ignore track-info overlay visibility while enabled, but it must still allow pane switching so lyrics, EQ, and visualizer content remain accessible inside the minimal playback surface.
 - When rendered artwork does not occupy the full playback pane, the remaining pane area should use a muted filler pattern so the image bounds remain legible without overwhelming the artwork itself.
 - Playback artwork rendering should route provider-supplied image data through reusable `pkg/components` image rendering instead of embedding terminal-image protocol logic inside the screen model.
 - Playback artwork requests should pass normalized cover-art metadata into the provider path instead of relying on a narrow track-ID-only contract.

@@ -16,9 +16,10 @@ type KeybindOptions struct {
 
 // GlobalKeybindOptions holds key lists that stay active in every mode.
 type GlobalKeybindOptions struct {
-	Quit       []string
-	ToggleMode []string
-	ToggleHelp []string
+	Quit          []string
+	ToggleMode    []string
+	ToggleHelp    []string
+	ToggleCompact []string
 }
 
 // QueueKeybindOptions holds key lists specific to queue mode.
@@ -69,9 +70,10 @@ type KeyMap struct {
 
 // GlobalKeyMap stores normalized global bindings.
 type GlobalKeyMap struct {
-	Quit       key.Binding
-	ToggleMode key.Binding
-	ToggleHelp key.Binding
+	Quit          key.Binding
+	ToggleMode    key.Binding
+	ToggleHelp    key.Binding
+	ToggleCompact key.Binding
 }
 
 // QueueKeyMap stores normalized queue-mode bindings.
@@ -111,9 +113,10 @@ type PlaybackKeyMap struct {
 func defaultKeybindOptions() KeybindOptions {
 	return KeybindOptions{
 		Global: GlobalKeybindOptions{
-			Quit:       []string{"ctrl+c"},
-			ToggleMode: []string{"tab"},
-			ToggleHelp: []string{"?"},
+			Quit:          []string{"ctrl+c"},
+			ToggleMode:    []string{"tab"},
+			ToggleHelp:    []string{"?"},
+			ToggleCompact: []string{"ctrl+g"},
 		},
 		Queue: QueueKeybindOptions{
 			ToggleSearchFocus: []string{"ctrl+f"},
@@ -157,9 +160,10 @@ func normalizedKeyMap(options KeybindOptions) KeyMap {
 	defaults := defaultKeybindOptions()
 
 	global := GlobalKeyMap{
-		Quit:       newBinding(options.Global.Quit, defaults.Global.Quit, "quit"),
-		ToggleMode: newBinding(options.Global.ToggleMode, defaults.Global.ToggleMode, "switch mode"),
-		ToggleHelp: newBinding(options.Global.ToggleHelp, defaults.Global.ToggleHelp, "toggle help"),
+		Quit:          newBinding(options.Global.Quit, defaults.Global.Quit, "quit"),
+		ToggleMode:    newBinding(options.Global.ToggleMode, defaults.Global.ToggleMode, "switch mode"),
+		ToggleHelp:    newBinding(options.Global.ToggleHelp, defaults.Global.ToggleHelp, "toggle help"),
+		ToggleCompact: newBinding(options.Global.ToggleCompact, defaults.Global.ToggleCompact, "toggle compact mode"),
 	}
 
 	queue := QueueKeyMap{

@@ -146,6 +146,7 @@ func main() {
 		Visualization: engine.VisualizationService(),
 	}, ui.Options{
 		StartMode:      modeFromConfig(loaded.Config.UI.StartMode),
+		CompactMode:    loaded.Config.UI.CompactMode,
 		Theme:          loaded.Config.UI.Theme.Palette(),
 		CellWidthRatio: loaded.Config.UI.CellWidthRatio,
 		AlbumArt: ui.AlbumArtOptions{
@@ -154,9 +155,10 @@ func main() {
 		},
 		Keybinds: ui.KeybindOptions{
 			Global: ui.GlobalKeybindOptions{
-				Quit:       loaded.Config.Keybinds.Global.Quit,
-				ToggleMode: loaded.Config.Keybinds.Global.ToggleMode,
-				ToggleHelp: loaded.Config.Keybinds.Global.ToggleHelp,
+				Quit:          loaded.Config.Keybinds.Global.Quit,
+				ToggleMode:    loaded.Config.Keybinds.Global.ToggleMode,
+				ToggleHelp:    loaded.Config.Keybinds.Global.ToggleHelp,
+				ToggleCompact: loaded.Config.Keybinds.Global.ToggleCompact,
 			},
 			Queue: ui.QueueKeybindOptions{
 				ToggleSearchFocus: loaded.Config.Keybinds.Queue.ToggleSearchFocus,
